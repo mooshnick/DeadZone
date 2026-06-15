@@ -1,42 +1,70 @@
 package com.deadZone.shooterserver;
 
+import com.deadZone.shooterserver.model.GameMessage;
+import com.deadZone.shooterserver.model.Player;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
 
-    // רשימה שתשמור את כל השחקנים שמחוברים כרגע
-    private static final Set<WebSocketSession> sessions = Collections.synchronizedSet(new HashSet<>());
+    private static final Map<String, Player> players = new ConcurrentHashMap<>();
+    private static final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        sessions.add(session);
-        System.out.println("🟢 New player connected: " + session.getId());
+        sessions.put(session.getId(), session);
+        System.out.println("🟢 New connection: " + session.getId());
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
-        System.out.println("Received action: " + payload);
+        GameMessage gameMessage = objectMapper.readValue(payload, GameMessage.class);
 
-        // כאן השרת מעביר את ההודעה (למשל ירייה) לכל שאר השחקנים
-        for (WebSocketSession webSocketSession : sessions) {
-            if (webSocketSession.isOpen() && !session.getId().equals(webSocketSession.getId())) {
-                webSocketSession.sendMessage(new TextMessage(payload));
+        if ("JOIN".equals(gameMessage.getType())) {
+            Player newPlayer = new Player(gameMessage.getPlayerId(), gameMessage.getX(), gameMessage.getY());
+            players.put(session.getId(), newPlayer);
+            System.out.println("Player Joined: " + gameMessage.getPlayerId());
+
+        } else if ("MOVE".equals(gameMessage.getType())) {
+            Player player = players.get(session.getId());
+            if (player != null) {
+                player.setX(gameMessage.getX());
+                player.setY(gameMessage.getY());
             }
         }
+
+        broadcastGameState();
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) throws Exception {
-        sessions.remove(session);
-        System.out.println("🔴 Player disconnected: " + session.getId());
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        sessions.remove(session.getId());
+        Player disconnectedPlayer = players.remove(session.getId());
+
+        if (disconnectedPlayer != null) {
+            System.out.println("🔴 Player disconnected: " + disconnectedPlayer.getId());
+            broadcastGameState();
+        }
+    }
+
+    private void broadcastGameState() throws Exception {
+        String jsonState = objectMapper.writeValueAsString(players.values());
+        TextMessage message = new TextMessage(jsonState);
+
+        for (WebSocketSession session : sessions.values()) {
+            if (session.isOpen()) {
+                session.sendMessage(message);
+            }
+        }
     }
 }
