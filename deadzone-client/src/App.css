@@ -333,6 +333,10 @@ input {
   outline: none;
 }
 
+input::placeholder {
+  color: #73859c;
+}
+
 input[type='checkbox'] {
   width: 18px;
   height: 18px;
@@ -345,17 +349,82 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(87, 199, 255, 0.16);
 }
 
+.profile-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(87, 199, 255, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(15, 26, 40, 0.96), rgba(8, 15, 25, 0.96)),
+    radial-gradient(circle at 100% 0%, rgba(245, 165, 36, 0.16), transparent 36%);
+}
+
+.profile-panel-header {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-panel-header span {
+  color: #8fcfff;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.profile-panel-header strong {
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
 .account-box {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.account-box label {
+  color: #c7d7ea;
+}
+
+.account-actions,
+.account-status {
+  grid-column: 1 / -1;
+}
+
+.account-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.account-box small {
-  grid-column: 1 / -1;
-  color: #aebed2;
+.login-button,
+.create-account-button {
+  color: #141006;
+  background: #f5a524;
+}
+
+.create-account-button {
+  color: #06141f;
+  background: #57c7ff;
+}
+
+.account-status {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #dbe8f8;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 850;
+  line-height: 1.35;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.account-status.connected {
+  border-color: rgba(76, 255, 145, 0.3);
+  color: #baffd1;
+  background: rgba(76, 255, 145, 0.09);
 }
 
 .ghost-button {
@@ -484,9 +553,25 @@ button {
   position: relative;
 }
 
+.map-option::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 10, 16, 0.2), rgba(5, 10, 16, 0.68));
+}
+
+.map-option strong,
+.map-option span {
+  position: relative;
+  z-index: 1;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.68);
+}
+
 .map-option::after {
   content: '';
   position: absolute;
+  z-index: 1;
   inset: auto 8px 8px;
   height: 4px;
   border-radius: 999px;
@@ -544,6 +629,11 @@ button {
   border-radius: 8px;
   background: rgba(7, 14, 24, 0.82);
   box-sizing: border-box;
+}
+
+.match-panel {
+  grid-template-columns: minmax(430px, 1fr) minmax(210px, auto) minmax(260px, 0.8fr);
+  align-items: stretch;
 }
 
 .eyebrow {
@@ -691,12 +781,6 @@ button {
   width: 54px;
 }
 
-.loadout-status {
-  display: grid;
-  gap: 3px;
-  justify-items: center;
-}
-
 .exit-match {
   position: relative;
   z-index: 24;
@@ -705,18 +789,101 @@ button {
   background: #d83545;
 }
 
-.loadout-status strong {
-  color: #f7fbff;
-  font-size: 14px;
-  line-height: 1.1;
-}
-
-.loadout-status span,
 .feed,
 .score-table {
   color: #b8c6d9;
   font-size: 12px;
   font-weight: 800;
+}
+
+.combat-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.readout-card {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: 58px;
+  padding: 9px 11px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(24, 35, 51, 0.9), rgba(12, 20, 31, 0.9));
+}
+
+.readout-card span,
+.readout-card small {
+  color: #93a5bc;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.readout-card strong {
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.ammo-card strong {
+  color: #ffe3a3;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+
+.ammo-card i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--reload);
+  height: 4px;
+  background: #f5a524;
+  box-shadow: 0 0 16px rgba(245, 165, 36, 0.58);
+}
+
+.ammo-card.reloading {
+  border-color: rgba(245, 165, 36, 0.44);
+}
+
+.grenade-card strong {
+  display: flex;
+  gap: 2px;
+  align-items: baseline;
+  color: #7dffad;
+  font-size: 27px;
+}
+
+.grenade-card strong small {
+  color: #8da1bc;
+  font-size: 12px;
+}
+
+.grenade-pips {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.grenade-pips b {
+  width: 16px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.grenade-pips .filled {
+  background: #4cff91;
+  box-shadow: 0 0 12px rgba(76, 255, 145, 0.46);
+}
+
+.wallet-card strong {
+  color: #f5d76c;
+  font-size: 15px;
 }
 
 .score-table {
@@ -783,6 +950,15 @@ button {
   .match-panel {
     grid-template-columns: 1fr;
     justify-items: stretch;
+  }
+
+  .combat-readout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-box,
+  .account-actions {
+    grid-template-columns: 1fr;
   }
 
   .connection,

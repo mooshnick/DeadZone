@@ -61,11 +61,20 @@ public class UserController {
     public ResponseEntity<?> updateProgress(@PathVariable Long id, @RequestBody ProgressRequest request) {
         return userRepository.findById(id)
                 .<ResponseEntity<?>>map(user -> {
-                    if (request.wallet() != null) {
+                    if (request.wallet() != null && !user.isAdmin()) {
                         user.setWallet(Math.max(0, request.wallet()));
                     }
-                    if (request.xp() != null) {
+                    if (request.xp() != null && !user.isAdmin()) {
                         user.setXp(Math.max(0, request.xp()));
+                    }
+                    if (request.totalKills() != null) {
+                        user.setTotalKills(Math.max(user.getTotalKills(), request.totalKills()));
+                    }
+                    if (request.totalAssists() != null) {
+                        user.setTotalAssists(Math.max(user.getTotalAssists(), request.totalAssists()));
+                    }
+                    if (request.totalDeaths() != null) {
+                        user.setTotalDeaths(Math.max(user.getTotalDeaths(), request.totalDeaths()));
                     }
                     if (request.outfitId() != null && !request.outfitId().isBlank()) {
                         user.setOutfitId(request.outfitId());
@@ -84,14 +93,18 @@ public class UserController {
                                 .map(entry -> entry.getKey() + ":" + entry.getValue())
                                 .collect(Collectors.joining(",")));
                     }
+                    if (user.isAdmin()) {
+                        user.setWallet(Math.max(user.getWallet(), 1_000_000_000));
+                        user.setXp(Math.max(user.getXp(), 10_000_000));
+                    }
                     return ResponseEntity.ok(UserResponse.from(userRepository.save(user)));
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    public record ProgressRequest(Integer wallet, Integer xp, String outfitId, String weaponSkinId, List<String> ownedOutfits, List<String> ownedWeaponSkins, Map<String, Integer> weaponUpgrades) {}
+    public record ProgressRequest(Integer wallet, Integer xp, Integer totalKills, Integer totalAssists, Integer totalDeaths, String outfitId, String weaponSkinId, List<String> ownedOutfits, List<String> ownedWeaponSkins, Map<String, Integer> weaponUpgrades) {}
 
-    public record UserResponse(Long id, String username, int totalKills, int wallet, int xp, String outfitId, String weaponSkinId, List<String> ownedOutfits, List<String> ownedWeaponSkins, Map<String, Integer> weaponUpgrades) {
+    public record UserResponse(Long id, String username, boolean admin, int totalKills, int totalAssists, int totalDeaths, int wallet, int xp, String outfitId, String weaponSkinId, List<String> ownedOutfits, List<String> ownedWeaponSkins, Map<String, Integer> weaponUpgrades) {
         public static UserResponse from(User user) {
             String owned = user.getOwnedOutfits() == null || user.getOwnedOutfits().isBlank()
                     ? "classic"
@@ -108,7 +121,10 @@ public class UserController {
             return new UserResponse(
                     user.getId(),
                     user.getUsername(),
+                    user.isAdmin(),
                     user.getTotalKills(),
+                    user.getTotalAssists(),
+                    user.getTotalDeaths(),
                     user.getWallet(),
                     user.getXp(),
                     user.getOutfitId() == null ? "classic" : user.getOutfitId(),

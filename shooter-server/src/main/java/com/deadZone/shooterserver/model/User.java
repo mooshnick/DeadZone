@@ -22,6 +22,8 @@ public class User {
     private String password;
 
     private int totalKills;
+    private int totalAssists;
+    private int totalDeaths;
     private int wallet;
     private int xp;
     private String outfitId;
@@ -29,6 +31,7 @@ public class User {
     private String ownedOutfits;
     private String ownedWeaponSkins;
     private String weaponUpgrades;
+    private boolean admin;
 
     public User() {}
 
@@ -36,6 +39,8 @@ public class User {
         this.username = username;
         this.password = password;
         this.totalKills = 0;
+        this.totalAssists = 0;
+        this.totalDeaths = 0;
         this.wallet = 0;
         this.xp = 0;
         this.outfitId = "classic";
@@ -43,6 +48,7 @@ public class User {
         this.ownedOutfits = "classic";
         this.ownedWeaponSkins = "standard";
         this.weaponUpgrades = "";
+        this.admin = false;
     }
 
     public Long getId() { return id; }
@@ -56,6 +62,12 @@ public class User {
 
     public int getTotalKills() { return totalKills; }
     public void setTotalKills(int totalKills) { this.totalKills = totalKills; }
+
+    public int getTotalAssists() { return totalAssists; }
+    public void setTotalAssists(int totalAssists) { this.totalAssists = totalAssists; }
+
+    public int getTotalDeaths() { return totalDeaths; }
+    public void setTotalDeaths(int totalDeaths) { this.totalDeaths = totalDeaths; }
 
     public int getWallet() { return wallet; }
     public void setWallet(int wallet) { this.wallet = wallet; }
@@ -77,4 +89,7 @@ public class User {
 
     public String getWeaponUpgrades() { return weaponUpgrades; }
     public void setWeaponUpgrades(String weaponUpgrades) { this.weaponUpgrades = weaponUpgrades; }
+
+    public boolean isAdmin() { return admin; }
+    public void setAdmin(boolean admin) { this.admin = admin; }
 }
