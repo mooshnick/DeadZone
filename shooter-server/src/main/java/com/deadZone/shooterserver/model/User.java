@@ -10,6 +10,13 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "users")
 public class User {
+    public static final String DEFAULT_OUTFIT_ID = "classic";
+    public static final String DEFAULT_WEAPON_SKIN_ID = "standard";
+    public static final String ALL_OUTFITS = "classic,shadow,neon,forest,gold,lava,knight,striker";
+    public static final String ALL_WEAPON_SKINS = "standard,ember,arctic,toxic,royal,goldline";
+    public static final String MAX_WEAPON_UPGRADES = "rifle:10,shotgun:10,smg:10,sniper:10,blaster:10,rpg:10";
+    public static final int ADMIN_WALLET = 1_000_000_000;
+    public static final int ADMIN_XP = 10_000_000;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,10 +50,10 @@ public class User {
         this.totalDeaths = 0;
         this.wallet = 0;
         this.xp = 0;
-        this.outfitId = "classic";
-        this.weaponSkinId = "standard";
-        this.ownedOutfits = "classic";
-        this.ownedWeaponSkins = "standard";
+        this.outfitId = DEFAULT_OUTFIT_ID;
+        this.weaponSkinId = DEFAULT_WEAPON_SKIN_ID;
+        this.ownedOutfits = DEFAULT_OUTFIT_ID;
+        this.ownedWeaponSkins = DEFAULT_WEAPON_SKIN_ID;
         this.weaponUpgrades = "";
         this.admin = false;
     }
