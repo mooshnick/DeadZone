@@ -93,6 +93,9 @@ export class GrenadeSystem {
         this.scene.remove(grenade.mesh);
         return false;
       }
+
+
+
       return true;
     });
   }
