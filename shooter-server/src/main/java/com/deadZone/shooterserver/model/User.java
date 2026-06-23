@@ -11,9 +11,13 @@ import jakarta.persistence.Table;
 @Table(name = "users")
 public class User {
     public static final String DEFAULT_OUTFIT_ID = "classic";
+    public static final String DEFAULT_WEAPON_ID = "rifle";
     public static final String DEFAULT_WEAPON_SKIN_ID = "standard";
+    public static final String DEFAULT_GRENADE_SKIN_ID = "standard";
     public static final String ALL_OUTFITS = "classic,shadow,neon,forest,gold,lava,knight,striker";
     public static final String ALL_WEAPON_SKINS = "standard,ember,arctic,toxic,royal,goldline";
+    public static final String ALL_GRENADE_SKINS = "standard,signal,plasma,royal";
+    public static final String ALL_ACCESSORIES = "cap-red,crown,visor-blue,shades,tail-neon,tail-lava,boots-speed,boots-ice";
     public static final String MAX_WEAPON_UPGRADES = "rifle:10,shotgun:10,smg:10,sniper:10,blaster:10,rpg:10";
     public static final int ADMIN_WALLET = 1_000_000_000;
     public static final int ADMIN_XP = 10_000_000;
@@ -25,6 +29,9 @@ public class User {
     @Column(nullable = false, unique = true, length = 32)
     private String username;
 
+    @Column
+    private String email;
+
     @Column(nullable = false)
     private String password;
 
@@ -34,16 +41,24 @@ public class User {
     private int wallet;
     private int xp;
     private String outfitId;
+    private String weaponId;
     private String weaponSkinId;
+    private String grenadeSkinId;
     private String ownedOutfits;
     private String ownedWeaponSkins;
+    private String ownedGrenadeSkins;
+    private String ownedAccessories;
+    private String accessoryIds;
     private String weaponUpgrades;
+    @Column(length = 4096)
+    private String missionStats;
     private boolean admin;
 
     public User() {}
 
-    public User(String username, String password) {
+    public User(String username, String email, String password) {
         this.username = username;
+        this.email = email;
         this.password = password;
         this.totalKills = 0;
         this.totalAssists = 0;
@@ -51,10 +66,16 @@ public class User {
         this.wallet = 0;
         this.xp = 0;
         this.outfitId = DEFAULT_OUTFIT_ID;
+        this.weaponId = DEFAULT_WEAPON_ID;
         this.weaponSkinId = DEFAULT_WEAPON_SKIN_ID;
+        this.grenadeSkinId = DEFAULT_GRENADE_SKIN_ID;
         this.ownedOutfits = DEFAULT_OUTFIT_ID;
         this.ownedWeaponSkins = DEFAULT_WEAPON_SKIN_ID;
+        this.ownedGrenadeSkins = DEFAULT_GRENADE_SKIN_ID;
+        this.ownedAccessories = "";
+        this.accessoryIds = "";
         this.weaponUpgrades = "";
+        this.missionStats = "";
         this.admin = false;
     }
 
@@ -63,6 +84,9 @@ public class User {
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
@@ -85,8 +109,14 @@ public class User {
     public String getOutfitId() { return outfitId; }
     public void setOutfitId(String outfitId) { this.outfitId = outfitId; }
 
+    public String getWeaponId() { return weaponId; }
+    public void setWeaponId(String weaponId) { this.weaponId = weaponId; }
+
     public String getWeaponSkinId() { return weaponSkinId; }
     public void setWeaponSkinId(String weaponSkinId) { this.weaponSkinId = weaponSkinId; }
+
+    public String getGrenadeSkinId() { return grenadeSkinId; }
+    public void setGrenadeSkinId(String grenadeSkinId) { this.grenadeSkinId = grenadeSkinId; }
 
     public String getOwnedOutfits() { return ownedOutfits; }
     public void setOwnedOutfits(String ownedOutfits) { this.ownedOutfits = ownedOutfits; }
@@ -94,8 +124,20 @@ public class User {
     public String getOwnedWeaponSkins() { return ownedWeaponSkins; }
     public void setOwnedWeaponSkins(String ownedWeaponSkins) { this.ownedWeaponSkins = ownedWeaponSkins; }
 
+    public String getOwnedGrenadeSkins() { return ownedGrenadeSkins; }
+    public void setOwnedGrenadeSkins(String ownedGrenadeSkins) { this.ownedGrenadeSkins = ownedGrenadeSkins; }
+
+    public String getOwnedAccessories() { return ownedAccessories; }
+    public void setOwnedAccessories(String ownedAccessories) { this.ownedAccessories = ownedAccessories; }
+
+    public String getAccessoryIds() { return accessoryIds; }
+    public void setAccessoryIds(String accessoryIds) { this.accessoryIds = accessoryIds; }
+
     public String getWeaponUpgrades() { return weaponUpgrades; }
     public void setWeaponUpgrades(String weaponUpgrades) { this.weaponUpgrades = weaponUpgrades; }
+
+    public String getMissionStats() { return missionStats; }
+    public void setMissionStats(String missionStats) { this.missionStats = missionStats; }
 
     public boolean isAdmin() { return admin; }
     public void setAdmin(boolean admin) { this.admin = admin; }

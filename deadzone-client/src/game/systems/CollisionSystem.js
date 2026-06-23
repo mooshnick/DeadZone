@@ -1,7 +1,7 @@
 import { ARENA_LIMIT, FLOOR_Y, GRAVITY, JUMP_SPEED, PLAYER_HEIGHT, PLAYER_RADIUS } from '../config';
 import { clamp } from '../utils';
 
-const MAX_STEP_UP = 0.72;
+const MAX_STEP_UP = 0.9;
 const FLOOR_SNAP_DOWN = 1.15;
 
 export class CollisionSystem {
@@ -23,6 +23,29 @@ export class CollisionSystem {
       || block.kind === 'catwalk'
       || block.kind === 'factory-deck'
       || block.kind === 'upper-module';
+  }
+
+  isWalkableTop(block) {
+    if (block.kind?.includes('rail')) {
+      return false;
+    }
+
+    return this.isFloorLike(block)
+      || block.kind?.includes('wall')
+      || block.kind?.includes('barrier')
+      || block.kind?.includes('cover')
+      || block.kind?.includes('rock')
+      || block.kind?.includes('basalt')
+      || block.kind?.includes('module')
+      || block.kind?.includes('bush')
+      || block.kind?.includes('root')
+      || block.kind?.includes('tree')
+      || block.kind?.includes('stand')
+      || block.kind === 'core'
+      || block.kind === 'island'
+      || block.kind === 'dummy-wall'
+      || block.kind === 'factory-wall'
+      || block.kind === 'statue';
   }
 
   isStepLike(block) {
@@ -54,7 +77,7 @@ export class CollisionSystem {
       const blockTop = block.y + block.h / 2 + PLAYER_RADIUS;
       const blockBottom = block.y - block.h / 2;
       const verticalGap = blockTop - position.y;
-      const canStepOnto = this.isFloorLike(block)
+      const canStepOnto = this.isWalkableTop(block)
         && (!velocity || velocity.y <= 0)
         && verticalGap <= MAX_STEP_UP
         && verticalGap >= -FLOOR_SNAP_DOWN;
@@ -65,13 +88,17 @@ export class CollisionSystem {
       if (this.isFloorLike(block) && verticalGap < -FLOOR_SNAP_DOWN) {
         continue;
       }
-      const hitCeiling = velocity && velocity.y > 0 && position.y >= blockBottom - PLAYER_RADIUS && position.y < blockTop - 0.75;
+      const hitCeiling = velocity
+        && velocity.y > 0
+        && !this.isStepLike(block)
+        && position.y >= blockBottom - PLAYER_RADIUS
+        && position.y < blockTop - 0.75;
       if (hitCeiling) {
         position.y = blockBottom - PLAYER_RADIUS - 0.02;
         velocity.y = 0;
         continue;
       }
-      if (this.isFloorLike(block) && !this.isStepLike(block) && verticalGap > MAX_STEP_UP) {
+      if (this.isFloorLike(block) && verticalGap > MAX_STEP_UP) {
         continue;
       }
       if (position.y > blockTop + PLAYER_HEIGHT || position.y < blockBottom - PLAYER_RADIUS) {
@@ -128,6 +155,7 @@ export class CollisionSystem {
       const blockTop = block.y + block.h / 2 + PLAYER_RADIUS;
       return Math.abs(position.x - block.x) <= block.w / 2 + PLAYER_RADIUS
         && Math.abs(position.z - block.z) <= block.d / 2 + PLAYER_RADIUS
+        && this.isWalkableTop(block)
         && Math.abs(position.y - blockTop) < 0.35;
     });
   }

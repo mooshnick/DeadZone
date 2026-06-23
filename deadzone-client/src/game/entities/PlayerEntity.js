@@ -4,13 +4,15 @@ import { spawnFor } from '../world/SpawnPoints';
 import { nowMs } from '../utils';
 
 export class PlayerEntity {
-  constructor({ id, name, team, weaponId, outfitId = 'classic', weaponSkinId = 'standard', weaponLevel = 0, mapId = 'foundry', isBot = false, index = 0, money = 0 }) {
+  constructor({ accessoryIds = [], id, name, team, gameMode = 'team-deathmatch', weaponId, outfitId = 'classic', weaponSkinId = 'standard', weaponLevel = 0, mapId = 'foundry', isBot = false, index = 0, money = 0 }) {
     const weapon = WEAPONS[weaponId] || WEAPONS.rifle;
     this.id = id;
     this.name = name;
     this.team = team;
+    this.gameMode = gameMode;
     this.weaponId = weaponId;
     this.outfitId = outfitId;
+    this.accessoryIds = accessoryIds;
     this.weaponSkinId = weaponSkinId;
     this.weaponLevel = weaponLevel;
     this.mapId = mapId;

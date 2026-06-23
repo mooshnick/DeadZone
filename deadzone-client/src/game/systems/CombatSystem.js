@@ -3,17 +3,28 @@ import { ASSIST_REWARD, ASSIST_SCORE, ASSIST_WINDOW, ASSIST_XP, KILL_REWARD, KIL
 import { nowMs } from '../utils';
 
 export class CombatSystem {
-  constructor({ scene, players, localId, collisionSystem, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil }) {
+  constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil }) {
     this.scene = scene;
     this.players = players;
     this.localId = localId;
     this.collisionSystem = collisionSystem;
+    this.gameMode = gameMode;
     this.onScoreChange = onScoreChange;
     this.onWalletChange = onWalletChange;
     this.onProgressChange = onProgressChange;
     this.onEvent = onEvent;
     this.onRecoil = onRecoil;
     this.bullets = [];
+  }
+
+  isEnemy(player, ownerId, ownerTeam) {
+    if (player.id === ownerId || player.isDead || player.health <= 0) {
+      return false;
+    }
+    if (this.gameMode === 'free-for-all') {
+      return true;
+    }
+    return player.team !== ownerTeam;
   }
 
   updateReload(player, time) {
@@ -28,7 +39,7 @@ export class CombatSystem {
     }
   }
 
-  shoot(player, targetDirection) {
+  shoot(player, targetDirection, shotOrigin = null) {
     const time = nowMs();
     const weapon = WEAPONS[player.weaponId] || WEAPONS.rifle;
     if (!player.canShoot(time)) {
@@ -38,14 +49,28 @@ export class CombatSystem {
       this.startReload(player, time);
       return;
     }
-    player.consumeAmmo(time);
+    const shotsToFire = Math.min(weapon.burstCount || 1, player.ammo);
+    player.ammo -= shotsToFire;
+    player.lastShot = time;
     this.onRecoil?.(player, weapon);
 
-    const origin = player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(targetDirection.clone().multiplyScalar(1.6));
     const upgradeMultiplier = 1 + (player.weaponLevel || 0) * 0.08;
     const damage = Math.round(weapon.damage * upgradeMultiplier * (player.buffs.damage ? 1.45 : 1));
+
+    for (let shotIndex = 0; shotIndex < shotsToFire; shotIndex += 1) {
+      const delay = (weapon.burstDelay || 0) * shotIndex;
+      window.setTimeout(() => {
+        if (player.isDead) return;
+        this.spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex, shotOrigin);
+      }, delay);
+    }
+  }
+
+  spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex = 0, shotOrigin = null) {
+    const origin = (shotOrigin || player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(targetDirection.clone().multiplyScalar(1.6))).clone();
     for (let index = 0; index < weapon.pellets; index += 1) {
-      const spread = weapon.pellets === 1 ? 0 : (index - (weapon.pellets - 1) / 2) * weapon.spread + (Math.random() - 0.5) * weapon.spread;
+      const pelletOffset = weapon.pellets === 1 ? 0 : index - (weapon.pellets - 1) / 2;
+      const spread = pelletOffset * weapon.spread + (Math.random() - 0.5) * weapon.spread + shotIndex * (weapon.spread * 0.35);
       const direction = targetDirection.clone().add(new THREE.Vector3(spread, (Math.random() - 0.5) * weapon.spread, Math.abs(spread) * 0.25)).normalize();
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(player.weaponId === 'sniper' ? 0.16 : 0.23, 12, 12),
@@ -80,9 +105,7 @@ export class CombatSystem {
       }
 
       const hit = players.find((player) => (
-        player.id !== bullet.ownerId
-        && player.team !== bullet.team
-        && player.health > 0
+        this.isEnemy(player, bullet.ownerId, bullet.team)
         && player.position.distanceTo(bullet.mesh.position) < 1.55
       ));
       if (!hit) return true;
@@ -116,7 +139,7 @@ export class CombatSystem {
     setTimeout(() => this.scene.remove(marker), 140);
 
     for (const player of this.players.values()) {
-      if (player.id === ownerId || player.team === team || player.isDead) continue;
+      if (!this.isEnemy(player, ownerId, team)) continue;
       const distance = player.position.distanceTo(position);
       if (distance > radius) continue;
       const scaledDamage = Math.round(damage * (1 - distance / (radius * 1.25)));
@@ -184,19 +207,19 @@ export class CombatSystem {
     shooter.score += KILL_SCORE;
     shooter.money += KILL_REWARD;
     this.onWalletChange?.(shooter);
-    this.onProgressChange?.({ playerId: shooter.id, xp: KILL_XP, reason: 'kill' });
-    this.onEvent(`${shooter.name} eliminated ${target.name} +NIS ${KILL_REWARD}`);
+    this.onProgressChange?.({ playerId: shooter.id, xp: KILL_XP, reason: 'kill', weaponId: shooter.weaponId, wallet: shooter.money });
+    this.onEvent(`${shooter.name} eliminated ${target.name} +🪙 ${KILL_REWARD}`);
 
     for (const [helperId, lastDamageAt] of target.damageLog.entries()) {
       if (helperId === shooter.id || time - lastDamageAt > ASSIST_WINDOW) continue;
       const helper = this.players.get(helperId);
-      if (!helper || helper.team !== shooter.team) continue;
+      if (!helper || (this.gameMode !== 'free-for-all' && helper.team !== shooter.team)) continue;
       helper.assists += 1;
       helper.score += ASSIST_SCORE;
       helper.money += ASSIST_REWARD;
       this.onWalletChange?.(helper);
-      this.onProgressChange?.({ playerId: helper.id, xp: ASSIST_XP, reason: 'assist' });
-      this.onEvent(`${helper.name} assisted +NIS ${ASSIST_REWARD}`);
+      this.onProgressChange?.({ playerId: helper.id, xp: ASSIST_XP, reason: 'assist', weaponId: helper.weaponId, wallet: helper.money });
+      this.onEvent(`${helper.name} assisted +🪙 ${ASSIST_REWARD}`);
     }
   }
 }

@@ -17,6 +17,22 @@ export function spawnFor(team, index = 0, mapId = 'foundry') {
     const point = (team === 'blue' ? blueSpawns : redSpawns)[index % 4];
     return new THREE.Vector3(...point);
   }
+  if (mapId === 'apocalyptic') {
+    const blueSpawns = [
+      [-42, 1.25, 18],
+      [-38, 1.25, -16],
+      [-24, 1.25, 6],
+      [-18, 1.25, 34],
+    ];
+    const redSpawns = [
+      [42, 1.25, -18],
+      [38, 1.25, 16],
+      [24, 1.25, -6],
+      [18, 1.25, -34],
+    ];
+    const point = (team === 'blue' ? blueSpawns : redSpawns)[index % 4];
+    return new THREE.Vector3(...point);
+  }
   const side = team === 'blue' ? -1 : 1;
   return new THREE.Vector3(side * (28 + index * 2), 1.25, -18 + index * 7);
 }

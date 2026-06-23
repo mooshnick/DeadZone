@@ -1,44 +1,280 @@
+import { useState } from 'react';
+import { CharacterPreview } from './CharacterPreview';
+import { StoreVisual } from './StoreVisual';
+import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
-import { MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
-export function Lobby({
+export function Lobby(props) {
+  if (props.screen === 'loading') {
+    return (
+      <main className="menu-shell">
+        <div className="session-loader">Restoring session...</div>
+      </main>
+    );
+  }
+
+  if (props.screen === 'auth') {
+    return <AuthenticationScreen {...props} />;
+  }
+
+  if (props.panel === 'player') {
+    return <PlayerScreen {...props} />;
+  }
+
+  if (props.panel === 'settings') {
+    return <SettingsScreen {...props} />;
+  }
+
+  if (props.panel === 'play' || props.panel === 'create') {
+    return <PlayScreen {...props} />;
+  }
+
+  return <MainMenu {...props} />;
+}
+
+function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, setAuthMode, setCredentials }) {
+  const mode = authMode || null;
+  const outfit = OUTFITS[0];
+
+  return (
+    <main className="menu-shell auth-screen">
+      <section className="auth-stage">
+        <div className="auth-landing-art">
+          <h1 className="auth-title">DEAD ZONE</h1>
+          <span className="auth-subtitle">Enter the arena</span>
+        </div>
+        <CharacterPreview outfit={outfit} variant="hero" />
+
+        {!mode && (
+          <div className="auth-choice">
+            <button className="primary-command" onClick={() => setAuthMode('login')}>Login</button>
+            <button className="secondary-command" onClick={() => setAuthMode('register')}>Register</button>
+          </div>
+        )}
+
+        {mode && (
+          <form
+            className="auth-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleAccountAction(mode);
+            }}
+          >
+            <header>
+              <strong>{mode === 'login' ? 'Welcome back' : 'Create account'}</strong>
+              <button type="button" className="icon-command" title="Close" onClick={() => setAuthMode(null)}>×</button>
+            </header>
+            <label>
+              Username
+              <input
+                autoFocus
+                autoComplete="username"
+                value={credentials.username}
+                onChange={(event) => setCredentials((draft) => ({ ...draft, username: event.target.value }))}
+              />
+            </label>
+            {mode === 'register' && (
+              <label>
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={credentials.email}
+                  onChange={(event) => setCredentials((draft) => ({ ...draft, email: event.target.value }))}
+                />
+              </label>
+            )}
+            <label>
+              Password
+              <input
+                type="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                value={credentials.password}
+                onChange={(event) => setCredentials((draft) => ({ ...draft, password: event.target.value }))}
+              />
+            </label>
+            {mode === 'register' && (
+              <label>
+                Confirm password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={credentials.confirmPassword}
+                  onChange={(event) => setCredentials((draft) => ({ ...draft, confirmPassword: event.target.value }))}
+                />
+              </label>
+            )}
+            {accountStatus && <div className="form-message">{accountStatus}</div>}
+            <button className="primary-command" type="submit">
+              {mode === 'login' ? 'Login' : 'Create Account'}
+            </button>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function MainMenu({
+  accessoryIds,
   account,
-  accountStatus,
-  autoTeamForRoom,
-  buyOrEquipOutfit,
-  buyOrEquipWeaponSkin,
-  createRoom,
-  credentials,
+  grenadeSkinId,
+  level,
+  levelProgress,
+  missionCards,
+  outfitId,
+  selectedGrenadeSkin,
+  selectedWeaponSkin,
+  setPanel,
+  signOut,
+  wallet,
+  weaponSkinId,
+  xp,
+}) {
+  const outfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
+  const accessories = (accessoryIds || []).map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
+
+  return (
+    <main className="menu-shell">
+      <header className="menu-topbar">
+        <div className="menu-brand compact">
+          <span>DEADZONE</span>
+          <small>{account?.username} / 🪙 {wallet}</small>
+        </div>
+        <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
+        <div className="topbar-actions">
+          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
+          <button className="logout-command" onClick={signOut}>Logout</button>
+        </div>
+      </header>
+      <section className="main-menu">
+        <CharacterPreview
+          outfit={outfit}
+          accessories={accessories}
+          weaponId="rifle"
+          weaponColor={WEAPON_SKINS.find((skin) => skin.id === weaponSkinId)?.color || selectedWeaponSkin.color}
+          grenadeColor={GRENADE_SKINS.find((skin) => skin.id === grenadeSkinId)?.color || selectedGrenadeSkin.color}
+          variant="hero"
+        />
+        <div className="main-actions">
+          <button className="secondary-command" onClick={() => setPanel('player')}>My Player</button>
+          <button className="primary-command" onClick={() => setPanel('play')}>Start Playing</button>
+        </div>
+        <MissionBoard missions={missionCards} />
+      </section>
+    </main>
+  );
+}
+
+function MissionBoard({ missions = [] }) {
+  return (
+    <aside className="mission-board">
+      <header>
+        <span>Missions</span>
+        <strong>Earn rewards</strong>
+      </header>
+      <div className="mission-list">
+        {missions.slice(0, 5).map((mission) => (
+          <article className={mission.claimed ? 'mission-card claimed' : 'mission-card'} key={mission.id}>
+            <div>
+              <strong>{mission.title}</strong>
+              <small>{mission.description}</small>
+            </div>
+            <span>{Math.min(mission.progress, mission.target)}/{mission.target}</span>
+            <i><b style={{ width: `${mission.percent}%` }} /></i>
+            <em>{mission.claimed ? 'Claimed' : `🪙 ${mission.rewardMoney} / ${mission.rewardXp} XP`}</em>
+          </article>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function ProgressBadge({ level, levelProgress, xp }) {
+  return (
+    <div className="menu-progress-badge">
+      <span>Level {level}</span>
+      <strong>{xp} XP</strong>
+      <i><b style={{ width: `${levelProgress}%` }} /></i>
+    </div>
+  );
+}
+
+function SettingsScreen({
   editingKeybind,
-  handleAccountAction,
-  joinMatch,
   keybinds,
   level,
   levelProgress,
-  mapUnlocked,
-  name,
+  resetKeybinds,
+  setEditingKeybind,
+  setPanel,
+  xp,
+}) {
+  return (
+    <main className="menu-shell">
+      <header className="menu-topbar">
+        <button className="back-command" onClick={() => setPanel('main')}>Back to Main Menu</button>
+        <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
+        <strong>Settings</strong>
+      </header>
+      <section className="settings-screen">
+        <div className="settings-card">
+          <header>
+            <span>Controls</span>
+            <strong>Keyboard Settings</strong>
+          </header>
+          <div className="keybind-list">
+            {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
+              <button
+                className={editingKeybind === action ? 'keybind-row listening' : 'keybind-row'}
+                key={action}
+                onClick={() => setEditingKeybind(action)}
+              >
+                <span>{label}</span>
+                <strong>{editingKeybind === action ? 'Press key...' : keybinds[action]}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="settings-actions">
+            <button className="secondary-command" onClick={resetKeybinds}>Reset Controls</button>
+            <button className="primary-command" onClick={() => setPanel('main')}>Done</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PlayerScreen({
+  accessoryIds,
+  buyOrEquipAccessory,
+  buyOrEquipGrenadeSkin,
+  buyOrEquipOutfit,
+  buyOrEquipWeaponSkin,
+  grenadeSkinId,
+  ownedGrenadeSkins,
+  ownedAccessories,
   ownedOutfits,
   ownedWeaponSkins,
-  panel,
+  outfitId,
+  level,
+  levelProgress,
   previewOutfit,
+  previewWeaponSkin,
+  previewGrenadeSkin,
+  previewAccessory,
   previewedOutfit,
-  resetKeybinds,
-  roomDraft,
-  rooms,
-  selectedMap,
-  selectedRoom,
-  selectedRoomId,
+  previewedWeaponSkin,
+  previewedGrenadeSkin,
+  previewedAccessories,
+  selectedGrenadeSkin,
   selectedWeaponSkin,
-  setCredentials,
-  setEditingKeybind,
-  setName,
   setPanel,
+  setPreviewGrenadeSkin,
+  setPreviewAccessory,
   setPreviewOutfit,
-  setRoomDraft,
-  setSelectedRoomId,
-  setWeaponId,
-  signOut,
-  updateKeybind,
+  setPreviewWeaponSkin,
+  selectWeapon,
   upgradeWeapon,
   wallet,
   weaponId,
@@ -47,251 +283,357 @@ export function Lobby({
   weaponUpgrades,
   xp,
 }) {
+  const [pendingPurchase, setPendingPurchase] = useState(null);
+  const [customizerTab, setCustomizerTab] = useState('outfits');
+  const outfit = previewOutfit || previewedOutfit || OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
+  const weaponSkin = previewWeaponSkin || previewedWeaponSkin || selectedWeaponSkin;
+  const grenadeSkin = previewGrenadeSkin || previewedGrenadeSkin || selectedGrenadeSkin;
+  const accessories = previewedAccessories || [];
+
+  const requestPurchase = (item, owned, action) => {
+    if (owned || item.price === 0) {
+      action();
+      return;
+    }
+    setPendingPurchase({ item, action });
+  };
+  const accessoriesBySlot = (slots) => ACCESSORIES.filter((item) => slots.includes(item.slot));
+  const activeAccessoryIdForSlot = (slot) => previewAccessory?.slot === slot
+    ? previewAccessory.id
+    : accessoryIds.find((id) => ACCESSORIES.find((accessory) => accessory.id === id)?.slot === slot);
+  const renderAccessoryStoreItem = (item) => (
+    <StoreItem
+      key={item.id}
+      active={activeAccessoryIdForSlot(item.slot) === item.id}
+      color={item.color}
+      equipped={accessoryIds.includes(item.id)}
+      kind={item.slot}
+      name={item.name}
+      owned={ownedAccessories.includes(item.id)}
+      price={item.price}
+      subtitle={item.slot}
+      onPreview={() => setPreviewAccessory(item)}
+      onAction={() => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item))}
+    />
+  );
+
   return (
-    <main className="shell" dir="ltr">
-      <section className="lobby-hub">
-        <div className="brand lobby-brand">
-          <span>DEADZONE 3D</span>
-          <strong>Ready Room</strong>
-          <small>Pick a room, tune your loadout, and drop into a 6 player arena.</small>
+    <main className="menu-shell">
+      <header className="menu-topbar">
+        <button className="back-command" onClick={() => setPanel('main')}>← Back to Main Menu</button>
+        <div className="topbar-actions">
+          <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
+          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
+          <strong>🪙 {wallet}</strong>
         </div>
-
-        <div className="hub-actions">
-          <button className={panel === 'name' ? 'hub-action selected' : 'hub-action'} onClick={() => setPanel('name')}>Choose Name</button>
-          <button className={panel === 'shop' ? 'hub-action selected' : 'hub-action'} onClick={() => setPanel('shop')}>Shop</button>
-          <button className={panel === 'settings' ? 'hub-action selected' : 'hub-action'} onClick={() => setPanel('settings')}>Settings</button>
-          <button className={panel === 'play' ? 'hub-action selected' : 'hub-action'} onClick={() => setPanel('play')}>Start Playing</button>
-          <button className={panel === 'create' ? 'hub-action selected' : 'hub-action'} onClick={() => setPanel('create')}>Create Room</button>
-        </div>
-
-        <div className="season-strip">
-          <span>{rooms.length} open rooms</span>
-          <span>{MAPS.length} arenas</span>
-          <span>{Object.keys(WEAPONS).length} weapons</span>
-          <span>NIS {wallet}</span>
-          <span>Level {level}</span>
-        </div>
-
-        <div className="hub-main">
-          <aside className="player-preview">
-            <div className="egg-preview" style={{ '--shell': previewedOutfit.shell, '--trim': previewedOutfit.trim }}>
-              <span />
-            </div>
-            <strong>{name}</strong>
-            <small>{previewedOutfit.name} / {WEAPONS[weaponId].name}</small>
-            <small>{selectedWeaponSkin.name}</small>
-            <small>Wallet NIS {wallet}</small>
-            <small>Level {level} / {xp} XP / {levelProgress}%</small>
-            <div className="quick-stats">
-              <span>AUTO TEAM</span>
-              <span>{selectedMap.name}</span>
-            </div>
-          </aside>
-
-          <section className="setup-panel hub-panel">
-            {panel === 'name' && (
+      </header>
+      <section className="player-customizer">
+        <aside className="customizer-preview">
+          <CharacterPreview accessories={accessories} outfit={outfit} weaponColor={weaponSkin.color} grenadeColor={grenadeSkin.color} variant="side" weaponId={weaponId} />
+          <strong>{outfit.name}</strong>
+          <span>{WEAPONS[weaponId].name} / {weaponSkin.name} / {grenadeSkin.name}</span>
+          {!!accessories.length && <small>{accessories.map((item) => item.name).join(' / ')}</small>}
+        </aside>
+        <div className="store-panel">
+          <div className="customizer-tabs" role="tablist" aria-label="Customizer sections">
+            <button className={customizerTab === 'outfits' ? 'active' : ''} onClick={() => setCustomizerTab('outfits')}>Outfits</button>
+            <button className={customizerTab === 'weapons' ? 'active' : ''} onClick={() => setCustomizerTab('weapons')}>Weapons</button>
+          </div>
+          <div className="store-scroll-area">
+            {customizerTab === 'outfits' ? (
               <>
-                <div className="profile-panel">
-                  <div className="profile-panel-header">
-                    <span>Player Profile</span>
-                    <strong>{account ? `Signed in as ${account.username}` : 'Create or load your fighter'}</strong>
-                  </div>
-                  <label>
-                    Display name
-                    <input value={name} maxLength={16} onChange={(event) => setName(event.target.value)} />
-                  </label>
-                  <div className="account-box">
-                    <label>
-                      Username
-                      <input
-                        placeholder="test"
-                        value={credentials.username}
-                        maxLength={16}
-                        onChange={(event) => setCredentials((draft) => ({ ...draft, username: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      Password
-                      <input
-                        placeholder="1234"
-                        type="password"
-                        value={credentials.password}
-                        maxLength={24}
-                        onChange={(event) => setCredentials((draft) => ({ ...draft, password: event.target.value }))}
-                      />
-                    </label>
-                    <div className="account-actions">
-                      <button className="login-button" onClick={() => handleAccountAction('login')}>Login</button>
-                      <button className="create-account-button" onClick={() => handleAccountAction('register')}>Create Account</button>
-                      {account && <button className="ghost-button" onClick={signOut}>Sign Out</button>}
-                    </div>
-                    <small className={account ? 'account-status connected' : 'account-status'}>{account ? 'Progress, money and unlocks are saved.' : accountStatus}</small>
-                  </div>
-                </div>
-                <div className="auto-team-note">Team is selected automatically when you join a room.</div>
+                <StoreSection title="Player Colors">
+                  {OUTFITS.map((item) => (
+                    <StoreItem
+                      key={item.id}
+                      active={(previewOutfit?.id || outfitId) === item.id}
+                      color={item.displayColor || item.shell}
+                      equipped={outfitId === item.id}
+                      kind="outfit"
+                      name={item.name}
+                      owned={ownedOutfits.includes(item.id)}
+                      price={item.price}
+                      onPreview={() => setPreviewOutfit(item)}
+                      onAction={() => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item))}
+                    />
+                  ))}
+                </StoreSection>
+                <StoreSection title="Hats, Hair & Face">
+                  {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryStoreItem)}
+                </StoreSection>
+                <StoreSection title="Middle Wear">
+                  {accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).map(renderAccessoryStoreItem)}
+                </StoreSection>
+                <StoreSection title="Shoes & Rides">
+                  {accessoriesBySlot(['shoes']).map(renderAccessoryStoreItem)}
+                </StoreSection>
               </>
-            )}
-
-            {panel === 'shop' && (
+            ) : (
               <>
-                <div className="section-title">Character Outfits</div>
-                <div className="option-grid outfit-grid">
-                  {OUTFITS.map((outfit) => (
-                    <button
-                      className={(previewOutfit?.id || previewedOutfit.id) === outfit.id ? 'option outfit-option selected' : 'option outfit-option'}
-                      key={outfit.id}
-                      onClick={() => setPreviewOutfit(outfit)}
-                    >
-                      <i style={{ '--shell': outfit.shell, '--trim': outfit.trim }} />
-                      <strong>{outfit.name}</strong>
-                      <span>{ownedOutfits.includes(outfit.id) ? 'Owned' : `Preview / NIS ${outfit.price}`}</span>
-                    </button>
-                  ))}
-                </div>
-                {previewOutfit && (
-                  <div className="shop-confirm">
-                    <strong>{previewOutfit.name}</strong>
-                    <span>{ownedOutfits.includes(previewOutfit.id) ? 'Already owned' : `Price NIS ${previewOutfit.price}`}</span>
-                    <button onClick={() => buyOrEquipOutfit(previewOutfit)}>
-                      {ownedOutfits.includes(previewOutfit.id) ? 'Equip Outfit' : 'Buy Outfit'}
-                    </button>
-                    <button className="ghost-button" onClick={() => setPreviewOutfit(null)}>Cancel Preview</button>
-                  </div>
-                )}
-                <div className="section-title">Weapon Skins</div>
-                <div className="option-grid outfit-grid">
-                  {WEAPON_SKINS.map((skin) => (
-                    <button
-                      className={weaponSkinId === skin.id ? 'option weapon-skin-option selected' : 'option weapon-skin-option'}
-                      key={skin.id}
-                      onClick={() => buyOrEquipWeaponSkin(skin)}
-                    >
-                      <i style={{ '--skin': skin.color }} />
-                      <strong>{skin.name}</strong>
-                      <span>{ownedWeaponSkins.includes(skin.id) ? 'Owned' : `NIS ${skin.price}`}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="section-title">Weapon Loadout</div>
-                <div className="option-grid weapon-grid">
+                <StoreSection title="Weapons">
                   {Object.entries(WEAPONS).map(([id, weapon]) => (
                     <button
-                      className={weaponId === id ? 'option selected' : 'option'}
+                      className={weaponId === id ? 'loadout-row active' : 'loadout-row'}
                       disabled={!weaponUnlocked(weapon)}
                       key={id}
-                      onClick={() => weaponUnlocked(weapon) && setWeaponId(id)}
+                      onClick={() => weaponUnlocked(weapon) && selectWeapon(id)}
                     >
-                      <strong>{weapon.name}</strong>
-                      <span>{weaponUnlocked(weapon) ? `${weapon.tag} / Mk ${weaponUpgrades[id] || 0}` : `Unlocks level ${weapon.unlockLevel}`}</span>
+                      <StoreVisual color={weapon.color} kind="weapon" weaponId={id} />
+                      <span><strong>{weapon.name}</strong><small>{weapon.tag}</small></span>
+                      <span>MK {weaponUpgrades[id] || 0}</span>
                       {weaponUnlocked(weapon) && (
                         <em onClick={(event) => { event.stopPropagation(); upgradeWeapon(id); }}>
-                          Upgrade NIS {75 + (weaponUpgrades[id] || 0) * 65}
+                          Upgrade
                         </em>
                       )}
                     </button>
                   ))}
-                </div>
-              </>
-            )}
-
-            {panel === 'settings' && (
-              <>
-                <div className="section-title">Keyboard Settings</div>
-                <div className="keybind-list">
-                  {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
-                    <button
-                      className={editingKeybind === action ? 'keybind-row listening' : 'keybind-row'}
-                      key={action}
-                      onClick={() => setEditingKeybind(action)}
-                      onKeyDown={(event) => {
-                        if (editingKeybind === action) {
-                          event.preventDefault();
-                          updateKeybind(action, event.code);
-                        }
-                      }}
-                    >
-                      <span>{label}</span>
-                      <strong>{editingKeybind === action ? 'Press key...' : keybinds[action]}</strong>
-                    </button>
+                </StoreSection>
+                <StoreSection title="Weapon Skins">
+                  {WEAPON_SKINS.map((item) => (
+                    <StoreItem
+                      key={item.id}
+                      active={(previewWeaponSkin?.id || weaponSkinId) === item.id}
+                      color={item.color}
+                      equipped={weaponSkinId === item.id}
+                      kind="weapon-skin"
+                      name={item.name}
+                      owned={ownedWeaponSkins.includes(item.id)}
+                      price={item.price}
+                      onPreview={() => setPreviewWeaponSkin(item)}
+                      onAction={() => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item))}
+                    />
                   ))}
-                </div>
-                <button className="ghost-button" onClick={resetKeybinds}>Reset Defaults</button>
-              </>
-            )}
-
-            {panel === 'play' && (
-              <>
-                <div className="section-title">Open Rooms</div>
-                <div className="room-list">
-                  {rooms.map((room) => {
-                    const map = MAPS.find((item) => item.id === room.mapId) || MAPS[0];
-                    const unlocked = mapUnlocked(map);
-                    return (
-                      <button
-                        className={selectedRoomId === room.id ? 'room-row selected' : 'room-row'}
-                        disabled={!unlocked}
-                        key={room.id}
-                        onClick={() => unlocked && setSelectedRoomId(room.id)}
-                      >
-                        <strong>{room.name}</strong>
-                        <span>{room.id}</span>
-                        <small>{map.name} / {unlocked ? `${room.players}/${room.maxPlayers}` : `Level ${map.unlockLevel}`} / B{room.bluePlayers ?? 0}-R{room.redPlayers ?? 0} / {room.allowBots ? 'Bots' : 'No bots'}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button className="start-button" onClick={joinMatch}>Join Selected Room</button>
-              </>
-            )}
-
-            {panel === 'create' && (
-              <>
-                <div className="section-title">New Room</div>
-                <label>
-                  Room name
-                  <input value={roomDraft.name} maxLength={18} onChange={(event) => setRoomDraft((draft) => ({ ...draft, name: event.target.value }))} />
-                </label>
-                <div className="section-title">Arena Type</div>
-                <div className="option-grid map-grid">
-                  {MAPS.map((map) => (
-                    <button
-                      className={roomDraft.mapId === map.id ? 'option map-option selected' : 'option map-option'}
-                      disabled={!mapUnlocked(map)}
-                      key={map.id}
-                      onClick={() => mapUnlocked(map) && setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}
-                      style={{ '--accent': map.accent, background: `linear-gradient(135deg, ${map.sky}, ${map.ground})` }}
-                    >
-                      <strong>{map.name}</strong>
-                      <span>{mapUnlocked(map) ? '3D arena' : `Unlocks level ${map.unlockLevel}`}</span>
-                    </button>
+                </StoreSection>
+                <StoreSection title="Grenade Skins">
+                  {GRENADE_SKINS.map((item) => (
+                    <StoreItem
+                      key={item.id}
+                      active={(previewGrenadeSkin?.id || grenadeSkinId) === item.id}
+                      color={item.color}
+                      equipped={grenadeSkinId === item.id}
+                      kind="grenade"
+                      name={item.name}
+                      owned={ownedGrenadeSkins.includes(item.id)}
+                      price={item.price}
+                      onPreview={() => setPreviewGrenadeSkin(item)}
+                      onAction={() => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item))}
+                    />
                   ))}
-                </div>
-                <label>
-                  Max players
-                  <input type="number" min="2" max="6" value={roomDraft.maxPlayers} onChange={(event) => setRoomDraft((draft) => ({ ...draft, maxPlayers: Math.max(2, Math.min(6, Number(event.target.value) || 2)) }))} />
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={roomDraft.allowBots}
-                    onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))}
-                  />
-                  Add bots to fill empty spots
-                </label>
-                <button className="start-button" onClick={createRoom}>Create Room</button>
+                </StoreSection>
               </>
             )}
-          </section>
+          </div>
+          <div className="customizer-footer">
+            <button className="primary-command" onClick={() => setPanel('main')}>Continue</button>
+          </div>
         </div>
+      </section>
+      {pendingPurchase && (
+        <div className="purchase-modal" role="dialog" aria-modal="true">
+          <div>
+            <strong>Confirm purchase</strong>
+            <span>{pendingPurchase.item.name} costs 🪙 {pendingPurchase.item.price}.</span>
+            <div className="purchase-actions">
+              <button className="secondary-command" onClick={() => setPendingPurchase(null)}>Cancel</button>
+              <button
+                className="primary-command"
+                onClick={() => {
+                  pendingPurchase.action();
+                  setPendingPurchase(null);
+                }}
+              >
+                Buy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
 
-        <div className="selected-room-strip">
-          <strong>{selectedRoom?.name}</strong>
-          <span>{selectedMap.name}</span>
-          <span>{selectedRoom?.players}/{selectedRoom?.maxPlayers} players</span>
-          <span>Auto team: {autoTeamForRoom(selectedRoom).toUpperCase()}</span>
-          <span>{selectedRoom?.allowBots ? 'Bots enabled' : 'Bots disabled'}</span>
+function StoreSection({ children, title }) {
+  return (
+    <section className="store-section">
+      <h2>{title}</h2>
+      <div className="store-grid">{children}</div>
+    </section>
+  );
+}
+
+function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, owned, price, subtitle }) {
+  return (
+    <article className={active ? 'store-item active' : 'store-item'}>
+      <button className="store-preview" onClick={onPreview || onAction}>
+        <StoreVisual color={color} kind={kind} />
+        <strong>{name}</strong>
+        {subtitle && <small>{subtitle}</small>}
+      </button>
+      <button className="store-buy" onClick={onAction}>
+        {owned ? (equipped ? 'Equipped' : 'Equip') : `🪙 ${price}`}
+      </button>
+    </article>
+  );
+}
+
+function PlayScreen({
+  accountStatus,
+  createRoom,
+  joinMatch,
+  joinRoomByCode,
+  level,
+  levelProgress,
+  mapUnlocked,
+  panel,
+  roomDraft,
+  rooms,
+  selectedRoomId,
+  setPanel,
+  setRoomDraft,
+  setSelectedRoomId,
+  xp,
+}) {
+  const [gameCode, setGameCode] = useState('');
+
+  return (
+    <main className="menu-shell">
+      <header className="menu-topbar">
+        <button className="back-command" onClick={() => setPanel('main')}>← Back to Main Menu</button>
+        <div className="topbar-actions">
+          <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
+          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
+          <strong>Multiplayer Lobby</strong>
+        </div>
+      </header>
+      <section className="play-lobby">
+        <div className="room-browser">
+          <header>
+            <div>
+              <span>OPEN ROOMS</span>
+              <strong>Choose a battle</strong>
+            </div>
+            <button className="add-room-command" title="Create a new room" onClick={() => setPanel('create')}>+</button>
+          </header>
+
+          {panel === 'create' ? (
+            <CreateRoomForm
+              createRoom={createRoom}
+              mapUnlocked={mapUnlocked}
+              roomDraft={roomDraft}
+              setPanel={setPanel}
+              setRoomDraft={setRoomDraft}
+            />
+          ) : (
+            <>
+              <div className="room-list-clean">
+                {rooms.map((room) => {
+                  const map = MAPS.find((item) => item.id === room.mapId) || MAPS[0];
+                  const mode = GAME_MODES.find((item) => item.id === room.gameMode) || GAME_MODES[0];
+                  return (
+                    <button
+                      className={room.id === selectedRoomId ? 'room-card active' : 'room-card'}
+                      key={room.id}
+                      onClick={() => setSelectedRoomId(room.id)}
+                    >
+                      <span className="room-color" style={{ background: map.accent }} />
+                      <span><strong>{room.name}</strong><small>{mode.short} / {map.name} / Code {room.id}</small></span>
+                      <span>{room.players}/{room.maxPlayers}</span>
+                    </button>
+                  );
+                })}
+                {!rooms.length && <div className="empty-rooms">No rooms are currently open.</div>}
+              </div>
+              <button className="primary-command join-room-command" disabled={!selectedRoomId} onClick={joinMatch}>
+                Join Selected Room
+              </button>
+              <form
+                className="game-code-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  joinRoomByCode(gameCode);
+                }}
+              >
+                <label>
+                  Game Code
+                  <input
+                    placeholder="Enter invite code"
+                    value={gameCode}
+                    onChange={(event) => setGameCode(event.target.value.toUpperCase())}
+                  />
+                </label>
+                <button type="submit">Find Room</button>
+              </form>
+            </>
+          )}
+          {accountStatus && <div className="lobby-message">{accountStatus}</div>}
         </div>
       </section>
     </main>
+  );
+}
+
+function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomDraft }) {
+  return (
+    <div className="create-room-form">
+      <label>
+        Room name
+        <input
+          value={roomDraft.name}
+          onChange={(event) => setRoomDraft((draft) => ({ ...draft, name: event.target.value }))}
+        />
+      </label>
+      <div className="map-choice-grid">
+        {MAPS.map((map) => (
+          <button
+            className={roomDraft.mapId === map.id ? 'map-choice active' : 'map-choice'}
+            disabled={!mapUnlocked(map)}
+            key={map.id}
+            onClick={() => setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}
+          >
+            <i style={{ background: map.accent }} />
+            <span>{map.name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mode-choice-grid">
+        {GAME_MODES.map((mode) => (
+          <button
+            className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'}
+            key={mode.id}
+            onClick={() => setRoomDraft((draft) => ({ ...draft, gameMode: mode.id }))}
+          >
+            <strong>{mode.short}</strong>
+            <span>{mode.name}</span>
+            <small>{mode.description}</small>
+          </button>
+        ))}
+      </div>
+      <label>
+        Max players
+        <input
+          type="number"
+          min="2"
+          max="6"
+          value={roomDraft.maxPlayers}
+          onChange={(event) => setRoomDraft((draft) => ({
+            ...draft,
+            maxPlayers: Math.max(2, Math.min(6, Number(event.target.value) || 2)),
+          }))}
+        />
+      </label>
+      <label className="simple-check">
+        <input
+          type="checkbox"
+          checked={roomDraft.allowBots}
+          onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))}
+        />
+        Fill empty spots with bots
+      </label>
+      <div className="create-actions">
+        <button className="secondary-command" onClick={() => setPanel('play')}>Cancel</button>
+        <button className="primary-command" onClick={createRoom}>Create Room</button>
+      </div>
+    </div>
   );
 }

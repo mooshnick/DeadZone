@@ -1,33 +1,142 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadUser, loginUser, registerUser, saveUserProgress } from '../api/users';
+import { createRoomOnServer, fetchRooms, findRoomByCode } from '../api/rooms';
+import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress } from '../api/users';
 import { GameWorld } from '../game/GameWorld';
-import { levelForXp, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
+import { ACCESSORIES, DEFAULT_GAME_MODE, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
 import { makeId } from '../game/utils';
 import {
   ADMIN_WALLET,
   ADMIN_XP,
   DEFAULT_KEYBINDS,
-  guestProgressKey,
-  loadKeybinds,
-  savedKeybindsKey,
-  savedUserKey,
+  keybindsKeyForUser,
+  loadKeybindsForUser,
   starterRooms,
 } from './appConstants';
 
+const ROUTES = {
+  auth: '/auth',
+  login: '/login',
+  register: '/register',
+  main: '/menu',
+  player: '/my-player',
+  settings: '/settings',
+  play: '/rooms',
+  create: '/rooms/new',
+  match: '/game',
+};
+
+const EMPTY_MISSION_STATS = { claimed: [], mapPlays: {}, weaponKills: {} };
+
+function normalizeRoom(room, fallback = {}) {
+  return {
+    ...fallback,
+    ...room,
+    gameMode: room?.gameMode || fallback.gameMode || DEFAULT_GAME_MODE,
+  };
+}
+
+function parseMissionStats(value) {
+  if (!value) return { ...EMPTY_MISSION_STATS };
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return {
+      claimed: Array.isArray(parsed.claimed) ? parsed.claimed : [],
+      mapPlays: parsed.mapPlays && typeof parsed.mapPlays === 'object' ? parsed.mapPlays : {},
+      weaponKills: parsed.weaponKills && typeof parsed.weaponKills === 'object' ? parsed.weaponKills : {},
+    };
+  } catch {
+    return { ...EMPTY_MISSION_STATS };
+  }
+}
+
+function missionProgress(mission, stats, totalKills, totalAssists) {
+  if (mission.type === 'kills') return totalKills;
+  if (mission.type === 'assists') return totalAssists;
+  if (mission.type === 'weaponKills') return stats.weaponKills?.[mission.weaponId] || 0;
+  if (mission.type === 'mapPlays') return stats.mapPlays?.[mission.mapId] || 0;
+  return 0;
+}
+
+function awardReadyMissions(stats, totalKills, totalAssists) {
+  const nextStats = {
+    claimed: [...(stats.claimed || [])],
+    mapPlays: { ...(stats.mapPlays || {}) },
+    weaponKills: { ...(stats.weaponKills || {}) },
+  };
+  const claimed = new Set(nextStats.claimed);
+  const completed = [];
+  let money = 0;
+  let xp = 0;
+
+  MISSIONS.forEach((mission) => {
+    if (claimed.has(mission.id) || missionProgress(mission, nextStats, totalKills, totalAssists) < mission.target) {
+      return;
+    }
+    claimed.add(mission.id);
+    nextStats.claimed.push(mission.id);
+    completed.push(mission);
+    money += mission.rewardMoney;
+    xp += mission.rewardXp;
+  });
+
+  return { completed, money, stats: nextStats, xp };
+}
+
+function routeStateFromPath(pathname = window.location.pathname) {
+  switch (pathname) {
+    case ROUTES.auth:
+      return { screen: 'auth', authMode: null };
+    case ROUTES.register:
+      return { screen: 'auth', authMode: 'register' };
+    case ROUTES.login:
+      return { screen: 'auth', authMode: 'login' };
+    case ROUTES.player:
+      return { screen: 'lobby', panel: 'player' };
+    case ROUTES.settings:
+      return { screen: 'lobby', panel: 'settings' };
+    case ROUTES.play:
+      return { screen: 'lobby', panel: 'play' };
+    case ROUTES.create:
+      return { screen: 'lobby', panel: 'create' };
+    case ROUTES.match:
+      return { screen: 'match', panel: 'play' };
+    case ROUTES.main:
+    default:
+      return { screen: 'lobby', panel: 'main' };
+  }
+}
+
+function routeForPanel(panel) {
+  return ROUTES[panel] || ROUTES.main;
+}
+
+function updateRoute(path, replace = false) {
+  if (window.location.pathname === path) return;
+  window.history[replace ? 'replaceState' : 'pushState']({}, '', path);
+}
+
 export function useDeadzoneController() {
-  const [screen, setScreen] = useState('lobby');
-  const [panel, setPanel] = useState('play');
+  const [screen, setScreen] = useState('loading');
+  const [panel, setPanel] = useState('main');
+  const [authMode, setAuthMode] = useState(() => routeStateFromPath().authMode || null);
   const [rooms, setRooms] = useState(starterRooms);
   const [selectedRoomId, setSelectedRoomId] = useState(starterRooms[0].id);
-  const [roomDraft, setRoomDraft] = useState({ name: 'Custom Arena', mapId: 'foundry', maxPlayers: 6, allowBots: true });
+  const [roomDraft, setRoomDraft] = useState({ name: 'Custom Arena', mapId: 'foundry', gameMode: DEFAULT_GAME_MODE, maxPlayers: 6, allowBots: true });
   const [name, setName] = useState('Player ' + makeId().toUpperCase().slice(0, 3));
   const [account, setAccount] = useState(null);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
-  const [accountStatus, setAccountStatus] = useState('Play as guest or create a saved account.');
+  const [credentials, setCredentials] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [accountStatus, setAccountStatus] = useState('');
   const [team, setTeam] = useState('blue');
   const [weaponId, setWeaponId] = useState('rifle');
   const [outfitId, setOutfitId] = useState('classic');
   const [weaponSkinId, setWeaponSkinId] = useState('standard');
+  const [grenadeSkinId, setGrenadeSkinId] = useState('standard');
+  const [accessoryIds, setAccessoryIds] = useState([]);
   const [score, setScore] = useState({ blue: 0, red: 0, players: [] });
   const [wallet, setWallet] = useState(0);
   const [xp, setXp] = useState(0);
@@ -36,72 +145,186 @@ export function useDeadzoneController() {
   const [totalDeaths, setTotalDeaths] = useState(0);
   const [ownedOutfits, setOwnedOutfits] = useState(['classic']);
   const [ownedWeaponSkins, setOwnedWeaponSkins] = useState(['standard']);
+  const [ownedGrenadeSkins, setOwnedGrenadeSkins] = useState(['standard']);
+  const [ownedAccessories, setOwnedAccessories] = useState([]);
   const [weaponUpgrades, setWeaponUpgrades] = useState({});
+  const [missionStats, setMissionStats] = useState(EMPTY_MISSION_STATS);
   const [previewOutfit, setPreviewOutfit] = useState(null);
-  const [keybinds, setKeybinds] = useState(loadKeybinds);
+  const [previewWeaponSkin, setPreviewWeaponSkin] = useState(null);
+  const [previewGrenadeSkin, setPreviewGrenadeSkin] = useState(null);
+  const [previewAccessory, setPreviewAccessory] = useState(null);
+  const [keybinds, setKeybinds] = useState(DEFAULT_KEYBINDS);
   const [editingKeybind, setEditingKeybind] = useState(null);
   const [events, setEvents] = useState(['Choose a room and enter the 3D arena.']);
   const [activeBuffs, setActiveBuffs] = useState('No buffs');
   const [isScoped, setIsScoped] = useState(false);
   const [ammo, setAmmo] = useState({ ammo: 0, magazineSize: 0, reloading: false, reloadProgress: 1 });
   const [deathInfo, setDeathInfo] = useState({ isDead: false, ready: false, seconds: 0 });
+  const [grenadeCharge, setGrenadeCharge] = useState(0);
+  const [showScoreboard, setShowScoreboard] = useState(false);
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
   const keys = useRef(new Set());
   const mouse = useRef({ down: false });
   const localId = useMemo(() => 'player-' + makeId(), []);
-  const matchConfig = useRef({ name, team, weaponId, mapId: 'foundry', maps: MAPS, maxPlayers: 6, outfitId, weaponSkinId, keybinds, money: wallet });
+  const matchConfig = useRef({ name, team, weaponId, mapId: 'foundry', gameMode: DEFAULT_GAME_MODE, maps: MAPS, maxPlayers: 6, outfitId, accessoryIds, weaponSkinId, keybinds, money: wallet });
 
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) || rooms[0];
   const selectedMap = MAPS.find((map) => map.id === selectedRoom?.mapId) || MAPS[0];
   const selectedOutfit = OUTFITS.find((outfit) => outfit.id === outfitId) || OUTFITS[0];
   const previewedOutfit = previewOutfit || selectedOutfit;
   const selectedWeaponSkin = WEAPON_SKINS.find((skin) => skin.id === weaponSkinId) || WEAPON_SKINS[0];
+  const selectedGrenadeSkin = GRENADE_SKINS.find((skin) => skin.id === grenadeSkinId) || GRENADE_SKINS[0];
+  const previewedWeaponSkin = previewWeaponSkin || selectedWeaponSkin;
+  const previewedGrenadeSkin = previewGrenadeSkin || selectedGrenadeSkin;
+  const equippedAccessories = accessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
+  const previewedAccessories = previewAccessory
+    ? [...equippedAccessories.filter((item) => item.slot !== previewAccessory.slot), previewAccessory]
+    : equippedAccessories;
   const level = levelForXp(xp);
   const nextLevelXp = xpForLevel(level + 1);
   const currentLevelXp = xpForLevel(level);
   const levelProgress = nextLevelXp === currentLevelXp ? 0 : Math.round(((xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100);
+  const missionCards = MISSIONS.map((mission) => {
+    const progress = missionProgress(mission, missionStats, totalKills, totalAssists);
+    return {
+      ...mission,
+      claimed: missionStats.claimed.includes(mission.id),
+      progress,
+      percent: Math.min(100, Math.round((progress / mission.target) * 100)),
+    };
+  });
 
   useEffect(() => {
-    const savedId = localStorage.getItem(savedUserKey);
-    if (!savedId) {
-      try {
-        const guest = JSON.parse(localStorage.getItem(guestProgressKey));
-        if (guest) {
-          setWallet(guest.wallet || 0);
-          setXp(guest.xp || 0);
-          setTotalKills(guest.totalKills || 0);
-          setTotalAssists(guest.totalAssists || 0);
-          setTotalDeaths(guest.totalDeaths || 0);
-          setOwnedOutfits(guest.ownedOutfits || ['classic']);
-          setOwnedWeaponSkins(guest.ownedWeaponSkins || ['standard']);
-          setWeaponUpgrades(guest.weaponUpgrades || {});
-          setOutfitId(guest.outfitId || 'classic');
-          setWeaponSkinId(guest.weaponSkinId || 'standard');
+    const applyBrowserRoute = () => {
+      const route = routeStateFromPath();
+      if (route.screen === 'auth') {
+        setAuthMode(route.authMode);
+        if (!account) {
+          setScreen('auth');
         }
-      } catch {
-        localStorage.removeItem(guestProgressKey);
+        return;
       }
+      if (route.screen === 'match') {
+        setPanel('play');
+        if (account) setScreen('match');
+        return;
+      }
+      setPanel(route.panel || 'main');
+      if (account) setScreen('lobby');
+    };
+
+    window.addEventListener('popstate', applyBrowserRoute);
+    return () => window.removeEventListener('popstate', applyBrowserRoute);
+  }, [account]);
+
+  useEffect(() => {
+    const route = routeStateFromPath();
+    if (!hasSession()) {
+      if (route.screen !== 'auth') {
+        updateRoute(ROUTES.login, true);
+        setAuthMode('login');
+      } else {
+        setAuthMode(route.authMode || 'login');
+      }
+      setScreen('auth');
       return;
     }
 
-    loadUser(savedId)
-      .then((user) => applyUser(user, 'Loaded saved account.'))
+    loadUser()
+      .then((user) => {
+        const restoredRoute = routeStateFromPath();
+        applyUser(user, 'Session restored.');
+        if (restoredRoute.screen === 'auth') {
+          setPanel('main');
+          setScreen('lobby');
+          updateRoute(ROUTES.main, true);
+          return;
+        }
+        setPanel(restoredRoute.panel || 'main');
+        if (restoredRoute.screen === 'match') {
+          const room = starterRooms[0];
+          const restoredWeaponId = WEAPONS[user.weaponId] ? user.weaponId : 'rifle';
+          const restoredTeam = autoTeamForRoom(room);
+          setSelectedRoomId(room.id);
+          setTeam(restoredTeam);
+          matchConfig.current = {
+            name: user.username,
+            team: restoredTeam,
+            weaponId: restoredWeaponId,
+            outfitId: user.outfitId || 'classic',
+            accessoryIds: user.accessoryIds || [],
+            weaponSkinId: user.weaponSkinId || 'standard',
+            weaponLevel: user.weaponUpgrades?.[restoredWeaponId] || 0,
+            mapId: room.mapId,
+            gameMode: room.gameMode || DEFAULT_GAME_MODE,
+            maps: MAPS,
+            maxPlayers: room.maxPlayers,
+            allowBots: room.allowBots,
+            keybinds: loadKeybindsForUser(user),
+            onProgressChange: handleProgressChange,
+            money: user.admin ? ADMIN_WALLET : user.wallet || 0,
+          };
+        }
+        setScreen(restoredRoute.screen === 'match' ? 'match' : 'lobby');
+      })
       .catch(() => {
-        localStorage.removeItem(savedUserKey);
-        setAccountStatus('Saved account was not available. Playing as guest.');
+        clearSession();
+        setAccountStatus('Your saved session expired. Please log in again.');
+        setAuthMode('login');
+        updateRoute(ROUTES.login, true);
+        setScreen('auth');
       });
   }, []);
 
   useEffect(() => {
+    if (!account || screen !== 'lobby') return;
+    fetchRooms()
+      .then((openRooms) => {
+        const normalizedRooms = openRooms.map((room) => normalizeRoom(room));
+        setRooms(normalizedRooms);
+        setSelectedRoomId((current) => (
+          normalizedRooms.some((room) => room.id === current) ? current : normalizedRooms[0]?.id || ''
+        ));
+      })
+      .catch((error) => setAccountStatus(error.message));
+  }, [account, screen]);
+
+  useEffect(() => {
+    if (!editingKeybind) return undefined;
+    const capture = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setKeybinds((current) => {
+        const next = { ...current, [editingKeybind]: event.code };
+        if (account) {
+          localStorage.setItem(keybindsKeyForUser(account), JSON.stringify(next));
+        }
+        return next;
+      });
+      setEditingKeybind(null);
+    };
+    window.addEventListener('keydown', capture, { capture: true });
+    return () => window.removeEventListener('keydown', capture, { capture: true });
+  }, [account, editingKeybind]);
+
+  useEffect(() => {
     const down = (event) => {
-      if (screen === 'match' && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+      if (screen === 'match' && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(event.code)) {
         event.preventDefault();
+      }
+      if (screen === 'match' && event.code === 'Tab') {
+        setShowScoreboard(true);
       }
       keys.current.add(event.code);
     };
-    const up = (event) => keys.current.delete(event.code);
+    const up = (event) => {
+      if (event.code === 'Tab') {
+        setShowScoreboard(false);
+      }
+      keys.current.delete(event.code);
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
@@ -127,6 +350,7 @@ export function useDeadzoneController() {
       onDeathChange: setDeathInfo,
       onWalletChange: handleWalletChange,
       onScopeChange: setIsScoped,
+      onGrenadeChargeChange: setGrenadeCharge,
       onEvent: (message) => setEvents((items) => [message, ...items].slice(0, 5)),
     });
 
@@ -146,8 +370,10 @@ export function useDeadzoneController() {
   }, [localId, screen]);
 
   function applyUser(user, message) {
+    if (!user?.username) {
+      throw new Error('The login response did not include a valid user.');
+    }
     setAccount(user);
-    localStorage.setItem(savedUserKey, user.id);
     setName(user.username);
     setWallet(user.admin ? ADMIN_WALLET : user.wallet || 0);
     setXp(user.admin ? ADMIN_XP : user.xp || 0);
@@ -156,9 +382,16 @@ export function useDeadzoneController() {
     setTotalDeaths(user.totalDeaths || 0);
     setOwnedOutfits(user.ownedOutfits || ['classic']);
     setOwnedWeaponSkins(user.ownedWeaponSkins || ['standard']);
+    setOwnedGrenadeSkins(user.ownedGrenadeSkins || ['standard']);
+    setOwnedAccessories(user.ownedAccessories || []);
     setWeaponUpgrades(user.weaponUpgrades || {});
     setOutfitId(user.outfitId || 'classic');
+    setAccessoryIds(user.accessoryIds || []);
+    setWeaponId(WEAPONS[user.weaponId] ? user.weaponId : 'rifle');
     setWeaponSkinId(user.weaponSkinId || 'standard');
+    setGrenadeSkinId(user.grenadeSkinId || 'standard');
+    setMissionStats(parseMissionStats(user.missionStats));
+    setKeybinds(loadKeybindsForUser(user));
     setAccountStatus(message);
   }
 
@@ -166,59 +399,82 @@ export function useDeadzoneController() {
     const normalizedProgress = account?.admin
       ? { ...progress, wallet: ADMIN_WALLET, xp: ADMIN_XP }
       : progress;
-    if (!account?.id) {
-      const current = {
-        wallet,
-        xp,
-        totalKills,
-        totalAssists,
-        totalDeaths,
-        ownedOutfits,
-        ownedWeaponSkins,
-        weaponUpgrades,
-        outfitId,
-        weaponSkinId,
-        ...normalizedProgress,
-      };
-      localStorage.setItem(guestProgressKey, JSON.stringify(current));
-      return;
-    }
-    saveUserProgress(account.id, normalizedProgress).catch(() => {
-      setAccountStatus('Could not save progress. Start the server to keep wallet changes.');
+    if (!account?.id) return;
+    saveUserProgress(normalizedProgress).catch(() => {
+      setAccountStatus('Could not save player progress.');
     });
   }
 
   function handleWalletChange(amount) {
     const nextWallet = account?.admin ? ADMIN_WALLET : amount;
     setWallet(nextWallet);
-    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, weaponUpgrades, outfitId, weaponSkinId });
+    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId });
   }
 
   function handleProgressChange(progress) {
     const nextTotalKills = progress.reason === 'kill' ? totalKills + 1 : totalKills;
     const nextTotalAssists = progress.reason === 'assist' ? totalAssists + 1 : totalAssists;
+    const nextMissionStats = parseMissionStats(missionStats);
+    if (progress.reason === 'kill' && progress.weaponId) {
+      nextMissionStats.weaponKills[progress.weaponId] = (nextMissionStats.weaponKills[progress.weaponId] || 0) + 1;
+    }
+    const missionAwards = awardReadyMissions(nextMissionStats, nextTotalKills, nextTotalAssists);
+    setMissionStats(missionAwards.stats);
+    const walletBase = progress.wallet ?? wallet;
+    const nextWallet = account?.admin ? ADMIN_WALLET : walletBase + missionAwards.money;
+    setWallet(nextWallet);
     setTotalKills(nextTotalKills);
     setTotalAssists(nextTotalAssists);
     setXp((currentXp) => {
-      const nextXp = account?.admin ? ADMIN_XP : currentXp + progress.xp;
-      saveProgress({ wallet, xp: nextXp, totalKills: nextTotalKills, totalAssists: nextTotalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, weaponUpgrades, outfitId, weaponSkinId });
+      const nextXp = account?.admin ? ADMIN_XP : currentXp + progress.xp + missionAwards.xp;
+      saveProgress({
+        wallet: nextWallet,
+        xp: nextXp,
+        totalKills: nextTotalKills,
+        totalAssists: nextTotalAssists,
+        totalDeaths,
+        ownedOutfits,
+        ownedWeaponSkins,
+        ownedGrenadeSkins,
+        ownedAccessories,
+        accessoryIds,
+        weaponUpgrades,
+        outfitId,
+        weaponId,
+        weaponSkinId,
+        grenadeSkinId,
+        missionStats: JSON.stringify(missionAwards.stats),
+      });
       return nextXp;
     });
-    setEvents((items) => [`+${progress.xp} XP for ${progress.reason}`, ...items].slice(0, 5));
+    const missionMessages = missionAwards.completed.map((mission) => `Mission complete: ${mission.title} +🪙 ${mission.rewardMoney} +${mission.rewardXp} XP`);
+    setEvents((items) => [`+${progress.xp} XP for ${progress.reason}`, ...missionMessages, ...items].slice(0, 5));
   }
 
   async function handleAccountAction(action) {
     const username = credentials.username.trim();
-    const password = credentials.password.trim();
+    const password = credentials.password;
     if (!username || !password) {
       setAccountStatus('Enter username and password first.');
       return;
     }
+    if (action === 'register' && !credentials.email.trim()) {
+      setAccountStatus('Enter an email address.');
+      return;
+    }
+    if (action === 'register' && password !== credentials.confirmPassword) {
+      setAccountStatus('Passwords do not match.');
+      return;
+    }
     try {
       const user = action === 'register'
-        ? await registerUser(username, password)
+        ? await registerUser(username, credentials.email.trim(), password)
         : await loginUser(username, password);
       applyUser(user, action === 'register' ? 'Account created and saved.' : 'Logged in.');
+      setCredentials({ username: '', email: '', password: '', confirmPassword: '' });
+      setPanel('main');
+      setScreen('lobby');
+      updateRoute(ROUTES.main, true);
     } catch (error) {
       setAccountStatus(error.message);
     }
@@ -226,24 +482,94 @@ export function useDeadzoneController() {
 
   function signOut() {
     setAccount(null);
-    localStorage.removeItem(savedUserKey);
-    setAccountStatus('Signed out. Playing as guest.');
+    clearSession();
+    setCredentials({ username: '', email: '', password: '', confirmPassword: '' });
+    setKeybinds(DEFAULT_KEYBINDS);
+    setEditingKeybind(null);
+    setPanel('main');
+    setScreen('auth');
+    setAuthMode('login');
+    updateRoute(ROUTES.login, true);
+    setAccountStatus('You have been logged out.');
   }
 
   function updateKeybind(action, code) {
     const next = { ...keybinds, [action]: code };
     setKeybinds(next);
-    localStorage.setItem(savedKeybindsKey, JSON.stringify(next));
+    if (account) {
+      localStorage.setItem(keybindsKeyForUser(account), JSON.stringify(next));
+    }
     setEditingKeybind(null);
   }
 
   function resetKeybinds() {
     setKeybinds(DEFAULT_KEYBINDS);
-    localStorage.setItem(savedKeybindsKey, JSON.stringify(DEFAULT_KEYBINDS));
+    if (account) {
+      localStorage.setItem(keybindsKeyForUser(account), JSON.stringify(DEFAULT_KEYBINDS));
+    }
     setEditingKeybind(null);
   }
 
+  function openPanel(nextPanel, replace = false) {
+    setPanel(nextPanel);
+    setScreen('lobby');
+    updateRoute(routeForPanel(nextPanel), replace);
+  }
+
+  function openAuthMode(nextMode) {
+    setAuthMode(nextMode);
+    setScreen('auth');
+    updateRoute(nextMode === 'register' ? ROUTES.register : nextMode === 'login' ? ROUTES.login : ROUTES.auth);
+  }
+
+  function equipOwnedOutfitDuringMatch(nextOutfitId) {
+    if (!ownedOutfits.includes(nextOutfitId)) return;
+    setOutfitId(nextOutfitId);
+    matchConfig.current.outfitId = nextOutfitId;
+    worldRef.current?.updateLocalCosmetics({
+      outfitId: nextOutfitId,
+      accessoryIds,
+      weaponSkinId,
+    });
+    saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId: nextOutfitId, weaponId, weaponSkinId, grenadeSkinId });
+  }
+
+  function toggleOwnedAccessoryDuringMatch(accessory) {
+    if (!ownedAccessories.includes(accessory.id)) return;
+    const hasAccessory = accessoryIds.includes(accessory.id);
+    const nextAccessoryIds = hasAccessory
+      ? accessoryIds.filter((id) => id !== accessory.id)
+      : [
+        ...accessoryIds.filter((id) => ACCESSORIES.find((item) => item.id === id)?.slot !== accessory.slot),
+        accessory.id,
+      ];
+    setAccessoryIds(nextAccessoryIds);
+    matchConfig.current.accessoryIds = nextAccessoryIds;
+    worldRef.current?.updateLocalCosmetics({
+      outfitId,
+      accessoryIds: nextAccessoryIds,
+      weaponSkinId,
+    });
+    saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds: nextAccessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId });
+  }
+
+  function equipWeaponDuringMatch(nextWeaponId) {
+    if (!weaponUnlocked(WEAPONS[nextWeaponId])) return;
+    setWeaponId(nextWeaponId);
+    matchConfig.current.weaponId = nextWeaponId;
+    matchConfig.current.weaponLevel = weaponUpgrades[nextWeaponId] || 0;
+    worldRef.current?.updateLocalCosmetics({
+      outfitId,
+      accessoryIds,
+      weaponId: nextWeaponId,
+      weaponLevel: weaponUpgrades[nextWeaponId] || 0,
+      weaponSkinId,
+    });
+    saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId: nextWeaponId, weaponSkinId, grenadeSkinId });
+  }
+
   function autoTeamForRoom(room) {
+    if (!room) return 'blue';
     const blue = room.bluePlayers ?? Math.ceil((room.players || 0) / 2);
     const red = room.redPlayers ?? Math.floor((room.players || 0) / 2);
     return blue <= red ? 'blue' : 'red';
@@ -254,6 +580,7 @@ export function useDeadzoneController() {
   }
 
   function weaponUnlocked(weapon) {
+    if (!weapon) return false;
     return level >= (weapon.unlockLevel || 1);
   }
 
@@ -272,30 +599,108 @@ export function useDeadzoneController() {
     keys.current.clear();
     mouse.current.down = false;
     setScreen('lobby');
+    setPanel('play');
+    updateRoute(ROUTES.play);
     setIsScoped(false);
+    setGrenadeCharge(0);
+    setShowScoreboard(false);
     setDeathInfo({ isDead: false, ready: false, seconds: 0 });
     setEvents(['Returned to lobby.']);
   }
 
-  const createRoom = () => {
-    const id = 'ROOM-' + makeId().toUpperCase();
-    const room = {
-      id,
+  const createRoom = async () => {
+    const roomPayload = {
       name: roomDraft.name.trim() || 'Custom Arena',
       mapId: roomDraft.mapId,
-      players: 1,
-      maxPlayers: Number(roomDraft.maxPlayers),
+      maxPlayers: Math.max(2, Math.min(6, Number(roomDraft.maxPlayers) || 6)),
       allowBots: roomDraft.allowBots,
-      bluePlayers: 0,
-      redPlayers: 0,
+      gameMode: roomDraft.gameMode || DEFAULT_GAME_MODE,
     };
-    setRooms((items) => [room, ...items]);
-    setSelectedRoomId(id);
-    setPanel('play');
+    const applyCreatedRoom = (serverRoom, message) => {
+      const room = normalizeRoom(serverRoom, roomPayload);
+      setRooms((items) => [room, ...items.filter((item) => item.id !== room.id)]);
+      setSelectedRoomId(room.id);
+      setPanel('play');
+      updateRoute(ROUTES.play);
+      setAccountStatus(message);
+    };
+
+    try {
+      const room = await createRoomOnServer(roomPayload);
+      applyCreatedRoom(room, `Room created. Invite code: ${room.id}`);
+    } catch {
+      const localRoom = {
+        id: `ROOM-${makeId().toUpperCase()}`,
+        ...roomPayload,
+        players: 0,
+        bluePlayers: 0,
+        redPlayers: 0,
+      };
+      applyCreatedRoom(localRoom, `Room created locally. Invite code: ${localRoom.id}`);
+    }
   };
+
+  const joinRoomByCode = async (code) => {
+    if (!code.trim()) {
+      setAccountStatus('Enter a game code.');
+      return;
+    }
+    try {
+      const room = await findRoomByCode(code);
+      const normalizedRoom = normalizeRoom(room);
+      setRooms((items) => [normalizedRoom, ...items.filter((item) => item.id !== normalizedRoom.id)]);
+      setSelectedRoomId(normalizedRoom.id);
+      setAccountStatus(`Room ${normalizedRoom.id} selected.`);
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  };
+
+  function recordMapMission(mapId) {
+    const nextMissionStats = parseMissionStats(missionStats);
+    nextMissionStats.mapPlays[mapId] = (nextMissionStats.mapPlays[mapId] || 0) + 1;
+    const missionAwards = awardReadyMissions(nextMissionStats, totalKills, totalAssists);
+    setMissionStats(missionAwards.stats);
+    const nextWallet = account?.admin ? ADMIN_WALLET : wallet + missionAwards.money;
+    const nextXp = account?.admin ? ADMIN_XP : xp + missionAwards.xp;
+    if (missionAwards.money > 0) {
+      setWallet(nextWallet);
+    }
+    if (missionAwards.xp > 0) {
+      setXp(nextXp);
+    }
+    saveProgress({
+      wallet: nextWallet,
+      xp: nextXp,
+      totalKills,
+      totalAssists,
+      totalDeaths,
+      ownedOutfits,
+      ownedWeaponSkins,
+      ownedGrenadeSkins,
+      ownedAccessories,
+      accessoryIds,
+      weaponUpgrades,
+      outfitId,
+      weaponId,
+      weaponSkinId,
+      grenadeSkinId,
+      missionStats: JSON.stringify(missionAwards.stats),
+    });
+    if (missionAwards.completed.length) {
+      setEvents((items) => [
+        ...missionAwards.completed.map((mission) => `Mission complete: ${mission.title} +🪙 ${mission.rewardMoney} +${mission.rewardXp} XP`),
+        ...items,
+      ].slice(0, 5));
+    }
+  }
 
   const joinMatch = () => {
     const room = rooms.find((item) => item.id === selectedRoomId) || rooms[0];
+    if (!room) {
+      setAccountStatus('Select or create a room first.');
+      return;
+    }
     const trimmedName = name.trim() || 'Player';
     const assignedTeam = autoTeamForRoom(room);
     const allowedWeaponId = weaponUnlocked(WEAPONS[weaponId]) ? weaponId : 'rifle';
@@ -304,9 +709,11 @@ export function useDeadzoneController() {
       team: assignedTeam,
       weaponId: allowedWeaponId,
       outfitId,
+      accessoryIds,
       weaponSkinId,
       weaponLevel: weaponUpgrades[allowedWeaponId] || 0,
       mapId: room.mapId,
+      gameMode: room.gameMode || DEFAULT_GAME_MODE,
       maps: MAPS,
       maxPlayers: room.maxPlayers,
       allowBots: room.allowBots,
@@ -326,21 +733,61 @@ export function useDeadzoneController() {
     }));
     setName(trimmedName);
     setIsScoped(false);
+    setGrenadeCharge(0);
+    setShowScoreboard(false);
     setDeathInfo({ isDead: false, ready: false, seconds: 0 });
     setWeaponId(allowedWeaponId);
     setEvents([`${trimmedName} entered ${room.name} with ${WEAPONS[allowedWeaponId].name}`]);
+    recordMapMission(room.mapId);
     setScreen('match');
+    updateRoute(ROUTES.match);
+  };
+
+  const selectWeapon = (id) => {
+    if (!weaponUnlocked(WEAPONS[id])) {
+      return;
+    }
+    setWeaponId(id);
+    saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId: id, weaponSkinId, grenadeSkinId });
+  };
+
+  const buyOrEquipAccessory = (accessory) => {
+    if (ownedAccessories.includes(accessory.id)) {
+      const nextAccessoryIds = [
+        ...accessoryIds.filter((id) => ACCESSORIES.find((item) => item.id === id)?.slot !== accessory.slot),
+        accessory.id,
+      ];
+      setAccessoryIds(nextAccessoryIds);
+      setPreviewAccessory(null);
+      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds: nextAccessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId });
+      return;
+    }
+    if (wallet < accessory.price) {
+      setEvents((items) => [`Need 🪙 ${accessory.price - wallet} more for ${accessory.name}`, ...items].slice(0, 5));
+      return;
+    }
+    const nextWallet = wallet - accessory.price;
+    const nextOwnedAccessories = [...ownedAccessories, accessory.id];
+    const nextAccessoryIds = [
+      ...accessoryIds.filter((id) => ACCESSORIES.find((item) => item.id === id)?.slot !== accessory.slot),
+      accessory.id,
+    ];
+    setWallet(nextWallet);
+    setOwnedAccessories(nextOwnedAccessories);
+    setAccessoryIds(nextAccessoryIds);
+    setPreviewAccessory(null);
+    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories: nextOwnedAccessories, accessoryIds: nextAccessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId });
   };
 
   const buyOrEquipOutfit = (outfit) => {
     if (ownedOutfits.includes(outfit.id)) {
       setOutfitId(outfit.id);
       setPreviewOutfit(null);
-      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, weaponUpgrades, outfitId: outfit.id, weaponSkinId });
+      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId: outfit.id, weaponId, weaponSkinId, grenadeSkinId });
       return;
     }
     if (wallet < outfit.price) {
-      setEvents((items) => [`Need NIS ${outfit.price - wallet} more for ${outfit.name}`, ...items].slice(0, 5));
+      setEvents((items) => [`Need 🪙 ${outfit.price - wallet} more for ${outfit.name}`, ...items].slice(0, 5));
       return;
     }
     const nextWallet = wallet - outfit.price;
@@ -349,17 +796,18 @@ export function useDeadzoneController() {
     setOwnedOutfits(nextOwnedOutfits);
     setOutfitId(outfit.id);
     setPreviewOutfit(null);
-    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits: nextOwnedOutfits, ownedWeaponSkins, weaponUpgrades, outfitId: outfit.id, weaponSkinId });
+    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits: nextOwnedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId: outfit.id, weaponId, weaponSkinId, grenadeSkinId });
   };
 
   const buyOrEquipWeaponSkin = (skin) => {
     if (ownedWeaponSkins.includes(skin.id)) {
       setWeaponSkinId(skin.id);
-      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, weaponUpgrades, outfitId, weaponSkinId: skin.id });
+      setPreviewWeaponSkin(null);
+      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId: skin.id, grenadeSkinId });
       return;
     }
     if (wallet < skin.price) {
-      setEvents((items) => [`Need NIS ${skin.price - wallet} more for ${skin.name}`, ...items].slice(0, 5));
+      setEvents((items) => [`Need 🪙 ${skin.price - wallet} more for ${skin.name}`, ...items].slice(0, 5));
       return;
     }
     const nextWallet = wallet - skin.price;
@@ -367,21 +815,58 @@ export function useDeadzoneController() {
     setWallet(nextWallet);
     setOwnedWeaponSkins(nextOwnedWeaponSkins);
     setWeaponSkinId(skin.id);
-    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins: nextOwnedWeaponSkins, weaponUpgrades, outfitId, weaponSkinId: skin.id });
+    setPreviewWeaponSkin(null);
+    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins: nextOwnedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId: skin.id, grenadeSkinId });
+  };
+
+  const buyOrEquipGrenadeSkin = (skin) => {
+    if (ownedGrenadeSkins.includes(skin.id)) {
+      setGrenadeSkinId(skin.id);
+      setPreviewGrenadeSkin(null);
+      saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId: skin.id });
+      return;
+    }
+    if (wallet < skin.price) {
+      setAccountStatus(`You need 🪙 ${skin.price - wallet} more for ${skin.name}.`);
+      return;
+    }
+    const nextWallet = wallet - skin.price;
+    const nextOwnedGrenadeSkins = [...ownedGrenadeSkins, skin.id];
+    setWallet(nextWallet);
+    setOwnedGrenadeSkins(nextOwnedGrenadeSkins);
+    setGrenadeSkinId(skin.id);
+    setPreviewGrenadeSkin(null);
+    saveProgress({
+      wallet: nextWallet,
+      xp,
+      totalKills,
+      totalAssists,
+      totalDeaths,
+      ownedOutfits,
+      ownedWeaponSkins,
+      ownedAccessories,
+      accessoryIds,
+      weaponUpgrades,
+      outfitId,
+      weaponId,
+      weaponSkinId,
+      grenadeSkinId: skin.id,
+      ownedGrenadeSkins: nextOwnedGrenadeSkins,
+    });
   };
 
   const upgradeWeapon = (id) => {
     const current = weaponUpgrades[id] || 0;
     const price = 75 + current * 65;
     if (wallet < price) {
-      setEvents((items) => [`Need NIS ${price - wallet} more to upgrade`, ...items].slice(0, 5));
+      setEvents((items) => [`Need 🪙 ${price - wallet} more to upgrade`, ...items].slice(0, 5));
       return;
     }
     const nextWallet = wallet - price;
     const nextUpgrades = { ...weaponUpgrades, [id]: current + 1 };
     setWallet(nextWallet);
     setWeaponUpgrades(nextUpgrades);
-    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, weaponUpgrades: nextUpgrades, outfitId, weaponSkinId });
+    saveProgress({ wallet: nextWallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades: nextUpgrades, outfitId, weaponId, weaponSkinId, grenadeSkinId });
   };
 
   return {
@@ -389,7 +874,11 @@ export function useDeadzoneController() {
     lobbyProps: {
       account,
       accountStatus,
+      authMode,
       autoTeamForRoom,
+      accessoryIds,
+      buyOrEquipAccessory,
+      buyOrEquipGrenadeSkin,
       buyOrEquipOutfit,
       buyOrEquipWeaponSkin,
       createRoom,
@@ -397,36 +886,53 @@ export function useDeadzoneController() {
       editingKeybind,
       handleAccountAction,
       joinMatch,
+      joinRoomByCode,
       keybinds,
       level,
       levelProgress,
       mapUnlocked,
+      missionCards,
       name,
+      outfitId,
       ownedOutfits,
+      ownedGrenadeSkins,
+      ownedAccessories,
       ownedWeaponSkins,
       panel,
       previewOutfit,
+      previewWeaponSkin,
+      previewGrenadeSkin,
+      previewAccessory,
       previewedOutfit,
+      previewedWeaponSkin,
+      previewedGrenadeSkin,
+      previewedAccessories,
       resetKeybinds,
       roomDraft,
       rooms,
       selectedMap,
+      selectedGrenadeSkin,
       selectedRoom,
       selectedRoomId,
       selectedWeaponSkin,
       setCredentials,
       setEditingKeybind,
       setName,
-      setPanel,
+      setPanel: openPanel,
+      setAuthMode: openAuthMode,
       setPreviewOutfit,
+      setPreviewWeaponSkin,
+      setPreviewGrenadeSkin,
+      setPreviewAccessory,
       setRoomDraft,
       setSelectedRoomId,
-      setWeaponId,
+      selectWeapon,
       signOut,
       updateKeybind,
       upgradeWeapon,
       wallet,
       weaponId,
+      grenadeSkinId,
       weaponSkinId,
       weaponUnlocked,
       weaponUpgrades,
@@ -438,13 +944,29 @@ export function useDeadzoneController() {
       canvasRef,
       currentMatch: matchConfig.current,
       deathInfo,
+      equippedAccessoryIds: accessoryIds,
+      equipOwnedOutfitDuringMatch,
+      equipWeaponDuringMatch,
       events,
+      grenadeCharge,
       isScoped,
       leaveMatch,
       localId,
+      onToggleAccessoryDuringMatch: toggleOwnedAccessoryDuringMatch,
+      outfitId,
+      ownedAccessories,
+      ownedOutfits,
+      weaponId,
+      weaponSkinId,
+      grenadeSkinId,
+      weaponUnlocked,
       score,
       selectedRoomId,
       wallet,
+      xp,
+      level,
+      levelProgress,
+      showScoreboard,
       worldRef,
     },
   };

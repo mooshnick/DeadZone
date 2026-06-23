@@ -116,23 +116,50 @@ export class ArenaLayouts {
     const b = ArenaLayouts.block;
     const s = ArenaLayouts.stairs;
     const ts = ArenaLayouts.tallStairs;
+    const fs = ArenaLayouts.floorStairs;
     const cs = ArenaLayouts.castleStairs;
     const theme = map.theme || map.id;
     const layouts = {
       foundry: [
-        b(0, 0, 28, 24, 1, 5.5, 'factory-deck'),
-        b(-14, 0, 1, 24, 5, 8.2, 'factory-wall'),
-        b(14, 0, 1, 24, 5, 8.2, 'factory-wall'),
-        b(0, -12, 28, 1, 5, 8.2, 'factory-wall'),
-        b(-5, 2, 1, 10, 3, 7, 'factory-cover'),
-        b(6, -3, 8, 1, 3, 7, 'factory-cover'),
-        ...ts(-20, -9, 1, 0, 0, 5.5, 8, 'metal-steps'),
-        b(0, -26, 20, 5, 3),
-        b(-28, 0, 7, 22, 4),
-        b(28, 0, 7, 22, 4),
-        b(-12, 24, 20, 5, 3),
-        b(16, -2, 9, 9, 5),
-        b(-2, 10, 7, 16, 2.5),
+        b(0, -59, 118, 3, 11, 5.5, 'factory-boundary-wall'),
+        b(0, 59, 118, 3, 11, 5.5, 'factory-boundary-wall'),
+        b(-59, 0, 3, 118, 11, 5.5, 'factory-boundary-wall'),
+        b(59, 0, 3, 118, 11, 5.5, 'factory-boundary-wall'),
+        b(-50, -50, 10, 10, 12, 6, 'factory-corner-tower'),
+        b(50, -50, 10, 10, 12, 6, 'factory-corner-tower'),
+        b(-50, 50, 10, 10, 12, 6, 'factory-corner-tower'),
+        b(50, 50, 10, 10, 12, 6, 'factory-corner-tower'),
+
+        b(-21, -4, 2.5, 30, 4.2, 2.1, 'factory-spawn-wall'),
+        b(21, -4, 2.5, 30, 4.2, 2.1, 'factory-spawn-wall'),
+        b(-40, -30, 12, 4, 2.6, 1.3, 'factory-crate-stack'),
+        b(-39, 10, 8, 5, 2.4, 1.2, 'factory-crate-stack'),
+        b(40, 30, 12, 4, 2.6, 1.3, 'factory-crate-stack'),
+        b(39, -10, 8, 5, 2.4, 1.2, 'factory-crate-stack'),
+
+        b(0, 0, 14, 9, 3.2, 1.6, 'factory-furnace'),
+        b(-15, 0, 8, 3, 2.2, 1.1, 'factory-low-cover'),
+        b(15, 0, 8, 3, 2.2, 1.1, 'factory-low-cover'),
+        b(0, -18, 14, 3, 2.4, 1.2, 'factory-low-cover'),
+        b(0, 18, 14, 3, 2.4, 1.2, 'factory-low-cover'),
+        b(-18, -27, 10, 4, 3, 1.5, 'factory-machine'),
+        b(18, 27, 10, 4, 3, 1.5, 'factory-machine'),
+        b(-18, 27, 5, 10, 3, 1.5, 'factory-machine'),
+        b(18, -27, 5, 10, 3, 1.5, 'factory-machine'),
+
+        b(0, 36, 32, 8, 1, 5.4, 'factory-deck'),
+        b(0, -36, 32, 8, 1, 5.4, 'factory-deck'),
+        b(0, 40.6, 25, 1.1, 2.4, 6.65, 'factory-rail'),
+        b(0, -40.6, 25, 1.1, 2.4, 6.65, 'factory-rail'),
+        b(-14.4, 36, 1.1, 3.2, 2.4, 6.65, 'factory-rail'),
+        b(14.4, -36, 1.1, 3.2, 2.4, 6.65, 'factory-rail'),
+        ...fs(-34, 34, 1, 0, 0.7, 5.95, 9, 'metal-steps'),
+        ...fs(34, -34, -1, 0, 0.7, 5.95, 9, 'metal-steps'),
+
+        b(-45, 0, 5, 22, 3.2, 1.6, 'factory-pipe-cover'),
+        b(45, 0, 5, 22, 3.2, 1.6, 'factory-pipe-cover'),
+        b(-8, -43, 16, 4, 2.6, 1.3, 'factory-barrier'),
+        b(8, 43, 16, 4, 2.6, 1.3, 'factory-barrier'),
       ],
       pitch: [
         b(0, 0, 32, 18, 1, 5.2, 'upper-stand'),
@@ -311,10 +338,52 @@ export class ArenaLayouts {
         b(40, 0, 6, 42, 6, 3, 'module'),
         b(0, -40, 42, 6, 6, 3, 'module'),
         b(0, 40, 42, 6, 6, 3, 'module'),
+        ...ts(-56, -18, 1, 0, 0, 6, 10, 'metal-steps'),
+        ...ts(56, 18, -1, 0, 0, 6, 10, 'metal-steps'),
+        ...ts(-18, -56, 0, 1, 0, 6, 10, 'metal-steps'),
+        ...ts(18, 56, 0, -1, 0, 6, 10, 'metal-steps'),
+        b(-40, -18, 8, 8, 1, 5.5, 'upper-module'),
+        b(40, 18, 8, 8, 1, 5.5, 'upper-module'),
+        b(-18, -40, 8, 8, 1, 5.5, 'upper-module'),
+        b(18, 40, 8, 8, 1, 5.5, 'upper-module'),
         b(-22, -22, 14, 9, 2, 8, 'upper-module'),
         b(22, 22, 14, 9, 2, 8, 'upper-module'),
         ...s(-33, -12, 1, 0, 7, 'metal-steps'),
         ...s(33, 12, -1, 0, 7, 'metal-steps'),
+      ],
+      apocalyptic: [
+        b(0, -62, 124, 3, 11, 5.5, 'city-boundary'),
+        b(0, 62, 124, 3, 11, 5.5, 'city-boundary'),
+        b(-62, 0, 3, 124, 11, 5.5, 'city-boundary'),
+        b(62, 0, 3, 124, 11, 5.5, 'city-boundary'),
+
+        b(-46, -42, 14, 18, 13, 6.5, 'city-building'),
+        b(-22, -44, 16, 12, 8, 4, 'city-building'),
+        b(14, -46, 20, 10, 10, 5, 'city-building'),
+        b(42, -38, 12, 22, 15, 7.5, 'city-building'),
+
+        b(-42, -10, 12, 20, 9, 4.5, 'city-building'),
+        b(-14, -12, 14, 10, 6, 3, 'city-building'),
+        b(18, -14, 12, 18, 12, 6, 'city-building'),
+        b(44, -6, 12, 14, 8, 4, 'city-building'),
+
+        b(-48, 25, 16, 18, 14, 7, 'city-building'),
+        b(-20, 26, 18, 12, 7, 3.5, 'city-building'),
+        b(12, 24, 13, 20, 11, 5.5, 'city-building'),
+        b(40, 30, 17, 14, 9, 4.5, 'city-building'),
+
+        b(0, 0, 6, 28, 2.8, 1.4, 'city-bus'),
+        b(-28, 6, 12, 4, 2.4, 1.2, 'city-car-cover'),
+        b(29, 8, 13, 4, 2.4, 1.2, 'city-car-cover'),
+        b(-6, 38, 24, 4, 3.2, 1.6, 'city-rubble'),
+        b(24, 42, 16, 5, 3, 1.5, 'city-rubble'),
+        b(-34, 45, 13, 5, 3, 1.5, 'city-rubble'),
+
+        b(0, -28, 26, 6, 1, 4.7, 'city-overpass'),
+        b(-14, -28, 2, 6, 3, 5.8, 'city-rail'),
+        b(14, -28, 2, 6, 3, 5.8, 'city-rail'),
+        ...fs(-34, -38, 1, 0, 0.7, 4.95, 8, 'city-ramp'),
+        ...fs(34, -38, -1, 0, 0.7, 4.95, 8, 'city-ramp'),
       ],
     };
     return layouts[theme] || layouts.foundry;

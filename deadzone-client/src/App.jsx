@@ -1,16 +1,36 @@
 import './App.css';
+import { useCallback, useState } from 'react';
 import { useDeadzoneController } from './app/useDeadzoneController';
 import { Lobby } from './components/Lobby';
+import { LoadingScreen } from './components/LoadingScreen';
 import { MatchHud } from './components/MatchHud';
 
-function App() {
-  const { screen, lobbyProps, matchProps } = useDeadzoneController();
+const INITIAL_ASSETS = [
+  '/deadZone_Logo.png',
+  '/Shadow_Logo.png',
+  '/favicon.svg',
+  '/icons.svg',
+];
 
-  if (screen === 'lobby') {
-    return <Lobby {...lobbyProps} />;
+function App() {
+  const [loadingComplete, setLoadingComplete] = useState(false);
+  const { screen, lobbyProps, matchProps } = useDeadzoneController();
+  const handleLoadingComplete = useCallback(() => setLoadingComplete(true), []);
+
+  if (!loadingComplete) {
+    return (
+      <LoadingScreen
+        assetUrls={INITIAL_ASSETS}
+        backendUrl="http://127.0.0.1:8080/api/rooms"
+        timedProgressMs={4200}
+        onComplete={handleLoadingComplete}
+      />
+    );
   }
 
-  return <MatchHud {...matchProps} />;
+  return screen === 'match'
+    ? <MatchHud {...matchProps} />
+    : <Lobby screen={screen} {...lobbyProps} />;
 }
 
 export default App;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAX_PLAYERS, POWERUPS, WEAPONS } from './config';
+import { DEFAULT_GAME_MODE, MAX_PLAYERS, PLAYER_EYE_HEIGHT, POWERUPS, WEAPONS, WEAPON_SKINS } from './config';
 import { makeBot, makePlayer } from './players';
 import { InputController } from './input/InputController';
 import { PlayerMeshFactory } from './rendering/PlayerMeshFactory';
@@ -14,9 +14,10 @@ import { clamp, nowMs } from './utils';
 
 const MIN_LOOK_PITCH = -1.15;
 const MAX_LOOK_PITCH = 1.18;
+const TEAM_MODES = new Set(['team-deathmatch', 'capture-flag', 'attack-defend', 'circle-control']);
 
 export class GameWorld {
-  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onWalletChange, onEvent, onScopeChange }) {
+  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange }) {
     this.canvas = canvas;
     this.config = config;
     this.localId = localId;
@@ -29,23 +30,30 @@ export class GameWorld {
     this.onWalletChange = onWalletChange;
     this.onEvent = onEvent;
     this.onScopeChange = onScopeChange;
+    this.onGrenadeChargeChange = onGrenadeChargeChange;
     this.onProgressChange = config.onProgressChange;
 
     this.mapIndex = Math.max(0, config.maps.findIndex((map) => map.id === config.mapId));
     this.selectedMap = config.maps[this.mapIndex] || config.maps[0];
+    this.gameMode = config.gameMode || DEFAULT_GAME_MODE;
     this.maxPlayers = config.maxPlayers || MAX_PLAYERS;
     this.keybinds = config.keybinds || {};
     this.blocks = ArenaLayouts.blocksFor(this.selectedMap);
     this.players = new Map();
     this.isScoped = false;
+    this.scopeVisualProgress = 0;
     this.recoilOffset = { pitch: 0, yaw: 0 };
 
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+    this.viewWeapon = null;
+    this.viewWeaponKey = '';
     this.clock = null;
     this.frame = null;
     this.blockMeshes = [];
+    this.objectiveObjects = [];
+    this.objectiveState = this.createObjectiveState();
 
     this.inputController = null;
     this.collisionSystem = new CollisionSystem(this.blocks);
@@ -54,6 +62,8 @@ export class GameWorld {
     this.botSystem = null;
     this.grenadeSystem = null;
     this.qWasDown = false;
+    this.grenadeChargeStartedAt = 0;
+    this.grenadeCharge = 0;
     this.jumpWasDown = false;
     this.deathInputReleased = false;
   }
@@ -94,7 +104,94 @@ export class GameWorld {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.selectedMap.sky);
     this.scene.fog = new THREE.Fog(this.selectedMap.sky, 58, 120);
+    this.scene.add(this.camera);
     this.blockMeshes = new ArenaBuilder(this.scene, this.selectedMap).build(this.blocks);
+    this.setupObjectives();
+  }
+
+  createObjectiveState() {
+    return {
+      blue: 0,
+      red: 0,
+      message: '',
+      flags: {
+        blue: { base: new THREE.Vector3(-42, 1.4, 0), carrierId: null, atBase: true },
+        red: { base: new THREE.Vector3(42, 1.4, 0), carrierId: null, atBase: true },
+      },
+      sword: {
+        home: new THREE.Vector3(40, 1.4, -18),
+        plant: new THREE.Vector3(-40, 1.2, 18),
+        carrierId: null,
+      },
+      circles: [
+        { id: 'A', position: new THREE.Vector3(-24, 1.05, -18), owner: null, capturingTeam: null, capture: 0 },
+        { id: 'B', position: new THREE.Vector3(0, 1.05, 0), owner: null, capturingTeam: null, capture: 0 },
+        { id: 'C', position: new THREE.Vector3(24, 1.05, 18), owner: null, capturingTeam: null, capture: 0 },
+      ],
+      scoreTick: 0,
+    };
+  }
+
+  setupObjectives() {
+    if (this.gameMode === 'capture-flag') {
+      this.addObjectiveMarker(this.objectiveState.flags.blue.base, '#4aa8ff', 'flag', { team: 'blue' });
+      this.addObjectiveMarker(this.objectiveState.flags.red.base, '#ff5d70', 'flag', { team: 'red' });
+      this.objectiveState.message = 'Capture the enemy flag and bring it home';
+    }
+    if (this.gameMode === 'attack-defend') {
+      this.addObjectiveMarker(this.objectiveState.sword.home, '#ff5d70', 'sword');
+      this.addObjectiveMarker(this.objectiveState.sword.plant, '#4aa8ff', 'plant');
+      this.objectiveState.message = 'Red carries the sword. Blue defends the plant zone';
+    }
+    if (this.gameMode === 'circle-control') {
+      this.objectiveState.circles.forEach((circle) => {
+        this.addObjectiveMarker(circle.position, '#53ff9a', 'circle', { id: circle.id });
+      });
+      this.objectiveState.message = 'Hold the circles to score points';
+    }
+  }
+
+  addObjectiveMarker(position, color, kind, metadata = {}) {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(kind === 'circle' ? 4.2 : 2.1, kind === 'circle' ? 5.2 : 2.9, 40),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    group.add(ring);
+
+    if (kind === 'circle') {
+      const fill = new THREE.Mesh(
+        new THREE.CircleGeometry(4, 40),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, side: THREE.DoubleSide }),
+      );
+      fill.rotation.x = -Math.PI / 2;
+      fill.position.y = 0.025;
+      fill.scale.setScalar(0.05);
+      group.add(fill);
+      group.position.copy(position);
+      this.scene.add(group);
+      this.objectiveObjects.push({ group, fill, kind, color, position: position.clone(), ...metadata });
+      return;
+    }
+
+    const pole = new THREE.Mesh(
+      kind === 'sword' ? new THREE.BoxGeometry(0.22, 3.4, 0.22) : new THREE.CylinderGeometry(0.12, 0.12, 3.1, 10),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    pole.position.y = 1.55;
+    group.add(pole);
+
+    const top = new THREE.Mesh(
+      kind === 'plant' ? new THREE.BoxGeometry(2.2, 0.22, 2.2) : new THREE.BoxGeometry(1.25, 0.72, 0.12),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    top.position.set(kind === 'plant' ? 0 : 0.58, kind === 'plant' ? 0.22 : 2.65, 0);
+    group.add(top);
+
+    group.position.copy(position);
+    this.scene.add(group);
+    this.objectiveObjects.push({ group, kind, color, position: position.clone(), ...metadata });
   }
 
   setupSystems() {
@@ -103,6 +200,7 @@ export class GameWorld {
       players: this.players,
       localId: this.localId,
       collisionSystem: this.collisionSystem,
+      gameMode: this.gameMode,
       onScoreChange: this.onScoreChange,
       onWalletChange: (player) => {
         if (player.id === this.localId) {
@@ -127,12 +225,15 @@ export class GameWorld {
       combatSystem: this.combatSystem,
       collisionSystem: this.collisionSystem,
       directionFromPlayer: (player) => this.directionFromPlayer(player),
+      gameMode: this.gameMode,
+      objectiveTargetFor: (player) => this.objectiveTargetFor(player),
     });
     this.grenadeSystem = new GrenadeSystem({
       scene: this.scene,
       players: this.players,
       combatSystem: this.combatSystem,
       collisionSystem: this.collisionSystem,
+      gameMode: this.gameMode,
       onEvent: this.onEvent,
     });
     this.inputController = new InputController({
@@ -150,8 +251,10 @@ export class GameWorld {
       id: this.localId,
       name: this.config.name,
       team: this.config.team,
+      gameMode: this.gameMode,
       weaponId: this.config.weaponId,
       outfitId: this.config.outfitId,
+      accessoryIds: this.config.accessoryIds,
       weaponSkinId: this.config.weaponSkinId,
       weaponLevel: this.config.weaponLevel || 0,
       mapId: this.config.mapId,
@@ -164,7 +267,7 @@ export class GameWorld {
 
     for (let index = 0; index < this.maxPlayers - 1; index += 1) {
       const botTeam = index % 2 === 0 ? (this.config.team === 'blue' ? 'red' : 'blue') : this.config.team;
-      this.addPlayer(makeBot({ index, team: botTeam, mapId: this.config.mapId }));
+      this.addPlayer(makeBot({ index, team: botTeam, gameMode: this.gameMode, mapId: this.config.mapId }));
     }
   }
 
@@ -174,6 +277,33 @@ export class GameWorld {
     mesh.rotation.y = player.yaw;
     this.scene.add(mesh);
     this.players.set(player.id, player);
+  }
+
+  updateLocalCosmetics({ accessoryIds, outfitId, weaponId, weaponLevel, weaponSkinId }) {
+    const player = this.localPlayer();
+    if (!player) return;
+    player.outfitId = outfitId || player.outfitId;
+    player.accessoryIds = accessoryIds || player.accessoryIds;
+    player.weaponId = weaponId || player.weaponId;
+    player.weaponLevel = weaponLevel ?? player.weaponLevel;
+    player.weaponSkinId = weaponSkinId || player.weaponSkinId;
+    if (weaponId || weaponSkinId) {
+      this.viewWeaponKey = '';
+    }
+    if (weaponId) {
+      player.isReloading = false;
+      player.reloadEndsAt = 0;
+      player.ammo = player.isDead ? player.weapon.magazineSize : Math.min(player.ammo, player.weapon.magazineSize);
+    }
+    const previousMesh = player.mesh;
+    const nextMesh = new PlayerMeshFactory(this.localId).create(player);
+    nextMesh.position.copy(player.position);
+    nextMesh.rotation.copy(previousMesh?.rotation || nextMesh.rotation);
+    nextMesh.visible = previousMesh?.visible ?? true;
+    if (previousMesh) {
+      this.scene.remove(previousMesh);
+    }
+    this.scene.add(nextMesh);
   }
 
   localPlayer() {
@@ -192,10 +322,15 @@ export class GameWorld {
     this.onScopeChange(value);
   }
 
+  isSniperScoped() {
+    const localPlayer = this.localPlayer();
+    return this.isScoped && localPlayer?.weaponId === 'sniper';
+  }
+
   fireLocalWeapon() {
     const player = this.localPlayer();
     if (!player) return;
-    this.combatSystem.shoot(player, this.aimDirectionFromCrosshair(player));
+    this.combatSystem.shoot(player, this.aimDirectionFromCrosshair(player), this.shotOriginForLocalWeapon(player));
   }
 
   applyRecoil(player, weapon) {
@@ -220,18 +355,30 @@ export class GameWorld {
   }
 
   aimDirectionFromCrosshair(player) {
-    const cameraDirection = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDirection);
-    const muzzle = player.position.clone().add(new THREE.Vector3(0, 1.45, 0));
-    const target = this.camera.position.clone().add(cameraDirection.multiplyScalar(140));
-    return target.sub(muzzle).normalize();
+    return this.directionFromAngles(
+      player.yaw + this.recoilOffset.yaw * 0.35,
+      player.pitch + this.recoilOffset.pitch * 0.42,
+    );
+  }
+
+  shotOriginForLocalWeapon(player) {
+    if (!this.viewWeapon || player.weaponId === 'sniper') {
+      return null;
+    }
+    const muzzleByWeapon = {
+      shotgun: new THREE.Vector3(0, 0.05, -1.54),
+      rpg: new THREE.Vector3(0, 0, -1.86),
+      smg: new THREE.Vector3(0, 0.02, -1.08),
+      blaster: new THREE.Vector3(0, 0, -1.42),
+    };
+    return this.viewWeapon.localToWorld((muzzleByWeapon[player.weaponId] || new THREE.Vector3(0, 0.02, -1.68)).clone());
   }
 
   resize() {
     const { clientWidth, clientHeight } = this.canvas;
     this.renderer.setSize(clientWidth, clientHeight, false);
     this.camera.aspect = clientWidth / Math.max(1, clientHeight);
-    this.camera.fov = this.isScoped ? 42 : 70;
+    this.camera.fov = this.isSniperScoped() ? 24 : this.isScoped ? 42 : 70;
     this.camera.updateProjectionMatrix();
   }
 
@@ -244,6 +391,9 @@ export class GameWorld {
     this.deathInputReleased = false;
     this.jumpWasDown = false;
     this.qWasDown = false;
+    this.grenadeChargeStartedAt = 0;
+    this.grenadeCharge = 0;
+    this.onGrenadeChargeChange?.(0);
     this.onDeathChange({ isDead: false, ready: false, seconds: 0 });
     this.onEvent('Back in the arena');
   }
@@ -270,6 +420,10 @@ export class GameWorld {
         this.mouse.current.down = false;
         this.setScoped(false);
         this.deathInputReleased = true;
+        this.grenadeChargeStartedAt = 0;
+        this.grenadeCharge = 0;
+        this.onGrenadeChargeChange?.(0);
+        this.qWasDown = false;
       }
       const remaining = Math.max(0, Math.ceil((player.respawnReadyAt - time) / 1000));
       this.onDeathChange({ isDead: true, ready: remaining === 0, seconds: remaining });
@@ -284,7 +438,19 @@ export class GameWorld {
     this.jumpWasDown = jumpDown;
     const qDown = this.keys.current.has(this.keybinds.grenade || 'KeyQ');
     if (qDown && !this.qWasDown) {
-      this.grenadeSystem.throw(player, this.directionFromPlayer(player));
+      this.grenadeChargeStartedAt = time;
+    }
+    if (qDown) {
+      this.grenadeCharge = Math.min(1, Math.max(0, (time - this.grenadeChargeStartedAt) / 950));
+      this.onGrenadeChargeChange?.(this.grenadeCharge);
+    }
+    if (!qDown && this.qWasDown) {
+      const chargeMs = Math.min(950, Math.max(0, time - this.grenadeChargeStartedAt));
+      const charge = chargeMs / 950;
+      this.grenadeSystem.throw(player, this.directionFromPlayer(player), charge);
+      this.grenadeChargeStartedAt = 0;
+      this.grenadeCharge = 0;
+      this.onGrenadeChargeChange?.(0);
     }
     this.qWasDown = qDown;
     const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)).normalize();
@@ -311,6 +477,10 @@ export class GameWorld {
       player.mesh.position.copy(player.position);
       player.mesh.rotation.y = player.yaw;
       player.mesh.scale.set(1, 1, 1);
+      if (player.id === this.localId) {
+        player.mesh.visible = false;
+        continue;
+      }
       if (!player.isDead && nowMs() < player.invulnerableUntil) {
         player.mesh.visible = Math.floor(nowMs() / 150) % 2 === 0;
       } else if (!player.isDead) {
@@ -351,21 +521,90 @@ export class GameWorld {
 
   syncCamera() {
     const localPlayer = this.localPlayer();
-    const cameraTarget = localPlayer.position.clone().add(new THREE.Vector3(0, 1.75, 0));
+    if (!localPlayer) {
+      return;
+    }
+    const eyePosition = localPlayer.position.clone().add(new THREE.Vector3(0, PLAYER_EYE_HEIGHT, 0));
     const lookDirection = this.directionFromAngles(
       localPlayer.yaw + this.recoilOffset.yaw * 0.35,
       localPlayer.pitch + this.recoilOffset.pitch * 0.42,
     );
-    const cameraDistance = this.isScoped ? -4.6 : -8;
-    const cameraHeight = this.isScoped ? 2.45 : 4.2;
-    const cameraOffset = lookDirection.clone().multiplyScalar(cameraDistance).add(new THREE.Vector3(0, cameraHeight, 0));
-    const desiredCamera = cameraTarget.clone().add(cameraOffset);
-    for (let step = 0; step < 8 && this.collisionSystem.hitsSolid(desiredCamera); step += 1) {
-      desiredCamera.lerp(cameraTarget, 0.22);
-      desiredCamera.y += 0.18;
+    this.camera.position.copy(eyePosition);
+    this.camera.lookAt(eyePosition.clone().add(lookDirection.multiplyScalar(10)));
+    this.updateFirstPersonWeapon(localPlayer);
+  }
+
+  updateFirstPersonWeapon(localPlayer) {
+    if (!this.camera || !localPlayer || localPlayer.isDead) {
+      this.scopeVisualProgress = 0;
+      if (this.viewWeapon) {
+        this.viewWeapon.visible = false;
+      }
+      return;
     }
-    this.camera.position.lerp(desiredCamera, 0.22);
-    this.camera.lookAt(cameraTarget.clone().add(lookDirection.multiplyScalar(10)));
+
+    const weaponSkin = WEAPON_SKINS.find((item) => item.id === localPlayer.weaponSkinId) || WEAPON_SKINS[0];
+    const weaponKey = `${localPlayer.weaponId}:${weaponSkin.id}`;
+    if (this.viewWeaponKey !== weaponKey) {
+      if (this.viewWeapon) {
+        this.camera.remove(this.viewWeapon);
+      }
+      this.viewWeapon = new PlayerMeshFactory(this.localId).createWeapon(localPlayer.weaponId, weaponSkin.color);
+      this.viewWeapon.scale.setScalar(0.48);
+      this.viewWeapon.rotation.set(-0.08, 0.18, 0.02);
+      this.viewWeapon.traverse((object) => {
+        if (!object.isMesh) return;
+        object.frustumCulled = false;
+        object.castShadow = false;
+        object.receiveShadow = false;
+        object.renderOrder = 20;
+        if (object.material) {
+          object.material.depthTest = false;
+          object.material.depthWrite = false;
+        }
+      });
+      this.camera.add(this.viewWeapon);
+      this.viewWeaponKey = weaponKey;
+    }
+
+    const targetProgress = this.isScoped ? 1 : 0;
+    this.scopeVisualProgress += (targetProgress - this.scopeVisualProgress) * 0.22;
+    const aim = this.scopeVisualProgress * this.scopeVisualProgress * (3 - 2 * this.scopeVisualProgress);
+    const pose = this.firstPersonWeaponPose(localPlayer.weaponId);
+    const bob = localPlayer.isGrounded ? Math.sin(nowMs() * 0.008) * 0.012 * (1 - aim) : 0;
+    this.viewWeapon.visible = true;
+    this.viewWeapon.position.set(
+      THREE.MathUtils.lerp(pose.hip.position.x, pose.aim.position.x, aim),
+      THREE.MathUtils.lerp(pose.hip.position.y, pose.aim.position.y, aim) + bob,
+      THREE.MathUtils.lerp(pose.hip.position.z, pose.aim.position.z, aim),
+    );
+    this.viewWeapon.rotation.set(
+      THREE.MathUtils.lerp(pose.hip.rotation.x, pose.aim.rotation.x, aim),
+      THREE.MathUtils.lerp(pose.hip.rotation.y, pose.aim.rotation.y, aim),
+      THREE.MathUtils.lerp(pose.hip.rotation.z, pose.aim.rotation.z, aim),
+    );
+    this.viewWeapon.scale.setScalar(THREE.MathUtils.lerp(pose.hip.scale, pose.aim.scale, aim));
+  }
+
+  firstPersonWeaponPose(weaponId) {
+    const poses = {
+      sniper: {
+        hip: { position: new THREE.Vector3(0.54, -0.43, -1.12), rotation: new THREE.Euler(-0.08, 0.18, 0.02), scale: 0.48 },
+        aim: { position: new THREE.Vector3(0.015, -0.39, -0.74), rotation: new THREE.Euler(-0.01, 0, 0), scale: 0.58 },
+      },
+      shotgun: {
+        hip: { position: new THREE.Vector3(0.58, -0.45, -1.0), rotation: new THREE.Euler(-0.08, 0.2, 0.025), scale: 0.49 },
+        aim: { position: new THREE.Vector3(0.02, -0.27, -0.72), rotation: new THREE.Euler(-0.015, 0.006, 0), scale: 0.58 },
+      },
+      rpg: {
+        hip: { position: new THREE.Vector3(0.76, -0.5, -1.22), rotation: new THREE.Euler(-0.09, 0.18, 0.02), scale: 0.46 },
+        aim: { position: new THREE.Vector3(0.08, -0.31, -0.86), rotation: new THREE.Euler(-0.02, 0.005, 0), scale: 0.54 },
+      },
+    };
+    return poses[weaponId] || {
+      hip: { position: new THREE.Vector3(0.56, -0.43, -1.02), rotation: new THREE.Euler(-0.08, 0.18, 0.02), scale: 0.48 },
+      aim: { position: new THREE.Vector3(0.015, -0.26, -0.72), rotation: new THREE.Euler(-0.012, 0.004, 0), scale: 0.58 },
+    };
   }
 
   directionFromAngles(yaw, pitch) {
@@ -376,11 +615,183 @@ export class GameWorld {
     ).normalize();
   }
 
+  livingPlayers() {
+    return [...this.players.values()].filter((player) => !player.isDead && player.health > 0);
+  }
+
+  teamColor(team) {
+    return team === 'blue' ? '#4aa8ff' : '#ff5d70';
+  }
+
+  objectiveTargetFor(player) {
+    if (this.gameMode === 'capture-flag') {
+      const enemyTeam = player.team === 'blue' ? 'red' : 'blue';
+      const enemyFlag = this.objectiveState.flags[enemyTeam];
+      return enemyFlag.carrierId === player.id
+        ? this.objectiveState.flags[player.team].base
+        : enemyFlag.base;
+    }
+    if (this.gameMode === 'attack-defend') {
+      if (player.team === 'red') {
+        return this.objectiveState.sword.carrierId === player.id
+          ? this.objectiveState.sword.plant
+          : this.objectiveState.sword.home;
+      }
+      const carrier = this.objectiveState.sword.carrierId
+        ? this.players.get(this.objectiveState.sword.carrierId)
+        : null;
+      return carrier?.position || this.objectiveState.sword.plant;
+    }
+    if (this.gameMode === 'circle-control') {
+      return this.objectiveState.circles
+        .filter((circle) => circle.owner !== player.team)
+        .sort((a, b) => a.position.distanceTo(player.position) - b.position.distanceTo(player.position))[0]?.position || null;
+    }
+    return null;
+  }
+
+  updateObjectives(time, dt) {
+    if (this.gameMode === 'capture-flag') {
+      this.updateCaptureFlag();
+    }
+    if (this.gameMode === 'attack-defend') {
+      this.updateAttackDefend();
+    }
+    if (this.gameMode === 'circle-control') {
+      this.updateCircleControl(time, dt);
+    }
+    this.syncObjectiveVisuals(time);
+  }
+
+  syncObjectiveVisuals(time) {
+    for (const objective of this.objectiveObjects) {
+      if (objective.kind === 'flag') {
+        const flag = this.objectiveState.flags[objective.team];
+        const carrier = flag.carrierId ? this.players.get(flag.carrierId) : null;
+        objective.group.position.copy(carrier
+          ? carrier.position.clone().add(new THREE.Vector3(0, 2.8, 0))
+          : flag.base);
+      }
+      if (objective.kind === 'sword') {
+        const carrier = this.objectiveState.sword.carrierId
+          ? this.players.get(this.objectiveState.sword.carrierId)
+          : null;
+        objective.group.position.copy(carrier
+          ? carrier.position.clone().add(new THREE.Vector3(0, 2.7, 0))
+          : this.objectiveState.sword.home);
+      }
+      if (objective.kind === 'circle') {
+        const circle = this.objectiveState.circles.find((item) => item.id === objective.id);
+        const color = circle?.owner ? this.teamColor(circle.owner) : '#53ff9a';
+        objective.group.children.forEach((child) => child.material?.color?.set(color));
+        const fillAmount = circle?.owner ? 1 : Math.max(0.05, (circle?.capture || 0) / 100);
+        objective.fill?.scale.setScalar(fillAmount);
+        if (objective.fill?.material) {
+          objective.fill.material.opacity = circle?.owner ? 0.34 : 0.18;
+        }
+      }
+      objective.group.rotation.y = Math.sin(time * 0.0015) * 0.08;
+    }
+  }
+
+  updateCaptureFlag() {
+    const { flags } = this.objectiveState;
+    for (const player of this.livingPlayers()) {
+      const enemyTeam = player.team === 'blue' ? 'red' : 'blue';
+      const ownFlag = flags[player.team];
+      const enemyFlag = flags[enemyTeam];
+      if (!enemyFlag.carrierId && player.position.distanceTo(enemyFlag.base) < 3.2) {
+        enemyFlag.carrierId = player.id;
+        enemyFlag.atBase = false;
+        this.objectiveState.message = `${player.name} took the ${enemyTeam} flag`;
+        this.onEvent?.(this.objectiveState.message);
+      }
+      if (enemyFlag.carrierId === player.id && ownFlag.atBase && player.position.distanceTo(ownFlag.base) < 4) {
+        this.objectiveState[player.team] += 1;
+        enemyFlag.carrierId = null;
+        enemyFlag.atBase = true;
+        this.objectiveState.message = `${player.name} captured the flag`;
+        this.onEvent?.(`${player.name} scored for ${player.team}`);
+      }
+    }
+
+    for (const team of ['blue', 'red']) {
+      const flag = flags[team];
+      const carrier = flag.carrierId ? this.players.get(flag.carrierId) : null;
+      if (carrier?.isDead) {
+        flag.carrierId = null;
+        flag.atBase = true;
+        this.objectiveState.message = `${team} flag returned`;
+      }
+    }
+  }
+
+  updateAttackDefend() {
+    const sword = this.objectiveState.sword;
+    const carrier = sword.carrierId ? this.players.get(sword.carrierId) : null;
+    if (carrier?.isDead || carrier?.team !== 'red') {
+      sword.carrierId = null;
+    }
+
+    for (const player of this.livingPlayers()) {
+      if (player.team === 'red' && !sword.carrierId && player.position.distanceTo(sword.home) < 3.2) {
+        sword.carrierId = player.id;
+        this.objectiveState.message = `${player.name} picked up the sword`;
+        this.onEvent?.(this.objectiveState.message);
+      }
+      if (sword.carrierId === player.id && player.position.distanceTo(sword.plant) < 4.2) {
+        this.objectiveState.red += 1;
+        sword.carrierId = null;
+        this.objectiveState.message = `${player.name} planted the sword`;
+        this.onEvent?.('Red attackers scored');
+      }
+    }
+  }
+
+  updateCircleControl(time, dt) {
+    for (const circle of this.objectiveState.circles) {
+      const inside = this.livingPlayers().filter((player) => player.position.distanceTo(circle.position) < 6.2);
+      const blue = inside.filter((player) => player.team === 'blue').length;
+      const red = inside.filter((player) => player.team === 'red').length;
+      if (blue === red) continue;
+      const owner = blue > red ? 'blue' : 'red';
+      if (circle.capturingTeam !== owner) {
+        circle.capturingTeam = owner;
+        circle.capture = 0;
+      }
+      circle.capture = clamp(circle.capture + dt * 35, 0, 100);
+      if (circle.capture >= 100 && circle.owner !== owner) {
+        circle.owner = owner;
+        circle.capturingTeam = null;
+        circle.capture = 0;
+        this.objectiveState.message = `${owner} captured circle ${circle.id}`;
+        this.onEvent?.(this.objectiveState.message);
+      }
+    }
+
+    if (time - this.objectiveState.scoreTick > 1000) {
+      this.objectiveState.scoreTick = time;
+      for (const circle of this.objectiveState.circles) {
+        if (circle.owner) {
+          this.objectiveState[circle.owner] += 1;
+        }
+      }
+    }
+  }
+
   syncHud() {
     const localPlayer = this.localPlayer();
+    const killScoreBlue = [...this.players.values()].filter((player) => player.team === 'blue').reduce((sum, player) => sum + player.kills, 0);
+    const killScoreRed = [...this.players.values()].filter((player) => player.team === 'red').reduce((sum, player) => sum + player.kills, 0);
+    const usesObjectiveScore = TEAM_MODES.has(this.gameMode) && this.gameMode !== 'team-deathmatch';
+    const ffaLeader = [...this.players.values()].sort((a, b) => b.score - a.score)[0];
     this.onScoreChange({
-      blue: [...this.players.values()].filter((player) => player.team === 'blue').reduce((sum, player) => sum + player.kills, 0),
-      red: [...this.players.values()].filter((player) => player.team === 'red').reduce((sum, player) => sum + player.kills, 0),
+      blue: usesObjectiveScore ? this.objectiveState.blue : killScoreBlue,
+      red: usesObjectiveScore ? this.objectiveState.red : killScoreRed,
+      mode: this.gameMode,
+      objective: this.gameMode === 'free-for-all'
+        ? `Leader: ${ffaLeader?.name || 'None'}`
+        : this.objectiveState.message,
       players: [...this.players.values()]
         .map((player) => ({
           id: player.id,
@@ -415,6 +826,7 @@ export class GameWorld {
     this.combatSystem.updateBullets();
     this.powerupSystem.update(time);
     this.grenadeSystem.update(time, dt);
+    this.updateObjectives(time, dt);
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());

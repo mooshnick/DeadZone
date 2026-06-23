@@ -10,8 +10,14 @@ public record ProgressRequest(
         Integer totalAssists,
         Integer totalDeaths,
         String outfitId,
+        String weaponId,
         String weaponSkinId,
+        String grenadeSkinId,
         List<String> ownedOutfits,
         List<String> ownedWeaponSkins,
-        Map<String, Integer> weaponUpgrades
+        List<String> ownedGrenadeSkins,
+        List<String> ownedAccessories,
+        List<String> accessoryIds,
+        Map<String, Integer> weaponUpgrades,
+        String missionStats
 ) {}

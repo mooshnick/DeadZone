@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 public record UserResponse(
         Long id,
         String username,
+        String email,
         boolean admin,
         int totalKills,
         int totalAssists,
@@ -17,10 +18,16 @@ public record UserResponse(
         int wallet,
         int xp,
         String outfitId,
+        String weaponId,
         String weaponSkinId,
+        String grenadeSkinId,
         List<String> ownedOutfits,
         List<String> ownedWeaponSkins,
-        Map<String, Integer> weaponUpgrades
+        List<String> ownedGrenadeSkins,
+        List<String> ownedAccessories,
+        List<String> accessoryIds,
+        Map<String, Integer> weaponUpgrades,
+        String missionStats
 ) {
     public static UserResponse from(User user) {
         String owned = user.getOwnedOutfits() == null || user.getOwnedOutfits().isBlank()
@@ -29,6 +36,11 @@ public record UserResponse(
         String weaponSkins = user.getOwnedWeaponSkins() == null || user.getOwnedWeaponSkins().isBlank()
                 ? "standard"
                 : user.getOwnedWeaponSkins();
+        String grenadeSkins = user.getOwnedGrenadeSkins() == null || user.getOwnedGrenadeSkins().isBlank()
+                ? "standard"
+                : user.getOwnedGrenadeSkins();
+        String accessories = user.getOwnedAccessories() == null ? "" : user.getOwnedAccessories();
+        String equippedAccessories = user.getAccessoryIds() == null ? "" : user.getAccessoryIds();
         Map<String, Integer> upgrades = user.getWeaponUpgrades() == null || user.getWeaponUpgrades().isBlank()
                 ? Map.of()
                 : Arrays.stream(user.getWeaponUpgrades().split(","))
@@ -39,6 +51,7 @@ public record UserResponse(
         return new UserResponse(
                 user.getId(),
                 user.getUsername(),
+                user.getEmail(),
                 user.isAdmin(),
                 user.getTotalKills(),
                 user.getTotalAssists(),
@@ -46,10 +59,16 @@ public record UserResponse(
                 user.getWallet(),
                 user.getXp(),
                 user.getOutfitId() == null ? "classic" : user.getOutfitId(),
+                user.getWeaponId() == null ? "rifle" : user.getWeaponId(),
                 user.getWeaponSkinId() == null ? "standard" : user.getWeaponSkinId(),
+                user.getGrenadeSkinId() == null ? "standard" : user.getGrenadeSkinId(),
                 Arrays.stream(owned.split(",")).filter(item -> !item.isBlank()).toList(),
                 Arrays.stream(weaponSkins.split(",")).filter(item -> !item.isBlank()).toList(),
-                upgrades
+                Arrays.stream(grenadeSkins.split(",")).filter(item -> !item.isBlank()).toList(),
+                Arrays.stream(accessories.split(",")).filter(item -> !item.isBlank()).toList(),
+                Arrays.stream(equippedAccessories.split(",")).filter(item -> !item.isBlank()).toList(),
+                upgrades,
+                user.getMissionStats() == null ? "" : user.getMissionStats()
         );
     }
 }

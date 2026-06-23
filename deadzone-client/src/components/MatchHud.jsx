@@ -1,4 +1,7 @@
-import { MAPS, WEAPONS } from '../game/config';
+import { useState } from 'react';
+import { CharacterPreview } from './CharacterPreview';
+import { StoreVisual } from './StoreVisual';
+import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 export function MatchHud({
   activeBuffs,
@@ -6,49 +9,259 @@ export function MatchHud({
   canvasRef,
   currentMatch,
   deathInfo,
+  equippedAccessoryIds,
+  equipOwnedOutfitDuringMatch,
+  equipWeaponDuringMatch,
   events,
+  grenadeCharge,
+  grenadeSkinId,
   isScoped,
   leaveMatch,
   localId,
+  onToggleAccessoryDuringMatch,
+  outfitId,
+  ownedAccessories,
+  ownedOutfits,
   score,
   selectedRoomId,
   wallet,
+  weaponId,
+  weaponSkinId,
+  weaponUnlocked,
+  level,
+  levelProgress,
+  showScoreboard,
   worldRef,
+  xp,
 }) {
-  const weapon = WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
+  const [showDeathCustomizer, setShowDeathCustomizer] = useState(false);
+  const [deathCustomizerTab, setDeathCustomizerTab] = useState('outfits');
+  const [compactHud, setCompactHud] = useState(false);
+  const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
+  const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
+  const previewAccessories = equippedAccessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
+  const previewWeaponSkin = WEAPON_SKINS.find((item) => item.id === weaponSkinId) || WEAPON_SKINS[0];
+  const previewGrenadeSkin = GRENADE_SKINS.find((item) => item.id === grenadeSkinId) || GRENADE_SKINS[0];
   const mapName = MAPS.find((map) => map.id === currentMatch.mapId)?.name || 'Arena';
+  const mode = GAME_MODES.find((item) => item.id === (score.mode || currentMatch.gameMode)) || GAME_MODES[0];
   const reloadPercent = Math.round((ammo.reloadProgress || 0) * 100);
   const grenadeCount = Math.min(3, ammo.grenades ?? 0);
+  const freeForAll = mode.id === 'free-for-all';
+  const leader = score.players[0];
+  const bluePlayers = score.players.filter((player) => player.team === 'blue');
+  const redPlayers = score.players.filter((player) => player.team === 'red');
+  const activeAccessoryIdForSlot = (slot) => equippedAccessoryIds.find((id) => ACCESSORIES.find((item) => item.id === id)?.slot === slot);
+  const accessoriesBySlot = (slots) => ACCESSORIES.filter((item) => ownedAccessories.includes(item.id) && slots.includes(item.slot));
+  const renderAccessoryOption = (item) => (
+    <button
+      className={activeAccessoryIdForSlot(item.slot) === item.id ? 'death-customizer-item active' : 'death-customizer-item'}
+      key={item.id}
+      onClick={() => onToggleAccessoryDuringMatch(item)}
+    >
+      <StoreVisual color={item.color} kind={item.slot} />
+      <b>{item.name}</b>
+      <small>{item.slot}</small>
+    </button>
+  );
+
+  const sniperScoped = isScoped && weaponId === 'sniper';
+  const shellClassName = [
+    'game-3d-shell',
+    isScoped ? 'scoped' : '',
+    sniperScoped ? 'sniper-scoped' : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <main className={isScoped ? 'game-3d-shell scoped' : 'game-3d-shell'} dir="ltr">
+    <main className={shellClassName} dir="ltr">
       <canvas className="world-canvas" ref={canvasRef} />
       <div className="scope-vignette" />
+      <div className="sniper-scope-overlay">
+        <i />
+        <b />
+        <span />
+      </div>
       <div className="crosshair" />
+      <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
+        <span>{grenadeCharge > 0.82 ? 'Perfect throw' : 'Grenade power'}</span>
+        <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
+      </div>
 
       {deathInfo.isDead && (
         <div className="death-screen">
-          <strong>You were eliminated</strong>
-          <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
-          <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.respawnLocal()}>Return to Match</button>
-          <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={leaveMatch}>Exit to Lobby</button>
+          {!showDeathCustomizer ? (
+            <>
+              <strong>You were eliminated</strong>
+              <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
+              <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.respawnLocal()}>Return to Match</button>
+              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
+              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={leaveMatch}>Exit to Lobby</button>
+            </>
+          ) : (
+            <div className="death-customizer">
+              <header>
+                <strong>Customize Character</strong>
+                <button className="ghost-button" onClick={() => setShowDeathCustomizer(false)}>Back</button>
+              </header>
+              <div className="death-customizer-layout">
+                <aside className="death-customizer-preview">
+                  <CharacterPreview
+                    accessories={previewAccessories}
+                    grenadeColor={previewGrenadeSkin.color}
+                    outfit={previewOutfit}
+                    variant="side"
+                    weaponColor={previewWeaponSkin.color}
+                    weaponId={weaponId}
+                  />
+                  <strong>{previewOutfit.name}</strong>
+                  <span>{weapon.name}</span>
+                </aside>
+                <div className="death-customizer-options">
+                  <div className="customizer-tabs" role="tablist" aria-label="Respawn customizer sections">
+                    <button className={deathCustomizerTab === 'outfits' ? 'active' : ''} onClick={() => setDeathCustomizerTab('outfits')}>Outfits</button>
+                    <button className={deathCustomizerTab === 'weapons' ? 'active' : ''} onClick={() => setDeathCustomizerTab('weapons')}>Weapons</button>
+                  </div>
+                  <div className="death-customizer-scroll">
+                    {deathCustomizerTab === 'outfits' ? (
+                      <>
+                        <section>
+                          <span>Outfits</span>
+                          <div className="death-customizer-grid">
+                            {OUTFITS.filter((item) => ownedOutfits.includes(item.id)).map((item) => (
+                              <button
+                                className={outfitId === item.id ? 'death-customizer-item active' : 'death-customizer-item'}
+                                key={item.id}
+                                onClick={() => equipOwnedOutfitDuringMatch(item.id)}
+                              >
+                                <StoreVisual color={item.displayColor || item.shell} kind="outfit" />
+                                <b>{item.name}</b>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                        <section>
+                          <span>Hats, Hair & Face</span>
+                          <div className="death-customizer-grid">
+                            {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryOption)}
+                            {!accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).length && <em>No accessories owned yet</em>}
+                          </div>
+                        </section>
+                        <section>
+                          <span>Middle Wear</span>
+                          <div className="death-customizer-grid">
+                            {accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).map(renderAccessoryOption)}
+                            {!accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).length && <em>No accessories owned yet</em>}
+                          </div>
+                        </section>
+                        <section>
+                          <span>Shoes & Rides</span>
+                          <div className="death-customizer-grid">
+                            {accessoriesBySlot(['shoes']).map(renderAccessoryOption)}
+                            {!accessoriesBySlot(['shoes']).length && <em>No accessories owned yet</em>}
+                          </div>
+                        </section>
+                      </>
+                    ) : (
+                      <section>
+                        <span>Weapons for next spawn</span>
+                        <div className="death-customizer-grid">
+                          {Object.entries(WEAPONS).map(([id, item]) => (
+                            <button
+                              className={weaponId === id ? 'death-customizer-item active' : 'death-customizer-item'}
+                              disabled={!weaponUnlocked(item)}
+                              key={id}
+                              onClick={() => equipWeaponDuringMatch(id)}
+                            >
+                              <StoreVisual color={item.color} kind="weapon" weaponId={id} />
+                              <b>{item.name}</b>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                  </div>
+                  <div className="customizer-footer death-customizer-footer">
+                    <button
+                      className="primary-command"
+                      disabled={!deathInfo.ready}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onClick={() => worldRef.current?.respawnLocal()}
+                    >
+                      {deathInfo.ready ? 'Continue' : `Ready in ${deathInfo.seconds}s`}
+                    </button>
+                    <button className="secondary-command" onClick={() => setShowDeathCustomizer(false)}>Back</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <header className="hud overlay">
-        <div>
-          <span className="eyebrow">Room / Map</span>
-          <strong>{selectedRoomId} / {mapName}</strong>
+        <div className="hud-brand-block">
+          <img className="hud-game-logo" src="/Shadow_Logo.png" alt="DeadZone" />
+          <div>
+            <span className="eyebrow">Room / Map</span>
+            <strong>{selectedRoomId} / {mapName}</strong>
+            <small>{mode.name}</small>
+          </div>
         </div>
         <div className="scoreboard">
-          <span className="blue-score">Blue {score.blue}</span>
-          <b>:</b>
-          <span className="red-score">{score.red} Red</span>
+          {freeForAll ? (
+            <>
+              <span className="blue-score">Leader</span>
+              <b>{leader ? leader.score : 0}</b>
+              <span className="red-score">{leader?.name || 'None'}</span>
+            </>
+          ) : (
+            <>
+              <span className="blue-score">Blue {score.blue}</span>
+              <b>:</b>
+              <span className="red-score">{score.red} Red</span>
+            </>
+          )}
+        </div>
+        <div className="hud-progression">
+          <span>Level {level}</span>
+          <strong>{xp} XP</strong>
+          <i><b style={{ width: `${levelProgress}%` }} /></i>
         </div>
         <button className="exit-match" onClick={leaveMatch}>Exit</button>
       </header>
 
-      <footer className="match-panel overlay">
+      {score.objective && <div className="objective-status">{score.objective}</div>}
+
+      {showScoreboard && (
+        <section className="scoreboard-overlay">
+          <header>
+            <strong>Scoreboard</strong>
+            <span>K / A / D / Score</span>
+          </header>
+          {freeForAll ? (
+            <ScoreboardTeam localId={localId} players={score.players} title="All Players" variant="neutral" />
+          ) : (
+            <div className="scoreboard-teams">
+              <ScoreboardTeam localId={localId} players={bluePlayers} title="Blue Team" />
+              <ScoreboardTeam localId={localId} players={redPlayers} title="Red Team" />
+            </div>
+          )}
+        </section>
+      )}
+
+      <aside className={compactHud ? 'compact-combat-widget minimized' : 'compact-combat-widget'}>
+          <span>Ammo / Grenades</span>
+          <strong>{ammo.reloading ? `${reloadPercent}%` : `${ammo.ammo}/${ammo.magazineSize}`}</strong>
+          <small>Grenades {grenadeCount}/3</small>
+      </aside>
+
+      <footer className={compactHud ? 'match-panel overlay compact' : 'match-panel overlay'}>
+        <button
+          className="hud-collapse-toggle"
+          title={compactHud ? 'Open combat HUD' : 'Minimize combat HUD'}
+          onClick={() => setCompactHud((value) => !value)}
+        >
+          {compactHud ? '⌃' : '⌄'}
+        </button>
         <div className="combat-readout">
           <div className="readout-card weapon-card">
             <span>Weapon</span>
@@ -70,17 +283,9 @@ export function MatchHud({
           </div>
           <div className="readout-card wallet-card">
             <span>Cash</span>
-            <strong>NIS {wallet}</strong>
+            <strong>🪙 {wallet}</strong>
             <small>kills pay</small>
           </div>
-        </div>
-
-        <div className="score-table">
-          {score.players.slice(0, 4).map((player) => (
-            <span className={player.id === localId ? 'me' : ''} key={player.id}>
-              {player.name} {player.kills}/{player.assists}/{player.deaths} {player.score}
-            </span>
-          ))}
         </div>
 
         <div className="feed">
@@ -88,5 +293,31 @@ export function MatchHud({
         </div>
       </footer>
     </main>
+  );
+}
+
+function ScoreboardTeam({ localId, players, title, variant }) {
+  return (
+    <section className={variant === 'neutral' ? 'scoreboard-team neutral' : title.startsWith('Red') ? 'scoreboard-team red' : 'scoreboard-team blue'}>
+      <header>
+        <strong>{title}</strong>
+        <span>K</span>
+        <span>A</span>
+        <span>D</span>
+        <span>Score</span>
+      </header>
+      <div>
+        {players.map((player) => (
+          <article className={player.id === localId ? 'me' : ''} key={player.id}>
+            <b>{player.name}</b>
+            <strong>{player.kills}</strong>
+            <strong>{player.assists}</strong>
+            <strong>{player.deaths}</strong>
+            <em>{player.score}</em>
+          </article>
+        ))}
+        {!players.length && <small>No players yet</small>}
+      </div>
+    </section>
   );
 }
