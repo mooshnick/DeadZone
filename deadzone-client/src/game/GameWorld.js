@@ -9,15 +9,24 @@ import { CollisionSystem } from './systems/CollisionSystem';
 import { CombatSystem } from './systems/CombatSystem';
 import { GrenadeSystem } from './systems/GrenadeSystem';
 import { PowerupSystem } from './systems/PowerupSystem';
+import { PlayerCollisionSystem } from './systems/PlayerCollisionSystem';
 import { ArenaLayouts } from './world/ArenaLayouts';
 import { clamp, nowMs } from './utils';
 
 const MIN_LOOK_PITCH = -1.15;
 const MAX_LOOK_PITCH = 1.18;
 const TEAM_MODES = new Set(['team-deathmatch', 'capture-flag', 'attack-defend', 'circle-control']);
+const WIN_BONUS = { score: 75, xp: 100, money: 20 };
+const OBJECTIVE_REWARDS = {
+  flagCapture: { score: 300, xp: 180, money: 30, label: 'flag capture' },
+  flagReturn: { score: 120, xp: 75, money: 12, label: 'flag return' },
+  circleCapture: { score: 140, xp: 80, money: 12, label: 'zone capture' },
+  swordPlant: { score: 260, xp: 160, money: 28, label: 'successful attack' },
+  swordDefense: { score: 170, xp: 100, money: 18, label: 'carrier defense' },
+};
 
 export class GameWorld {
-  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange }) {
+  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange, onMatchEnd }) {
     this.canvas = canvas;
     this.config = config;
     this.localId = localId;
@@ -31,12 +40,20 @@ export class GameWorld {
     this.onEvent = onEvent;
     this.onScopeChange = onScopeChange;
     this.onGrenadeChargeChange = onGrenadeChargeChange;
+    this.onMatchEnd = onMatchEnd;
     this.onProgressChange = config.onProgressChange;
 
     this.mapIndex = Math.max(0, config.maps.findIndex((map) => map.id === config.mapId));
     this.selectedMap = config.maps[this.mapIndex] || config.maps[0];
     this.gameMode = config.gameMode || DEFAULT_GAME_MODE;
     this.maxPlayers = config.maxPlayers || MAX_PLAYERS;
+    this.scoreLimit = config.scoreLimit || 30;
+    this.timeLimitMinutes = Math.min(20, Math.max(5, config.timeLimitMinutes || 20));
+    this.matchStartedAt = nowMs();
+    this.matchEnded = false;
+    this.matchResult = null;
+    this.isPaused = false;
+    this.pauseStartedAt = 0;
     this.keybinds = config.keybinds || {};
     this.blocks = ArenaLayouts.blocksFor(this.selectedMap);
     this.players = new Map();
@@ -61,6 +78,7 @@ export class GameWorld {
     this.powerupSystem = null;
     this.botSystem = null;
     this.grenadeSystem = null;
+    this.playerCollisionSystem = null;
     this.qWasDown = false;
     this.grenadeChargeStartedAt = 0;
     this.grenadeCharge = 0;
@@ -115,8 +133,8 @@ export class GameWorld {
       red: 0,
       message: '',
       flags: {
-        blue: { base: new THREE.Vector3(-42, 1.4, 0), carrierId: null, atBase: true },
-        red: { base: new THREE.Vector3(42, 1.4, 0), carrierId: null, atBase: true },
+        blue: { base: new THREE.Vector3(-42, 1.4, 0), carrierId: null, atBase: true, droppedPosition: null },
+        red: { base: new THREE.Vector3(42, 1.4, 0), carrierId: null, atBase: true, droppedPosition: null },
       },
       sword: {
         home: new THREE.Vector3(40, 1.4, -18),
@@ -214,6 +232,7 @@ export class GameWorld {
       },
       onEvent: this.onEvent,
       onRecoil: (player, weapon) => this.applyRecoil(player, weapon),
+      onElimination: (shooter, target) => this.handleObjectiveElimination(shooter, target),
     });
     this.powerupSystem = new PowerupSystem({
       scene: this.scene,
@@ -236,6 +255,7 @@ export class GameWorld {
       gameMode: this.gameMode,
       onEvent: this.onEvent,
     });
+    this.playerCollisionSystem = new PlayerCollisionSystem(this.players, this.collisionSystem);
     this.inputController = new InputController({
       canvas: this.canvas,
       keys: this.keys,
@@ -329,7 +349,7 @@ export class GameWorld {
 
   fireLocalWeapon() {
     const player = this.localPlayer();
-    if (!player) return;
+    if (!player || this.matchEnded) return;
     this.combatSystem.shoot(player, this.aimDirectionFromCrosshair(player), this.shotOriginForLocalWeapon(player));
   }
 
@@ -398,9 +418,30 @@ export class GameWorld {
     this.onEvent('Back in the arena');
   }
 
+  setPaused(value) {
+    if (this.matchEnded || this.isPaused === value) return;
+    const time = nowMs();
+    this.isPaused = value;
+    this.mouse.current.down = false;
+    if (value) {
+      this.pauseStartedAt = time;
+      this.setScoped(false);
+      document.exitPointerLock?.();
+      return;
+    }
+    if (this.pauseStartedAt > 0) {
+      this.matchStartedAt += time - this.pauseStartedAt;
+    }
+    this.pauseStartedAt = 0;
+  }
+
   updateLocal(dt, time) {
     const player = this.localPlayer();
     if (!player) return;
+    if (this.matchEnded) {
+      this.mouse.current.down = false;
+      return;
+    }
 
     this.combatSystem.updateReload(player, time);
     const weapon = WEAPONS[player.weaponId] || WEAPONS.rifle;
@@ -651,6 +692,7 @@ export class GameWorld {
   }
 
   updateObjectives(time, dt) {
+    if (this.matchEnded) return;
     if (this.gameMode === 'capture-flag') {
       this.updateCaptureFlag();
     }
@@ -670,7 +712,7 @@ export class GameWorld {
         const carrier = flag.carrierId ? this.players.get(flag.carrierId) : null;
         objective.group.position.copy(carrier
           ? carrier.position.clone().add(new THREE.Vector3(0, 2.8, 0))
-          : flag.base);
+          : flag.droppedPosition || flag.base);
       }
       if (objective.kind === 'sword') {
         const carrier = this.objectiveState.sword.carrierId
@@ -682,12 +724,13 @@ export class GameWorld {
       }
       if (objective.kind === 'circle') {
         const circle = this.objectiveState.circles.find((item) => item.id === objective.id);
-        const color = circle?.owner ? this.teamColor(circle.owner) : '#53ff9a';
+        const activeTeam = circle?.capturingTeam || circle?.owner;
+        const color = activeTeam ? this.teamColor(activeTeam) : '#53ff9a';
         objective.group.children.forEach((child) => child.material?.color?.set(color));
-        const fillAmount = circle?.owner ? 1 : Math.max(0.05, (circle?.capture || 0) / 100);
+        const fillAmount = circle?.owner && !circle?.capturingTeam ? 1 : Math.max(0.02, (circle?.capture || 0) / 100);
         objective.fill?.scale.setScalar(fillAmount);
         if (objective.fill?.material) {
-          objective.fill.material.opacity = circle?.owner ? 0.34 : 0.18;
+          objective.fill.material.opacity = circle?.capturingTeam ? 0.62 : circle?.owner ? 0.4 : 0.2;
         }
       }
       objective.group.rotation.y = Math.sin(time * 0.0015) * 0.08;
@@ -700,9 +743,18 @@ export class GameWorld {
       const enemyTeam = player.team === 'blue' ? 'red' : 'blue';
       const ownFlag = flags[player.team];
       const enemyFlag = flags[enemyTeam];
-      if (!enemyFlag.carrierId && player.position.distanceTo(enemyFlag.base) < 3.2) {
+      if (!ownFlag.atBase && !ownFlag.carrierId && ownFlag.droppedPosition && player.position.distanceTo(ownFlag.droppedPosition) < 3.2) {
+        ownFlag.atBase = true;
+        ownFlag.droppedPosition = null;
+        this.awardObjective(player, OBJECTIVE_REWARDS.flagReturn);
+        this.objectiveState.message = `${player.name} returned the ${player.team} flag`;
+        this.onEvent?.(this.objectiveState.message);
+      }
+      const enemyFlagPosition = enemyFlag.droppedPosition || enemyFlag.base;
+      if (!enemyFlag.carrierId && player.position.distanceTo(enemyFlagPosition) < 3.2) {
         enemyFlag.carrierId = player.id;
         enemyFlag.atBase = false;
+        enemyFlag.droppedPosition = null;
         this.objectiveState.message = `${player.name} took the ${enemyTeam} flag`;
         this.onEvent?.(this.objectiveState.message);
       }
@@ -710,6 +762,8 @@ export class GameWorld {
         this.objectiveState[player.team] += 1;
         enemyFlag.carrierId = null;
         enemyFlag.atBase = true;
+        enemyFlag.droppedPosition = null;
+        this.awardObjective(player, OBJECTIVE_REWARDS.flagCapture);
         this.objectiveState.message = `${player.name} captured the flag`;
         this.onEvent?.(`${player.name} scored for ${player.team}`);
       }
@@ -719,9 +773,10 @@ export class GameWorld {
       const flag = flags[team];
       const carrier = flag.carrierId ? this.players.get(flag.carrierId) : null;
       if (carrier?.isDead) {
+        flag.droppedPosition = carrier.position.clone();
         flag.carrierId = null;
-        flag.atBase = true;
-        this.objectiveState.message = `${team} flag returned`;
+        flag.atBase = false;
+        this.objectiveState.message = `${team} flag dropped`;
       }
     }
   }
@@ -742,6 +797,7 @@ export class GameWorld {
       if (sword.carrierId === player.id && player.position.distanceTo(sword.plant) < 4.2) {
         this.objectiveState.red += 1;
         sword.carrierId = null;
+        this.awardObjective(player, OBJECTIVE_REWARDS.swordPlant);
         this.objectiveState.message = `${player.name} planted the sword`;
         this.onEvent?.('Red attackers scored');
       }
@@ -766,6 +822,9 @@ export class GameWorld {
         circle.capture = 0;
         this.objectiveState.message = `${owner} captured circle ${circle.id}`;
         this.onEvent?.(this.objectiveState.message);
+        inside.filter((player) => player.team === owner).forEach((player) => {
+          this.awardObjective(player, OBJECTIVE_REWARDS.circleCapture);
+        });
       }
     }
 
@@ -789,6 +848,9 @@ export class GameWorld {
       blue: usesObjectiveScore ? this.objectiveState.blue : killScoreBlue,
       red: usesObjectiveScore ? this.objectiveState.red : killScoreRed,
       mode: this.gameMode,
+      target: this.scoreLimit,
+      remainingSeconds: this.remainingSeconds(),
+      ended: this.matchEnded,
       objective: this.gameMode === 'free-for-all'
         ? `Leader: ${ffaLeader?.name || 'None'}`
         : this.objectiveState.message,
@@ -821,14 +883,106 @@ export class GameWorld {
     const dt = Math.min(0.033, this.clock.getDelta());
     const time = nowMs();
     this.resize();
-    this.updateLocal(dt, time);
-    this.botSystem.update(dt, time);
-    this.combatSystem.updateBullets();
-    this.powerupSystem.update(time);
-    this.grenadeSystem.update(time, dt);
-    this.updateObjectives(time, dt);
+    if (!this.isPaused) {
+      this.updateLocal(dt, time);
+    }
+    if (!this.matchEnded && !this.isPaused) {
+      this.botSystem.update(dt, time);
+      this.playerCollisionSystem.resolve();
+      this.combatSystem.updateBullets();
+      this.powerupSystem.update(time);
+      this.grenadeSystem.update(time, dt);
+      this.updateObjectives(time, dt);
+      this.checkMatchEnd(time);
+    }
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());
+  }
+
+  handleObjectiveElimination(shooter, target) {
+    if (this.gameMode !== 'attack-defend' || target.id !== this.objectiveState.sword.carrierId || shooter.team !== 'blue') {
+      return;
+    }
+    this.objectiveState.blue += 1;
+    this.objectiveState.sword.carrierId = null;
+    this.awardObjective(shooter, OBJECTIVE_REWARDS.swordDefense);
+    this.objectiveState.message = `${shooter.name} stopped the sword carrier`;
+    this.onEvent?.('Blue defenders scored by eliminating the carrier');
+  }
+
+  awardObjective(player, reward) {
+    player.score += reward.score;
+    player.money += reward.money;
+    this.combatSystem?.onWalletChange?.(player);
+    this.combatSystem?.onProgressChange?.({
+      playerId: player.id,
+      xp: reward.xp,
+      reason: reward.label,
+      weaponId: player.weaponId,
+      wallet: player.money,
+    });
+    this.onEvent?.(`${player.name}: ${reward.label} +🪙 ${reward.money} +${reward.xp} XP`);
+  }
+
+  remainingSeconds() {
+    const durationMs = this.timeLimitMinutes * 60 * 1000;
+    return Math.max(0, Math.ceil((durationMs - (nowMs() - this.matchStartedAt)) / 1000));
+  }
+
+  currentScores() {
+    if (this.gameMode === 'free-for-all') {
+      const leader = [...this.players.values()].sort((a, b) => b.kills - a.kills || b.score - a.score)[0];
+      return { blue: 0, red: 0, leader, highScore: leader?.kills || 0 };
+    }
+    if (this.gameMode === 'team-deathmatch') {
+      return {
+        blue: [...this.players.values()].filter((player) => player.team === 'blue').reduce((sum, player) => sum + player.kills, 0),
+        red: [...this.players.values()].filter((player) => player.team === 'red').reduce((sum, player) => sum + player.kills, 0),
+      };
+    }
+    return { blue: this.objectiveState.blue, red: this.objectiveState.red };
+  }
+
+  checkMatchEnd(time) {
+    if (this.matchEnded) return;
+    const scores = this.currentScores();
+    const reachedTarget = this.gameMode === 'free-for-all'
+      ? scores.highScore >= this.scoreLimit
+      : scores.blue >= this.scoreLimit || scores.red >= this.scoreLimit;
+    const timedOut = this.remainingSeconds() <= 0;
+    if (!reachedTarget && !timedOut) return;
+
+    let winner = null;
+    if (this.gameMode === 'free-for-all') {
+      winner = scores.leader?.id || null;
+    } else if (scores.blue !== scores.red) {
+      winner = scores.blue > scores.red ? 'blue' : 'red';
+    }
+    this.finishMatch(winner, timedOut ? 'Time limit reached' : 'Score target reached', time);
+  }
+
+  finishMatch(winner, reason) {
+    this.matchEnded = true;
+    this.mouse.current.down = false;
+    document.exitPointerLock?.();
+    const localPlayer = this.localPlayer();
+    const localWon = this.gameMode === 'free-for-all'
+      ? winner === localPlayer?.id
+      : winner === localPlayer?.team;
+    if (localWon && localPlayer) {
+      this.awardObjective(localPlayer, { ...WIN_BONUS, label: 'match victory' });
+    }
+    const winnerName = this.gameMode === 'free-for-all'
+      ? this.players.get(winner)?.name
+      : winner ? `${winner === 'blue' ? 'Blue' : 'Red'} Team` : null;
+    this.matchResult = {
+      winner,
+      winnerName: winnerName || 'Draw',
+      reason,
+      localWon,
+    };
+    this.onMatchEnd?.(this.matchResult);
+    this.onEvent?.(`${this.matchResult.winnerName} won. ${reason}`);
   }
 }

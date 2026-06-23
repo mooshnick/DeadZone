@@ -23,9 +23,13 @@ class LobbyRoomServiceTests {
                 "foundry",
                 "capture-flag",
                 6,
-                true
+                true,
+                9,
+                15
         ));
 
         assertThat(room.gameMode()).isEqualTo("capture-flag");
+        assertThat(room.scoreLimit()).isEqualTo(9);
+        assertThat(room.timeLimitMinutes()).isEqualTo(15);
     }
 }

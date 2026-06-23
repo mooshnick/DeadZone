@@ -33,3 +33,11 @@ export function createRoomOnServer(room) {
     body: JSON.stringify(room),
   });
 }
+
+export function joinRoomOnServer(code) {
+  return request(`/${encodeURIComponent(code.trim())}/join`, { method: 'POST' });
+}
+
+export function leaveRoomOnServer(code) {
+  return request(`/${encodeURIComponent(code.trim())}/leave`, { method: 'POST' });
+}

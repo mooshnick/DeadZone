@@ -1,8 +1,8 @@
 export const starterRooms = [
-  { id: 'ROOM-ALPHA', name: 'Alpha Rush', mapId: 'foundry', gameMode: 'team-deathmatch', players: 3, bluePlayers: 2, redPlayers: 1, maxPlayers: 6, allowBots: true },
-  { id: 'ROOM-CITY', name: 'City Ruins', mapId: 'apocalyptic', gameMode: 'free-for-all', players: 0, bluePlayers: 0, redPlayers: 0, maxPlayers: 6, allowBots: true },
-  { id: 'ROOM-NEON', name: 'Neon Duel', mapId: 'neon', gameMode: 'capture-flag', players: 2, bluePlayers: 1, redPlayers: 1, maxPlayers: 4, allowBots: false },
-  { id: 'ROOM-JUNGLE', name: 'Overgrowth Ops', mapId: 'jungle', gameMode: 'circle-control', players: 5, bluePlayers: 3, redPlayers: 2, maxPlayers: 6, allowBots: true },
+  { id: 'ROOM-ALPHA', name: 'Alpha Rush', mapId: 'foundry', gameMode: 'team-deathmatch', scoreLimit: 30, timeLimitMinutes: 20, players: 3, bluePlayers: 2, redPlayers: 1, maxPlayers: 6, allowBots: true },
+  { id: 'ROOM-CITY', name: 'City Ruins', mapId: 'apocalyptic', gameMode: 'free-for-all', scoreLimit: 25, timeLimitMinutes: 20, players: 0, bluePlayers: 0, redPlayers: 0, maxPlayers: 6, allowBots: true },
+  { id: 'ROOM-NEON', name: 'Neon Duel', mapId: 'neon', gameMode: 'capture-flag', scoreLimit: 5, timeLimitMinutes: 20, players: 2, bluePlayers: 1, redPlayers: 1, maxPlayers: 4, allowBots: false },
+  { id: 'ROOM-JUNGLE', name: 'Overgrowth Ops', mapId: 'jungle', gameMode: 'circle-control', scoreLimit: 20, timeLimitMinutes: 20, players: 5, bluePlayers: 3, redPlayers: 2, maxPlayers: 6, allowBots: true },
 ];
 
 export const savedKeybindsKey = 'deadzone-keybinds';

@@ -53,4 +53,22 @@ public class LobbyRoomController {
         jwtService.requireUserId(authorization);
         return ResponseEntity.ok(lobbyRoomService.create(request));
     }
+
+    @PostMapping("/{code}/join")
+    public ResponseEntity<LobbyRoomResponse> join(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String code
+    ) {
+        jwtService.requireUserId(authorization);
+        return ResponseEntity.ok(lobbyRoomService.join(code));
+    }
+
+    @PostMapping("/{code}/leave")
+    public ResponseEntity<LobbyRoomResponse> leave(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String code
+    ) {
+        jwtService.requireUserId(authorization);
+        return ResponseEntity.ok(lobbyRoomService.leave(code));
+    }
 }

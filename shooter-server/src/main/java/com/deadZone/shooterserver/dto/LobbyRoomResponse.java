@@ -5,9 +5,12 @@ public record LobbyRoomResponse(
         String name,
         String mapId,
         String gameMode,
+        int scoreLimit,
+        int timeLimitMinutes,
         int players,
         int maxPlayers,
         int bluePlayers,
         int redPlayers,
-        boolean allowBots
+        boolean allowBots,
+        boolean permanent
 ) {}

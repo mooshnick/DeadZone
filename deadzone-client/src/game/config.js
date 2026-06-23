@@ -24,6 +24,16 @@ export const GAME_MODES = [
   { id: 'circle-control', name: 'Circle Control', short: 'Zones', description: 'Stand inside circles to capture and score.' },
 ];
 
+export const GAME_MODE_RULES = {
+  'team-deathmatch': { minScore: 20, maxScore: 60, defaultScore: 30, scoreStep: 5 },
+  'free-for-all': { minScore: 15, maxScore: 50, defaultScore: 25, scoreStep: 5 },
+  'capture-flag': { minScore: 3, maxScore: 15, defaultScore: 5, scoreStep: 1 },
+  'attack-defend': { minScore: 15, maxScore: 60, defaultScore: 30, scoreStep: 5 },
+  'circle-control': { minScore: 10, maxScore: 30, defaultScore: 20, scoreStep: 5 },
+};
+
+export const MATCH_TIME_OPTIONS = [5, 10, 15, 20];
+
 const premiumPrice = (price) => (price === 0 ? 0 : Math.round(price * 2.4));
 
 export const WEAPONS = {

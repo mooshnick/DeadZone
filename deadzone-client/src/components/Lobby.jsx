@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
-import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
+import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
 
 export function Lobby(props) {
@@ -537,7 +537,7 @@ function PlayScreen({
                       onClick={() => setSelectedRoomId(room.id)}
                     >
                       <span className="room-color" style={{ background: map.accent }} />
-                      <span><strong>{room.name}</strong><small>{mode.short} / {map.name} / Code {room.id}</small></span>
+                      <span><strong>{room.name}</strong><small>{mode.short} / {map.name} / First to {room.scoreLimit} / {room.timeLimitMinutes} min / Code {room.id}</small></span>
                       <span>{room.players}/{room.maxPlayers}</span>
                     </button>
                   );
@@ -574,6 +574,7 @@ function PlayScreen({
 }
 
 function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomDraft }) {
+  const modeRules = GAME_MODE_RULES[roomDraft.gameMode] || GAME_MODE_RULES['team-deathmatch'];
   return (
     <div className="create-room-form">
       <label>
@@ -601,13 +602,44 @@ function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomD
           <button
             className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'}
             key={mode.id}
-            onClick={() => setRoomDraft((draft) => ({ ...draft, gameMode: mode.id }))}
+            onClick={() => setRoomDraft((draft) => ({
+              ...draft,
+              gameMode: mode.id,
+              scoreLimit: GAME_MODE_RULES[mode.id].defaultScore,
+            }))}
           >
             <strong>{mode.short}</strong>
             <span>{mode.name}</span>
             <small>{mode.description}</small>
           </button>
         ))}
+      </div>
+      <div className="room-rule-grid">
+        <label>
+          Score target
+          <input
+            type="number"
+            min={modeRules.minScore}
+            max={modeRules.maxScore}
+            step={modeRules.scoreStep}
+            value={roomDraft.scoreLimit}
+            onChange={(event) => setRoomDraft((draft) => ({
+              ...draft,
+              scoreLimit: Math.max(modeRules.minScore, Math.min(modeRules.maxScore, Number(event.target.value) || modeRules.defaultScore)),
+            }))}
+          />
+          <small>Allowed: {modeRules.minScore}–{modeRules.maxScore}</small>
+        </label>
+        <label>
+          Match time
+          <select
+            value={roomDraft.timeLimitMinutes}
+            onChange={(event) => setRoomDraft((draft) => ({ ...draft, timeLimitMinutes: Number(event.target.value) }))}
+          >
+            {MATCH_TIME_OPTIONS.map((minutes) => <option value={minutes} key={minutes}>{minutes} minutes</option>)}
+          </select>
+          <small>Maximum 20 minutes</small>
+        </label>
       </div>
       <label>
         Max players

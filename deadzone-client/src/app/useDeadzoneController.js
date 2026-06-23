@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createRoomOnServer, fetchRooms, findRoomByCode } from '../api/rooms';
+import { createRoomOnServer, fetchRooms, findRoomByCode, joinRoomOnServer, leaveRoomOnServer } from '../api/rooms';
 import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress } from '../api/users';
 import { GameWorld } from '../game/GameWorld';
-import { ACCESSORIES, DEFAULT_GAME_MODE, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
+import { ACCESSORIES, DEFAULT_GAME_MODE, GAME_MODE_RULES, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
 import { makeId } from '../game/utils';
 import {
   ADMIN_WALLET,
@@ -28,10 +28,14 @@ const ROUTES = {
 const EMPTY_MISSION_STATS = { claimed: [], mapPlays: {}, weaponKills: {} };
 
 function normalizeRoom(room, fallback = {}) {
+  const gameMode = room?.gameMode || fallback.gameMode || DEFAULT_GAME_MODE;
+  const rules = GAME_MODE_RULES[gameMode] || GAME_MODE_RULES[DEFAULT_GAME_MODE];
   return {
     ...fallback,
     ...room,
-    gameMode: room?.gameMode || fallback.gameMode || DEFAULT_GAME_MODE,
+    gameMode,
+    scoreLimit: room?.scoreLimit || fallback.scoreLimit || rules.defaultScore,
+    timeLimitMinutes: room?.timeLimitMinutes || fallback.timeLimitMinutes || 20,
   };
 }
 
@@ -121,7 +125,15 @@ export function useDeadzoneController() {
   const [authMode, setAuthMode] = useState(() => routeStateFromPath().authMode || null);
   const [rooms, setRooms] = useState(starterRooms);
   const [selectedRoomId, setSelectedRoomId] = useState(starterRooms[0].id);
-  const [roomDraft, setRoomDraft] = useState({ name: 'Custom Arena', mapId: 'foundry', gameMode: DEFAULT_GAME_MODE, maxPlayers: 6, allowBots: true });
+  const [roomDraft, setRoomDraft] = useState({
+    name: 'Custom Arena',
+    mapId: 'foundry',
+    gameMode: DEFAULT_GAME_MODE,
+    scoreLimit: GAME_MODE_RULES[DEFAULT_GAME_MODE].defaultScore,
+    timeLimitMinutes: 20,
+    maxPlayers: 6,
+    allowBots: true,
+  });
   const [name, setName] = useState('Player ' + makeId().toUpperCase().slice(0, 3));
   const [account, setAccount] = useState(null);
   const [credentials, setCredentials] = useState({
@@ -162,6 +174,7 @@ export function useDeadzoneController() {
   const [deathInfo, setDeathInfo] = useState({ isDead: false, ready: false, seconds: 0 });
   const [grenadeCharge, setGrenadeCharge] = useState(0);
   const [showScoreboard, setShowScoreboard] = useState(false);
+  const [matchResult, setMatchResult] = useState(null);
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
@@ -259,6 +272,8 @@ export function useDeadzoneController() {
             weaponLevel: user.weaponUpgrades?.[restoredWeaponId] || 0,
             mapId: room.mapId,
             gameMode: room.gameMode || DEFAULT_GAME_MODE,
+            scoreLimit: room.scoreLimit,
+            timeLimitMinutes: room.timeLimitMinutes,
             maps: MAPS,
             maxPlayers: room.maxPlayers,
             allowBots: room.allowBots,
@@ -351,6 +366,7 @@ export function useDeadzoneController() {
       onWalletChange: handleWalletChange,
       onScopeChange: setIsScoped,
       onGrenadeChargeChange: setGrenadeCharge,
+      onMatchEnd: setMatchResult,
       onEvent: (message) => setEvents((items) => [message, ...items].slice(0, 5)),
     });
 
@@ -606,6 +622,13 @@ export function useDeadzoneController() {
     setShowScoreboard(false);
     setDeathInfo({ isDead: false, ready: false, seconds: 0 });
     setEvents(['Returned to lobby.']);
+    setMatchResult(null);
+    leaveRoomOnServer(selectedRoomId)
+      .then((updatedRoom) => {
+        const normalized = normalizeRoom(updatedRoom);
+        setRooms((items) => items.map((item) => (item.id === normalized.id ? normalized : item)));
+      })
+      .catch(() => {});
   }
 
   const createRoom = async () => {
@@ -615,6 +638,8 @@ export function useDeadzoneController() {
       maxPlayers: Math.max(2, Math.min(6, Number(roomDraft.maxPlayers) || 6)),
       allowBots: roomDraft.allowBots,
       gameMode: roomDraft.gameMode || DEFAULT_GAME_MODE,
+      scoreLimit: roomDraft.scoreLimit,
+      timeLimitMinutes: roomDraft.timeLimitMinutes,
     };
     const applyCreatedRoom = (serverRoom, message) => {
       const room = normalizeRoom(serverRoom, roomPayload);
@@ -714,6 +739,8 @@ export function useDeadzoneController() {
       weaponLevel: weaponUpgrades[allowedWeaponId] || 0,
       mapId: room.mapId,
       gameMode: room.gameMode || DEFAULT_GAME_MODE,
+      scoreLimit: room.scoreLimit,
+      timeLimitMinutes: room.timeLimitMinutes,
       maps: MAPS,
       maxPlayers: room.maxPlayers,
       allowBots: room.allowBots,
@@ -736,11 +763,18 @@ export function useDeadzoneController() {
     setGrenadeCharge(0);
     setShowScoreboard(false);
     setDeathInfo({ isDead: false, ready: false, seconds: 0 });
+    setMatchResult(null);
     setWeaponId(allowedWeaponId);
     setEvents([`${trimmedName} entered ${room.name} with ${WEAPONS[allowedWeaponId].name}`]);
     recordMapMission(room.mapId);
     setScreen('match');
     updateRoute(ROUTES.match);
+    joinRoomOnServer(room.id)
+      .then((updatedRoom) => {
+        const normalized = normalizeRoom(updatedRoom, room);
+        setRooms((items) => items.map((item) => (item.id === normalized.id ? normalized : item)));
+      })
+      .catch(() => {});
   };
 
   const selectWeapon = (id) => {
@@ -938,7 +972,7 @@ export function useDeadzoneController() {
       weaponUpgrades,
       xp,
     },
-    matchProps: {
+      matchProps: {
       activeBuffs,
       ammo,
       canvasRef,
@@ -966,6 +1000,7 @@ export function useDeadzoneController() {
       xp,
       level,
       levelProgress,
+      matchResult,
       showScoreboard,
       worldRef,
     },

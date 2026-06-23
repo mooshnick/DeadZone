@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
+import { MatchPauseMenu } from './MatchPauseMenu';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 export function MatchHud({
@@ -30,12 +31,15 @@ export function MatchHud({
   weaponUnlocked,
   level,
   levelProgress,
+  matchResult,
   showScoreboard,
   worldRef,
   xp,
 }) {
   const [showDeathCustomizer, setShowDeathCustomizer] = useState(false);
   const [deathCustomizerTab, setDeathCustomizerTab] = useState('outfits');
+  const [pauseCustomizerTab, setPauseCustomizerTab] = useState('outfits');
+  const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [compactHud, setCompactHud] = useState(false);
   const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
   const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
@@ -48,6 +52,8 @@ export function MatchHud({
   const grenadeCount = Math.min(3, ammo.grenades ?? 0);
   const freeForAll = mode.id === 'free-for-all';
   const leader = score.players[0];
+  const remainingMinutes = Math.floor((score.remainingSeconds || 0) / 60);
+  const remainingClockSeconds = String((score.remainingSeconds || 0) % 60).padStart(2, '0');
   const bluePlayers = score.players.filter((player) => player.team === 'blue');
   const redPlayers = score.players.filter((player) => player.team === 'red');
   const activeAccessoryIdForSlot = (slot) => equippedAccessoryIds.find((id) => ACCESSORIES.find((item) => item.id === id)?.slot === slot);
@@ -65,10 +71,20 @@ export function MatchHud({
   );
 
   const sniperScoped = isScoped && weaponId === 'sniper';
+  const setPaused = (value) => {
+    setShowPauseMenu(value);
+    worldRef.current?.setPaused(value);
+  };
+  const exitPausedMatch = () => {
+    worldRef.current?.setPaused(false);
+    setShowPauseMenu(false);
+    leaveMatch();
+  };
   const shellClassName = [
     'game-3d-shell',
     isScoped ? 'scoped' : '',
     sniperScoped ? 'sniper-scoped' : '',
+    compactHud ? 'hud-minimized' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -197,6 +213,38 @@ export function MatchHud({
         </div>
       )}
 
+      {matchResult && (
+        <section className="match-result-overlay">
+          <span>{matchResult.localWon ? 'Victory' : matchResult.winner ? 'Match Complete' : 'Draw'}</span>
+          <strong>{matchResult.winnerName}</strong>
+          <small>{matchResult.reason}</small>
+          {matchResult.localWon && <em>Victory bonus: 🪙 20 +100 XP</em>}
+          <button className="primary-command" onClick={leaveMatch}>Return to Lobby</button>
+        </section>
+      )}
+
+      {showPauseMenu && !deathInfo.isDead && !matchResult && (
+        <div className="pause-screen">
+          <MatchPauseMenu
+            activeTab={pauseCustomizerTab}
+            accessoryIds={equippedAccessoryIds}
+            equipOutfit={equipOwnedOutfitDuringMatch}
+            equipWeapon={equipWeaponDuringMatch}
+            grenadeSkinId={grenadeSkinId}
+            onContinue={() => setPaused(false)}
+            onExit={exitPausedMatch}
+            onSetTab={setPauseCustomizerTab}
+            onToggleAccessory={onToggleAccessoryDuringMatch}
+            outfitId={outfitId}
+            ownedAccessories={ownedAccessories}
+            ownedOutfits={ownedOutfits}
+            weaponId={weaponId}
+            weaponSkinId={weaponSkinId}
+            weaponUnlocked={weaponUnlocked}
+          />
+        </div>
+      )}
+
       <header className="hud overlay">
         <div className="hud-brand-block">
           <img className="hud-game-logo" src="/Shadow_Logo.png" alt="DeadZone" />
@@ -210,7 +258,7 @@ export function MatchHud({
           {freeForAll ? (
             <>
               <span className="blue-score">Leader</span>
-              <b>{leader ? leader.score : 0}</b>
+              <b>{leader ? leader.kills : 0}</b>
               <span className="red-score">{leader?.name || 'None'}</span>
             </>
           ) : (
@@ -221,13 +269,27 @@ export function MatchHud({
             </>
           )}
         </div>
+        <div className="match-rules-status">
+          <strong>{remainingMinutes}:{remainingClockSeconds}</strong>
+          <span>Target {score.target || currentMatch.scoreLimit}</span>
+        </div>
         <div className="hud-progression">
           <span>Level {level}</span>
           <strong>{xp} XP</strong>
           <i><b style={{ width: `${levelProgress}%` }} /></i>
         </div>
-        <button className="exit-match" onClick={leaveMatch}>Exit</button>
       </header>
+
+      <button
+        aria-label="Pause"
+        className="pause-match"
+        disabled={deathInfo.isDead || Boolean(matchResult)}
+        onClick={() => setPaused(true)}
+        title="Pause"
+      >
+        <span />
+        <span />
+      </button>
 
       {score.objective && <div className="objective-status">{score.objective}</div>}
 
