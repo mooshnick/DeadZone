@@ -509,7 +509,11 @@ function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, o
 
 function PlayScreen({
   accountStatus,
+  answerFriendRequest,
+  answerRoomInvite,
   createRoom,
+  findPlayers,
+  inviteFriend,
   joinMatch,
   joinRoomByCode,
   level,
@@ -518,6 +522,10 @@ function PlayScreen({
   panel,
   roomDraft,
   rooms,
+  social,
+  playerSearchResults,
+  requestFriendship,
+  selectedRoom,
   selectedRoomId,
   setPanel,
   setRoomDraft,
@@ -537,7 +545,8 @@ function PlayScreen({
         </div>
       </header>
       <section className="play-lobby">
-        <div className="room-browser">
+        <div className="multiplayer-hub">
+          <div className="room-browser">
           <header>
             <div>
               <span>OPEN ROOMS</span>
@@ -597,9 +606,133 @@ function PlayScreen({
             </>
           )}
           {accountStatus && <div className="lobby-message">{accountStatus}</div>}
+          </div>
+          <SocialPanel
+            answerFriendRequest={answerFriendRequest}
+            answerRoomInvite={answerRoomInvite}
+            findPlayers={findPlayers}
+            inviteFriend={inviteFriend}
+            playerSearchResults={playerSearchResults}
+            requestFriendship={requestFriendship}
+            selectedRoom={selectedRoom}
+            social={social}
+          />
         </div>
       </section>
     </main>
+  );
+}
+
+function SocialPanel({
+  answerFriendRequest,
+  answerRoomInvite,
+  findPlayers,
+  inviteFriend,
+  playerSearchResults = [],
+  requestFriendship,
+  selectedRoom,
+  social = {},
+}) {
+  const [tab, setTab] = useState('friends');
+  const [query, setQuery] = useState('');
+  const requestCount = (social.incomingRequests?.length || 0) + (social.roomInvites?.length || 0);
+
+  return (
+    <aside className="social-panel">
+      <header>
+        <div>
+          <span>SQUAD</span>
+          <strong>Friends & Invites</strong>
+        </div>
+        {!!requestCount && <b>{requestCount}</b>}
+      </header>
+      <div className="social-tabs">
+        <button className={tab === 'friends' ? 'active' : ''} onClick={() => setTab('friends')}>Friends</button>
+        <button className={tab === 'requests' ? 'active' : ''} onClick={() => setTab('requests')}>Requests</button>
+        <button className={tab === 'invites' ? 'active' : ''} onClick={() => setTab('invites')}>Invites</button>
+      </div>
+      <div className="social-scroll">
+        {tab === 'friends' && (
+          <>
+            <form
+              className="friend-search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                findPlayers(query);
+              }}
+            >
+              <input
+                placeholder="Search username"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <button type="submit" title="Search players">Search</button>
+            </form>
+            {!!playerSearchResults.length && (
+              <div className="social-list search-results">
+                {playerSearchResults.map((player) => (
+                  <div className="social-row" key={player.id}>
+                    <span><strong>{player.username}</strong><small>Level {player.level}</small></span>
+                    <button onClick={() => requestFriendship(player.username)}>Add</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="social-section-title">
+              <span>Your friends</span>
+              <small>{selectedRoom ? `Invite to ${selectedRoom.id}` : 'Select a room first'}</small>
+            </div>
+            <div className="social-list">
+              {(social.friends || []).map((friend) => (
+                <div className="social-row" key={friend.id}>
+                  <span><strong>{friend.username}</strong><small>Level {friend.level}</small></span>
+                  <button disabled={!selectedRoom} onClick={() => inviteFriend(friend.id)}>Invite</button>
+                </div>
+              ))}
+              {!social.friends?.length && <p className="social-empty">Search for a username and send your first friend request.</p>}
+            </div>
+          </>
+        )}
+        {tab === 'requests' && (
+          <div className="social-list">
+            {(social.incomingRequests || []).map((request) => (
+              <div className="social-row stacked" key={request.id}>
+                <span><strong>{request.user.username}</strong><small>wants to be your friend</small></span>
+                <div>
+                  <button onClick={() => answerFriendRequest(request.id, true)}>Accept</button>
+                  <button className="muted" onClick={() => answerFriendRequest(request.id, false)}>Decline</button>
+                </div>
+              </div>
+            ))}
+            {(social.outgoingRequests || []).map((request) => (
+              <div className="social-row pending" key={request.id}>
+                <span><strong>{request.user.username}</strong><small>Request pending</small></span>
+              </div>
+            ))}
+            {!social.incomingRequests?.length && !social.outgoingRequests?.length && (
+              <p className="social-empty">No pending friend requests.</p>
+            )}
+          </div>
+        )}
+        {tab === 'invites' && (
+          <div className="social-list">
+            {(social.roomInvites || []).map((invite) => (
+              <div className="social-row stacked" key={invite.id}>
+                <span>
+                  <strong>{invite.sender.username}</strong>
+                  <small>{invite.room.name} / Code {invite.room.id}</small>
+                </span>
+                <div>
+                  <button onClick={() => answerRoomInvite(invite.id, true)}>Accept</button>
+                  <button className="muted" onClick={() => answerRoomInvite(invite.id, false)}>Decline</button>
+                </div>
+              </div>
+            ))}
+            {!social.roomInvites?.length && <p className="social-empty">No room invitations right now.</p>}
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }
 

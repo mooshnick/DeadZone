@@ -1142,16 +1142,184 @@
   overflow: hidden;
 }
 
+.multiplayer-hub {
+  display: grid;
+  grid-template-columns: minmax(560px, 900px) minmax(290px, 360px);
+  gap: 18px;
+  width: min(1280px, 100%);
+  height: 100%;
+  min-height: 0;
+}
+
 .room-browser {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(900px, 100%);
+  width: 100%;
   max-height: calc(100svh - 148px);
   min-height: 0;
   border: 1px solid #35404d;
   border-radius: 8px;
   background: #181f28;
   overflow: hidden;
+}
+
+.social-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  max-height: calc(100svh - 148px);
+  border: 1px solid #35404d;
+  border-radius: 8px;
+  background: #181f28;
+  overflow: hidden;
+}
+
+.social-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  border-bottom: 1px solid #35404d;
+}
+
+.social-panel > header div,
+.social-row > span {
+  display: grid;
+}
+
+.social-panel > header span,
+.social-section-title span {
+  color: #8fa0b3;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.social-panel > header b {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  color: #111820;
+  background: #ffc247;
+}
+
+.social-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #35404d;
+}
+
+.social-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid #35404d;
+  color: #9eacbc;
+  font-weight: 900;
+  background: #202832;
+}
+
+.social-tabs button:last-child {
+  border-right: 0;
+}
+
+.social-tabs button.active {
+  color: #ffc247;
+  background: #293442;
+}
+
+.social-scroll {
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+  scrollbar-color: #ffc247 rgba(255, 255, 255, 0.1);
+  scrollbar-width: thin;
+}
+
+.friend-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.friend-search input {
+  min-width: 0;
+}
+
+.friend-search button,
+.social-row button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #e29d27;
+  border-radius: 4px;
+  color: #15191f;
+  font-weight: 950;
+  background: #ffc247;
+}
+
+.social-row button.muted {
+  border-color: #465364;
+  color: #d5deea;
+  background: #303a47;
+}
+
+.social-row button:disabled {
+  opacity: 0.45;
+}
+
+.social-section-title {
+  display: grid;
+  gap: 2px;
+  margin: 18px 2px 8px;
+}
+
+.social-section-title small,
+.social-row small {
+  color: #8fa0b3;
+}
+
+.social-list {
+  display: grid;
+  gap: 8px;
+}
+
+.search-results {
+  margin-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #35404d;
+}
+
+.social-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #333e4b;
+  border-radius: 5px;
+  background: #202832;
+}
+
+.social-row.stacked {
+  display: grid;
+}
+
+.social-row.stacked > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.social-row.pending {
+  opacity: 0.72;
+}
+
+.social-empty {
+  padding: 24px 10px;
+  color: #8fa0b3;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .room-browser > header {
@@ -1518,6 +1686,21 @@
 
   .game-code-form {
     grid-template-columns: 1fr;
+  }
+
+  .play-lobby {
+    overflow-y: auto;
+  }
+
+  .multiplayer-hub {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .room-browser,
+  .social-panel {
+    min-height: 560px;
+    max-height: none;
   }
 
   .auth-choice,

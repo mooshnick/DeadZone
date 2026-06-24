@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoomOnServer, fetchRooms, findRoomByCode, joinRoomOnServer, leaveRoomOnServer } from '../api/rooms';
 import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress, verifyEmail } from '../api/users';
+import {
+  acceptFriendRequest,
+  acceptRoomInvite,
+  declineFriendRequest,
+  declineRoomInvite,
+  fetchSocialOverview,
+  inviteFriendToRoom,
+  searchPlayers,
+  sendFriendRequest,
+} from '../api/social';
 import { GameWorld } from '../game/GameWorld';
 import { ACCESSORIES, DEFAULT_GAME_MODE, GAME_MODE_RULES, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
 import { makeId } from '../game/utils';
@@ -234,6 +244,13 @@ export function useDeadzoneController() {
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
   const [missionClock, setMissionClock] = useState(Date.now());
+  const [social, setSocial] = useState({
+    friends: [],
+    incomingRequests: [],
+    outgoingRequests: [],
+    roomInvites: [],
+  });
+  const [playerSearchResults, setPlayerSearchResults] = useState([]);
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
@@ -379,16 +396,29 @@ export function useDeadzoneController() {
   }, []);
 
   useEffect(() => {
-    if (!account || screen !== 'lobby') return;
-    fetchRooms()
-      .then((openRooms) => {
+    if (!account || screen !== 'lobby') return undefined;
+    let active = true;
+    const refreshLobby = () => {
+      Promise.all([fetchRooms(), fetchSocialOverview()])
+        .then(([openRooms, socialOverview]) => {
+          if (!active) return;
         const normalizedRooms = openRooms.map((room) => normalizeRoom(room));
         setRooms(normalizedRooms);
+          setSocial(socialOverview);
         setSelectedRoomId((current) => (
           normalizedRooms.some((room) => room.id === current) ? current : normalizedRooms[0]?.id || ''
         ));
       })
-      .catch((error) => setAccountStatus(error.message));
+        .catch((error) => {
+          if (active) setAccountStatus(error.message);
+        });
+    };
+    refreshLobby();
+    const timer = window.setInterval(refreshLobby, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [account, screen]);
 
   useEffect(() => {
@@ -773,15 +803,8 @@ export function useDeadzoneController() {
     try {
       const room = await createRoomOnServer(roomPayload);
       applyCreatedRoom(room, `Room created. Invite code: ${room.id}`);
-    } catch {
-      const localRoom = {
-        id: `ROOM-${makeId().toUpperCase()}`,
-        ...roomPayload,
-        players: 0,
-        bluePlayers: 0,
-        redPlayers: 0,
-      };
-      applyCreatedRoom(localRoom, `Room created locally. Invite code: ${localRoom.id}`);
+    } catch (error) {
+      setAccountStatus(`Room was not created: ${error.message}`);
     }
   };
 
@@ -912,7 +935,7 @@ export function useDeadzoneController() {
     setAccountStatus(cost === 0 ? 'Mission changed for free.' : `Mission changed for 🪙 ${cost}.`);
   }
 
-  const joinMatch = () => {
+  const joinMatch = async () => {
     const room = rooms.find((item) => item.id === selectedRoomId) || rooms[0];
     if (!room) {
       setAccountStatus('Select or create a room first.');
@@ -921,6 +944,14 @@ export function useDeadzoneController() {
     const trimmedName = name.trim() || 'Player';
     const assignedTeam = autoTeamForRoom(room);
     const allowedWeaponId = weaponUnlocked(WEAPONS[weaponId]) ? weaponId : 'rifle';
+    let joinedRoom;
+    try {
+      joinedRoom = normalizeRoom(await joinRoomOnServer(room.id), room);
+      setRooms((items) => items.map((item) => (item.id === joinedRoom.id ? joinedRoom : item)));
+    } catch (error) {
+      setAccountStatus(`Could not join room: ${error.message}`);
+      return;
+    }
     matchConfig.current = {
       name: trimmedName,
       team: assignedTeam,
@@ -942,15 +973,6 @@ export function useDeadzoneController() {
       money: wallet,
     };
     setTeam(assignedTeam);
-    setRooms((items) => items.map((item) => {
-      if (item.id !== room.id) return item;
-      return {
-        ...item,
-        players: Math.min(item.maxPlayers, (item.players || 0) + 1),
-        bluePlayers: assignedTeam === 'blue' ? (item.bluePlayers || 0) + 1 : (item.bluePlayers || 0),
-        redPlayers: assignedTeam === 'red' ? (item.redPlayers || 0) + 1 : (item.redPlayers || 0),
-      };
-    }));
     setName(trimmedName);
     setIsScoped(false);
     setGrenadeCharge(0);
@@ -963,13 +985,79 @@ export function useDeadzoneController() {
     recordMapMission(room.mapId);
     setScreen('match');
     updateRoute(ROUTES.match);
-    joinRoomOnServer(room.id)
-      .then((updatedRoom) => {
-        const normalized = normalizeRoom(updatedRoom, room);
-        setRooms((items) => items.map((item) => (item.id === normalized.id ? normalized : item)));
-      })
-      .catch(() => {});
   };
+
+  async function refreshSocial() {
+    const overview = await fetchSocialOverview();
+    setSocial(overview);
+    return overview;
+  }
+
+  async function findPlayers(username) {
+    if (username.trim().length < 2) {
+      setPlayerSearchResults([]);
+      return;
+    }
+    try {
+      setPlayerSearchResults(await searchPlayers(username));
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
+
+  async function requestFriendship(username) {
+    try {
+      await sendFriendRequest(username);
+      await refreshSocial();
+      setPlayerSearchResults([]);
+      setAccountStatus(`Friend request sent to ${username}.`);
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
+
+  async function answerFriendRequest(requestId, accept) {
+    try {
+      await (accept ? acceptFriendRequest(requestId) : declineFriendRequest(requestId));
+      await refreshSocial();
+      setAccountStatus(accept ? 'Friend request accepted.' : 'Friend request declined.');
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
+
+  async function inviteFriend(friendId) {
+    if (!selectedRoomId) {
+      setAccountStatus('Select or create a room before inviting a friend.');
+      return;
+    }
+    try {
+      await inviteFriendToRoom(friendId, selectedRoomId);
+      setAccountStatus('Room invitation sent.');
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
+
+  async function answerRoomInvite(invitationId, accept) {
+    try {
+      if (!accept) {
+        await declineRoomInvite(invitationId);
+        await refreshSocial();
+        setAccountStatus('Room invitation declined.');
+        return;
+      }
+      const room = normalizeRoom(await acceptRoomInvite(invitationId));
+      setRooms((items) => [room, ...items.filter((item) => item.id !== room.id)]);
+      setSelectedRoomId(room.id);
+      await refreshSocial();
+      setPanel('play');
+      updateRoute(ROUTES.play);
+      setAccountStatus(`Invitation accepted. Room ${room.id} is selected.`);
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
 
   const selectWeapon = (id) => {
     if (!weaponUnlocked(WEAPONS[id])) {
@@ -1102,6 +1190,8 @@ export function useDeadzoneController() {
     lobbyProps: {
       account,
       accountStatus,
+      answerFriendRequest,
+      answerRoomInvite,
       authMode,
       autoTeamForRoom,
       accessoryIds,
@@ -1115,6 +1205,8 @@ export function useDeadzoneController() {
       handleAccountAction,
       joinMatch,
       joinRoomByCode,
+      findPlayers,
+      inviteFriend,
       keybinds,
       level,
       levelProgress,
@@ -1140,6 +1232,8 @@ export function useDeadzoneController() {
       rerollMission,
       roomDraft,
       rooms,
+      social,
+      playerSearchResults,
       selectedMap,
       selectedGrenadeSkin,
       selectedRoom,
@@ -1156,6 +1250,7 @@ export function useDeadzoneController() {
       setPreviewAccessory,
       setRoomDraft,
       setSelectedRoomId,
+      requestFriendship,
       selectWeapon,
       signOut,
       updateKeybind,
