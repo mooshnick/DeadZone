@@ -3,6 +3,7 @@ package com.deadZone.shooterserver.service;
 import com.deadZone.shooterserver.model.EmailVerificationToken;
 import com.deadZone.shooterserver.model.User;
 import com.deadZone.shooterserver.repository.EmailVerificationTokenRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,9 +16,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class EmailVerificationService {
@@ -26,27 +33,35 @@ public class EmailVerificationService {
 
     private final EmailVerificationTokenRepository tokenRepository;
     private final ObjectProvider<JavaMailSender> mailSender;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
     private final String mailFrom;
     private final String mailHost;
     private final String mailUsername;
     private final String mailPassword;
+    private final String resendApiKey;
     private final boolean consoleFallback;
 
     public EmailVerificationService(
             EmailVerificationTokenRepository tokenRepository,
             ObjectProvider<JavaMailSender> mailSender,
+            ObjectMapper objectMapper,
             @Value("${deadzone.email.from:noreply@deadzone.local}") String mailFrom,
             @Value("${spring.mail.host:}") String mailHost,
             @Value("${spring.mail.username:}") String mailUsername,
             @Value("${spring.mail.password:}") String mailPassword,
+            @Value("${deadzone.email.resend-api-key:}") String resendApiKey,
             @Value("${deadzone.email.console-fallback:false}") boolean consoleFallback
     ) {
         this.tokenRepository = tokenRepository;
         this.mailSender = mailSender;
+        this.objectMapper = objectMapper;
+        this.httpClient = HttpClient.newHttpClient();
         this.mailFrom = mailFrom;
         this.mailHost = mailHost;
         this.mailUsername = mailUsername;
         this.mailPassword = mailPassword == null ? "" : mailPassword.replaceAll("\\s+", "");
+        this.resendApiKey = resendApiKey == null ? "" : resendApiKey.trim();
         this.consoleFallback = consoleFallback;
     }
 
@@ -62,6 +77,19 @@ public class EmailVerificationService {
                 user,
                 Instant.now().plus(15, ChronoUnit.MINUTES)
         ));
+        String subject = "DeadZone verification code: " + token.getToken();
+        String text = """
+                DeadZone email verification
+
+                %s
+
+                Enter this 6-digit code in the DeadZone verification screen.
+                The code expires in 15 minutes.
+                """.formatted(token.getToken());
+        if (!resendApiKey.isBlank()) {
+            return sendWithResend(user.getEmail(), subject, text);
+        }
+
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null || mailHost == null || mailHost.isBlank() || mailUsername == null || mailUsername.isBlank() || mailPassword == null || mailPassword.isBlank()) {
             if (consoleFallback) {
@@ -74,15 +102,8 @@ public class EmailVerificationService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailFrom);
         message.setTo(user.getEmail());
-        message.setSubject("DeadZone verification code: " + token.getToken());
-        message.setText("""
-                DeadZone email verification
-
-                %s
-
-                Enter this 6-digit code in the DeadZone verification screen.
-                The code expires in 15 minutes.
-                """.formatted(token.getToken()));
+        message.setSubject(subject);
+        message.setText(text);
         try {
             sender.send(message);
             return true;
@@ -90,6 +111,34 @@ public class EmailVerificationService {
             log.error("Failed to send email verification code to {}", user.getEmail(), error);
             String detail = error.getMostSpecificCause() == null ? error.getMessage() : error.getMostSpecificCause().getMessage();
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. SMTP error: " + detail);
+        }
+    }
+
+    private boolean sendWithResend(String to, String subject, String text) {
+        try {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "from", mailFrom,
+                    "to", List.of(to),
+                    "subject", subject,
+                    "text", text
+            ));
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.resend.com/emails"))
+                    .header("Authorization", "Bearer " + resendApiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                return true;
+            }
+            log.error("Resend email delivery failed with status {}: {}", response.statusCode(), response.body());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. Email API error: " + response.statusCode() + " " + response.body());
+        } catch (ResponseStatusException error) {
+            throw error;
+        } catch (Exception error) {
+            log.error("Resend email delivery failed", error);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. Email API error: " + error.getMessage());
         }
     }
 
