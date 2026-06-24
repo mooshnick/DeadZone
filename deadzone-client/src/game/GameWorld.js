@@ -26,7 +26,7 @@ const OBJECTIVE_REWARDS = {
 };
 
 export class GameWorld {
-  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange, onMatchEnd }) {
+  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onHealthChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange, onMatchEnd }) {
     this.canvas = canvas;
     this.config = config;
     this.localId = localId;
@@ -36,6 +36,7 @@ export class GameWorld {
     this.onBuffsChange = onBuffsChange;
     this.onAmmoChange = onAmmoChange;
     this.onDeathChange = onDeathChange;
+    this.onHealthChange = onHealthChange;
     this.onWalletChange = onWalletChange;
     this.onEvent = onEvent;
     this.onScopeChange = onScopeChange;
@@ -84,6 +85,7 @@ export class GameWorld {
     this.grenadeCharge = 0;
     this.jumpWasDown = false;
     this.deathInputReleased = false;
+    this.localDeathFocus = null;
   }
 
   start() {
@@ -232,7 +234,7 @@ export class GameWorld {
       },
       onEvent: this.onEvent,
       onRecoil: (player, weapon) => this.applyRecoil(player, weapon),
-      onElimination: (shooter, target) => this.handleObjectiveElimination(shooter, target),
+      onElimination: (shooter, target, time) => this.handleElimination(shooter, target, time),
     });
     this.powerupSystem = new PowerupSystem({
       scene: this.scene,
@@ -414,7 +416,9 @@ export class GameWorld {
     this.grenadeChargeStartedAt = 0;
     this.grenadeCharge = 0;
     this.onGrenadeChargeChange?.(0);
-    this.onDeathChange({ isDead: false, ready: false, seconds: 0 });
+    this.localDeathFocus = null;
+    this.onHealthChange?.(player.health);
+    this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
   }
 
@@ -467,7 +471,14 @@ export class GameWorld {
         this.qWasDown = false;
       }
       const remaining = Math.max(0, Math.ceil((player.respawnReadyAt - time) / 1000));
-      this.onDeathChange({ isDead: true, ready: remaining === 0, seconds: remaining });
+      const focusRemaining = Math.max(0, Math.ceil(((this.localDeathFocus?.until || 0) - time) / 1000));
+      this.onDeathChange({
+        isDead: true,
+        ready: remaining === 0,
+        seconds: remaining,
+        killerName: this.localDeathFocus?.killerName || '',
+        focusSeconds: focusRemaining,
+      });
       return;
     }
 
@@ -506,6 +517,9 @@ export class GameWorld {
     player.isGrounded = this.collisionSystem.move(player.position, player.velocity, wish.multiplyScalar(speed * dt), dt);
     if (this.selectedMap.hazard === 'lava' && player.position.y <= 1.35 && !this.collisionSystem.isOnRaisedBlock(player.position)) {
       player.kill(time);
+      this.localDeathFocus = null;
+      this.onHealthChange?.(0);
+      this.onDeathChange?.({ isDead: true, ready: false, seconds: 5, killerName: '', focusSeconds: 0 });
       this.onEvent('You fell into the lava');
     }
     if (this.mouse.current.down) {
@@ -565,6 +579,10 @@ export class GameWorld {
     if (!localPlayer) {
       return;
     }
+    if (localPlayer.isDead && this.syncDeathFocusCamera()) {
+      this.updateFirstPersonWeapon(localPlayer);
+      return;
+    }
     const eyePosition = localPlayer.position.clone().add(new THREE.Vector3(0, PLAYER_EYE_HEIGHT, 0));
     const lookDirection = this.directionFromAngles(
       localPlayer.yaw + this.recoilOffset.yaw * 0.35,
@@ -573,6 +591,24 @@ export class GameWorld {
     this.camera.position.copy(eyePosition);
     this.camera.lookAt(eyePosition.clone().add(lookDirection.multiplyScalar(10)));
     this.updateFirstPersonWeapon(localPlayer);
+  }
+
+  syncDeathFocusCamera() {
+    const time = nowMs();
+    const killer = this.localDeathFocus?.killerId ? this.players.get(this.localDeathFocus.killerId) : null;
+    if (!killer || killer.isDead || time > this.localDeathFocus.until) {
+      return false;
+    }
+    const localPlayer = this.localPlayer();
+    const killerHead = killer.position.clone().add(new THREE.Vector3(0, PLAYER_EYE_HEIGHT, 0));
+    const fromKillerToVictim = localPlayer.position.clone().sub(killer.position);
+    if (fromKillerToVictim.lengthSq() < 0.01) {
+      fromKillerToVictim.set(Math.sin(killer.yaw), 0, Math.cos(killer.yaw));
+    }
+    const cameraOffset = fromKillerToVictim.normalize().multiplyScalar(8).add(new THREE.Vector3(0, 3.2, 0));
+    this.camera.position.copy(killer.position.clone().add(cameraOffset));
+    this.camera.lookAt(killerHead);
+    return true;
   }
 
   updateFirstPersonWeapon(localPlayer) {
@@ -868,6 +904,7 @@ export class GameWorld {
         .sort((a, b) => b.score - a.score),
     });
     this.onBuffsChange(Object.keys(localPlayer.buffs).map((buff) => POWERUPS[buff].short).join(' / ') || 'No buffs');
+    this.onHealthChange?.(Math.round(localPlayer.health));
     const weapon = WEAPONS[localPlayer.weaponId] || WEAPONS.rifle;
     this.onAmmoChange({
       ammo: localPlayer.ammo,
@@ -898,6 +935,25 @@ export class GameWorld {
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());
+  }
+
+  handleElimination(shooter, target, time) {
+    if (target.id === this.localId) {
+      this.localDeathFocus = {
+        killerId: shooter.id,
+        killerName: shooter.name,
+        until: time + 2800,
+      };
+      this.onHealthChange?.(0);
+      this.onDeathChange?.({
+        isDead: true,
+        ready: false,
+        seconds: 5,
+        killerName: shooter.name,
+        focusSeconds: 3,
+      });
+    }
+    this.handleObjectiveElimination(shooter, target);
   }
 
   handleObjectiveElimination(shooter, target) {

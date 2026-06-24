@@ -3,6 +3,7 @@ package com.deadZone.shooterserver.service;
 import com.deadZone.shooterserver.dto.RegisterRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.model.User;
+import com.deadZone.shooterserver.repository.EmailVerificationTokenRepository;
 import com.deadZone.shooterserver.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class UserServiceTests {
@@ -22,8 +24,12 @@ class UserServiceTests {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EmailVerificationTokenRepository emailVerificationTokenRepository;
+
     @BeforeEach
     void clearUsers() {
+        emailVerificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -34,8 +40,10 @@ class UserServiceTests {
 
         assertThat(response.user().username()).isEqualTo("player-one");
         assertThat(response.user().email()).isEqualTo("one@example.com");
-        assertThat(response.token()).isNotBlank();
+        assertThat(response.user().emailVerified()).isFalse();
+        assertThat(response.token()).isNull();
         assertThat(storedUser.getPassword()).isNotEqualTo("secret");
+        assertThat(emailVerificationTokenRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -72,10 +80,10 @@ class UserServiceTests {
     }
 
     @Test
-    void multipleUsersMayShareTheSameEmail() {
+    void duplicateEmailsAreRejected() {
         userService.register(new RegisterRequest("first-player", "shared@example.com", "a"));
-        userService.register(new RegisterRequest("second-player", "shared@example.com", "b"));
 
-        assertThat(userRepository.count()).isEqualTo(2);
+        assertThatThrownBy(() -> userService.register(new RegisterRequest("second-player", "shared@example.com", "b")))
+                .hasMessageContaining("Email is already registered");
     }
 }

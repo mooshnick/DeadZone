@@ -16,6 +16,7 @@ export function MatchHud({
   events,
   grenadeCharge,
   grenadeSkinId,
+  health,
   isScoped,
   leaveMatch,
   localId,
@@ -40,6 +41,7 @@ export function MatchHud({
   const [deathCustomizerTab, setDeathCustomizerTab] = useState('outfits');
   const [pauseCustomizerTab, setPauseCustomizerTab] = useState('outfits');
   const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [compactHud, setCompactHud] = useState(false);
   const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
   const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
@@ -78,6 +80,7 @@ export function MatchHud({
   const exitPausedMatch = () => {
     worldRef.current?.setPaused(false);
     setShowPauseMenu(false);
+    setShowExitConfirm(false);
     leaveMatch();
   };
   const shellClassName = [
@@ -107,10 +110,16 @@ export function MatchHud({
           {!showDeathCustomizer ? (
             <>
               <strong>You were eliminated</strong>
+              {deathInfo.killerName && (
+                <em className="killer-focus-label">
+                  Killed by {deathInfo.killerName}
+                  {deathInfo.focusSeconds > 0 ? ` · focus ${deathInfo.focusSeconds}s` : ''}
+                </em>
+              )}
               <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
               <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.respawnLocal()}>Return to Match</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
-              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={leaveMatch}>Exit to Lobby</button>
+              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>Exit to Lobby</button>
             </>
           ) : (
             <div className="death-customizer">
@@ -232,7 +241,7 @@ export function MatchHud({
             equipWeapon={equipWeaponDuringMatch}
             grenadeSkinId={grenadeSkinId}
             onContinue={() => setPaused(false)}
-            onExit={exitPausedMatch}
+            onExit={() => setShowExitConfirm(true)}
             onSetTab={setPauseCustomizerTab}
             onToggleAccessory={onToggleAccessoryDuringMatch}
             outfitId={outfitId}
@@ -243,6 +252,19 @@ export function MatchHud({
             weaponUnlocked={weaponUnlocked}
           />
         </div>
+      )}
+
+      {showExitConfirm && (
+        <section className="exit-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="exit-confirm-title">
+          <div>
+            <strong id="exit-confirm-title">Exit match?</strong>
+            <span>Are you sure you want to leave the current game?</span>
+            <div>
+              <button className="secondary-command" onClick={() => setShowExitConfirm(false)}>Stay</button>
+              <button className="danger-command" onClick={exitPausedMatch}>Exit</button>
+            </div>
+          </div>
+        </section>
       )}
 
       <header className="hud overlay">
@@ -290,6 +312,14 @@ export function MatchHud({
         <span />
         <span />
       </button>
+
+      {compactHud && (
+        <aside className="health-widget" aria-label="Health">
+          <span>Health</span>
+          <strong>{Math.max(0, Math.min(100, Math.round(health ?? 100)))} HP</strong>
+          <i><b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} /></i>
+        </aside>
+      )}
 
       {score.objective && <div className="objective-status">{score.objective}</div>}
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoomOnServer, fetchRooms, findRoomByCode, joinRoomOnServer, leaveRoomOnServer } from '../api/rooms';
-import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress } from '../api/users';
+import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress, verifyEmail } from '../api/users';
 import { GameWorld } from '../game/GameWorld';
 import { ACCESSORIES, DEFAULT_GAME_MODE, GAME_MODE_RULES, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
 import { makeId } from '../game/utils';
@@ -23,6 +23,7 @@ const ROUTES = {
   play: '/rooms',
   create: '/rooms/new',
   match: '/game',
+  verifyEmail: '/verify-email',
 };
 
 const EMPTY_MISSION_STATS = { claimed: [], mapPlays: {}, weaponKills: {} };
@@ -94,6 +95,8 @@ function routeStateFromPath(pathname = window.location.pathname) {
       return { screen: 'auth', authMode: 'register' };
     case ROUTES.login:
       return { screen: 'auth', authMode: 'login' };
+    case ROUTES.verifyEmail:
+      return { screen: 'verify-email', token: new URLSearchParams(window.location.search).get('token') || '' };
     case ROUTES.player:
       return { screen: 'lobby', panel: 'player' };
     case ROUTES.settings:
@@ -141,6 +144,7 @@ export function useDeadzoneController() {
     email: '',
     password: '',
     confirmPassword: '',
+    verificationCode: '',
   });
   const [accountStatus, setAccountStatus] = useState('');
   const [team, setTeam] = useState('blue');
@@ -171,7 +175,8 @@ export function useDeadzoneController() {
   const [activeBuffs, setActiveBuffs] = useState('No buffs');
   const [isScoped, setIsScoped] = useState(false);
   const [ammo, setAmmo] = useState({ ammo: 0, magazineSize: 0, reloading: false, reloadProgress: 1 });
-  const [deathInfo, setDeathInfo] = useState({ isDead: false, ready: false, seconds: 0 });
+  const [health, setHealth] = useState(100);
+  const [deathInfo, setDeathInfo] = useState({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
   const [grenadeCharge, setGrenadeCharge] = useState(0);
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
@@ -234,12 +239,21 @@ export function useDeadzoneController() {
 
   useEffect(() => {
     const route = routeStateFromPath();
+    if (route.screen === 'verify-email') {
+      clearSession();
+      setScreen('auth');
+      setAuthMode('verify');
+      setAccountStatus('Enter the 6-digit code from your email.');
+      updateRoute(ROUTES.auth, true);
+      return;
+    }
+
     if (!hasSession()) {
       if (route.screen !== 'auth') {
-        updateRoute(ROUTES.login, true);
-        setAuthMode('login');
+        updateRoute(ROUTES.auth, true);
+        setAuthMode(null);
       } else {
-        setAuthMode(route.authMode || 'login');
+        setAuthMode(route.authMode || null);
       }
       setScreen('auth');
       return;
@@ -287,8 +301,8 @@ export function useDeadzoneController() {
       .catch(() => {
         clearSession();
         setAccountStatus('Your saved session expired. Please log in again.');
-        setAuthMode('login');
-        updateRoute(ROUTES.login, true);
+        setAuthMode(null);
+        updateRoute(ROUTES.auth, true);
         setScreen('auth');
       });
   }, []);
@@ -363,6 +377,7 @@ export function useDeadzoneController() {
       onBuffsChange: setActiveBuffs,
       onAmmoChange: setAmmo,
       onDeathChange: setDeathInfo,
+      onHealthChange: setHealth,
       onWalletChange: handleWalletChange,
       onScopeChange: setIsScoped,
       onGrenadeChargeChange: setGrenadeCharge,
@@ -470,6 +485,21 @@ export function useDeadzoneController() {
   async function handleAccountAction(action) {
     const username = credentials.username.trim();
     const password = credentials.password;
+    if (action === 'verify') {
+      if (!credentials.email.trim() || !credentials.verificationCode.trim()) {
+        setAccountStatus('Enter your email and 6-digit verification code.');
+        return;
+      }
+      try {
+        await verifyEmail(credentials.email.trim(), credentials.verificationCode.trim());
+        setCredentials({ username: '', email: credentials.email.trim(), password: '', confirmPassword: '', verificationCode: '' });
+        setAuthMode('login');
+        setAccountStatus('Email verified. You can log in now.');
+      } catch (error) {
+        setAccountStatus(error.message);
+      }
+      return;
+    }
     if (!username || !password) {
       setAccountStatus('Enter username and password first.');
       return;
@@ -486,12 +516,22 @@ export function useDeadzoneController() {
       const user = action === 'register'
         ? await registerUser(username, credentials.email.trim(), password)
         : await loginUser(username, password);
+      if (action === 'register' && !user.emailVerified) {
+        setCredentials({ username: '', email: credentials.email.trim(), password: '', confirmPassword: '', verificationCode: '' });
+        setAuthMode('verify');
+        setScreen('auth');
+        setAccountStatus('Account created. Enter the 6-digit code we sent to your email.');
+        return;
+      }
       applyUser(user, action === 'register' ? 'Account created and saved.' : 'Logged in.');
-      setCredentials({ username: '', email: '', password: '', confirmPassword: '' });
+      setCredentials({ username: '', email: '', password: '', confirmPassword: '', verificationCode: '' });
       setPanel('main');
       setScreen('lobby');
       updateRoute(ROUTES.main, true);
     } catch (error) {
+      if (String(error.message || '').includes('6-digit code')) {
+        setAuthMode('verify');
+      }
       setAccountStatus(error.message);
     }
   }
@@ -499,13 +539,13 @@ export function useDeadzoneController() {
   function signOut() {
     setAccount(null);
     clearSession();
-    setCredentials({ username: '', email: '', password: '', confirmPassword: '' });
+    setCredentials({ username: '', email: '', password: '', confirmPassword: '', verificationCode: '' });
     setKeybinds(DEFAULT_KEYBINDS);
     setEditingKeybind(null);
     setPanel('main');
     setScreen('auth');
-    setAuthMode('login');
-    updateRoute(ROUTES.login, true);
+    setAuthMode(null);
+    updateRoute(ROUTES.auth, true);
     setAccountStatus('You have been logged out.');
   }
 
@@ -620,7 +660,8 @@ export function useDeadzoneController() {
     setIsScoped(false);
     setGrenadeCharge(0);
     setShowScoreboard(false);
-    setDeathInfo({ isDead: false, ready: false, seconds: 0 });
+    setHealth(100);
+    setDeathInfo({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     setEvents(['Returned to lobby.']);
     setMatchResult(null);
     leaveRoomOnServer(selectedRoomId)
@@ -762,7 +803,8 @@ export function useDeadzoneController() {
     setIsScoped(false);
     setGrenadeCharge(0);
     setShowScoreboard(false);
-    setDeathInfo({ isDead: false, ready: false, seconds: 0 });
+    setHealth(100);
+    setDeathInfo({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     setMatchResult(null);
     setWeaponId(allowedWeaponId);
     setEvents([`${trimmedName} entered ${room.name} with ${WEAPONS[allowedWeaponId].name}`]);
@@ -984,6 +1026,7 @@ export function useDeadzoneController() {
       events,
       grenadeCharge,
       isScoped,
+      health,
       leaveMatch,
       localId,
       onToggleAccessoryDuringMatch: toggleOwnedAccessoryDuringMatch,

@@ -5,12 +5,20 @@ import com.deadZone.shooterserver.dto.LoginRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.dto.RegisterRequest;
 import com.deadZone.shooterserver.dto.UserResponse;
+import com.deadZone.shooterserver.dto.VerifyEmailRequest;
 import com.deadZone.shooterserver.model.User;
 import com.deadZone.shooterserver.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,11 +26,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
+    private final EmailVerificationService emailVerificationService;
+    private final ObjectMapper objectMapper;
 
-    public UserService(UserRepository userRepository, PasswordService passwordService, JwtService jwtService) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordService passwordService,
+            JwtService jwtService,
+            EmailVerificationService emailVerificationService,
+            ObjectMapper objectMapper
+    ) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.jwtService = jwtService;
+        this.emailVerificationService = emailVerificationService;
+        this.objectMapper = objectMapper;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -31,10 +49,15 @@ public class UserService {
         if (userRepository.findByUsername(username).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is already taken!");
         }
+        String email = request.email().trim().toLowerCase();
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered!");
+        }
 
-        User user = new User(username, request.email().trim(), passwordService.hash(request.password()));
+        User user = new User(username, email, passwordService.hash(request.password()));
         user = userRepository.save(user);
-        return authResponse(user);
+        emailVerificationService.sendVerification(user);
+        return new AuthResponse(null, UserResponse.from(user));
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -45,8 +68,19 @@ public class UserService {
         if (!passwordService.matches(request.password(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password!");
         }
+        if (!user.isEmailVerified()) {
+            emailVerificationService.sendVerification(user);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before logging in. We sent you a new 6-digit code.");
+        }
         upgradePasswordHashIfNeeded(user, request.password());
         return authResponse(user);
+    }
+
+    public UserResponse verifyEmail(VerifyEmailRequest request) {
+        User user = emailVerificationService.verify(request == null ? null : request.email(), request == null ? null : request.code());
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(Instant.now());
+        return UserResponse.from(userRepository.save(user));
     }
 
     public UserResponse getUser(Long id) {
@@ -87,27 +121,25 @@ public class UserService {
             user.setGrenadeSkinId(request.grenadeSkinId());
         }
         if (request.ownedOutfits() != null && !request.ownedOutfits().isEmpty()) {
-            user.setOwnedOutfits(String.join(",", request.ownedOutfits()));
+            user.setOwnedOutfits(request.ownedOutfits());
         }
         if (request.ownedWeaponSkins() != null && !request.ownedWeaponSkins().isEmpty()) {
-            user.setOwnedWeaponSkins(String.join(",", request.ownedWeaponSkins()));
+            user.setOwnedWeaponSkins(request.ownedWeaponSkins());
         }
         if (request.ownedGrenadeSkins() != null && !request.ownedGrenadeSkins().isEmpty()) {
-            user.setOwnedGrenadeSkins(String.join(",", request.ownedGrenadeSkins()));
+            user.setOwnedGrenadeSkins(request.ownedGrenadeSkins());
         }
         if (request.ownedAccessories() != null) {
-            user.setOwnedAccessories(String.join(",", request.ownedAccessories()));
+            user.setOwnedAccessories(request.ownedAccessories());
         }
         if (request.accessoryIds() != null) {
-            user.setAccessoryIds(String.join(",", request.accessoryIds()));
+            user.setAccessoryIds(request.accessoryIds());
         }
         if (request.weaponUpgrades() != null) {
-            user.setWeaponUpgrades(request.weaponUpgrades().entrySet().stream()
-                    .map(entry -> entry.getKey() + ":" + entry.getValue())
-                    .collect(Collectors.joining(",")));
+            user.setWeaponUpgrades(request.weaponUpgrades());
         }
         if (request.missionStats() != null) {
-            user.setMissionStats(request.missionStats());
+            applyMissionStats(user, request.missionStats());
         }
         enforceAdminBenefits(user);
         return UserResponse.from(userRepository.save(user));
@@ -130,19 +162,25 @@ public class UserService {
             user.setPassword(passwordService.hash(password));
         }
         user.setAdmin(true);
+        user.setEmailVerified(true);
+        if (user.getEmailVerifiedAt() == null) {
+            user.setEmailVerifiedAt(Instant.now());
+        }
         user.setWallet(User.ADMIN_WALLET);
         user.setXp(User.ADMIN_XP);
         user.setOutfitId(User.ALL_OUTFITS.split(",")[4]);
         user.setWeaponId("rpg");
         user.setWeaponSkinId("goldline");
-        user.setOwnedOutfits(User.ALL_OUTFITS);
-        user.setOwnedWeaponSkins(User.ALL_WEAPON_SKINS);
+        user.setOwnedOutfits(csv(User.ALL_OUTFITS));
+        user.setOwnedWeaponSkins(csv(User.ALL_WEAPON_SKINS));
         user.setGrenadeSkinId("royal");
-        user.setOwnedGrenadeSkins(User.ALL_GRENADE_SKINS);
-        user.setOwnedAccessories(User.ALL_ACCESSORIES);
-        user.setAccessoryIds("crown,shades,tail-neon,boots-speed");
-        user.setWeaponUpgrades(User.MAX_WEAPON_UPGRADES);
-        user.setMissionStats("");
+        user.setOwnedGrenadeSkins(csv(User.ALL_GRENADE_SKINS));
+        user.setOwnedAccessories(csv(User.ALL_ACCESSORIES));
+        user.setAccessoryIds(csv("crown,shades,tail-neon,boots-speed"));
+        user.setWeaponUpgrades(weaponUpgradeMap(User.MAX_WEAPON_UPGRADES));
+        user.setClaimedMissions(java.util.List.of());
+        user.setMapPlays(Map.of());
+        user.setWeaponKills(Map.of());
         return userRepository.save(user);
     }
 
@@ -193,40 +231,53 @@ public class UserService {
             user.setWeaponSkinId(User.DEFAULT_WEAPON_SKIN_ID);
             changed = true;
         }
-        if (user.getOwnedOutfits() == null || user.getOwnedOutfits().isBlank()) {
-            user.setOwnedOutfits(User.DEFAULT_OUTFIT_ID);
+        if (user.getOwnedOutfits() == null || user.getOwnedOutfits().isEmpty()) {
+            user.setOwnedOutfits(csv(User.DEFAULT_OUTFIT_ID));
             changed = true;
         }
-        if (user.getOwnedWeaponSkins() == null || user.getOwnedWeaponSkins().isBlank()) {
-            user.setOwnedWeaponSkins(User.DEFAULT_WEAPON_SKIN_ID);
+        if (user.getOwnedWeaponSkins() == null || user.getOwnedWeaponSkins().isEmpty()) {
+            user.setOwnedWeaponSkins(csv(User.DEFAULT_WEAPON_SKIN_ID));
             changed = true;
         }
         if (user.getWeaponUpgrades() == null) {
-            user.setWeaponUpgrades("");
+            user.setWeaponUpgrades(Map.of());
             changed = true;
         }
         if (user.getGrenadeSkinId() == null || user.getGrenadeSkinId().isBlank()) {
             user.setGrenadeSkinId(User.DEFAULT_GRENADE_SKIN_ID);
             changed = true;
         }
-        if (user.getOwnedGrenadeSkins() == null || user.getOwnedGrenadeSkins().isBlank()) {
-            user.setOwnedGrenadeSkins(User.DEFAULT_GRENADE_SKIN_ID);
+        if (user.getOwnedGrenadeSkins() == null || user.getOwnedGrenadeSkins().isEmpty()) {
+            user.setOwnedGrenadeSkins(csv(User.DEFAULT_GRENADE_SKIN_ID));
             changed = true;
         }
         if (user.getOwnedAccessories() == null) {
-            user.setOwnedAccessories("");
+            user.setOwnedAccessories(java.util.List.of());
             changed = true;
         }
         if (user.getAccessoryIds() == null) {
-            user.setAccessoryIds("");
+            user.setAccessoryIds(java.util.List.of());
             changed = true;
         }
-        if (user.getMissionStats() == null) {
-            user.setMissionStats("");
+        if (user.getClaimedMissions() == null) {
+            user.setClaimedMissions(java.util.List.of());
+            changed = true;
+        }
+        if (user.getMapPlays() == null) {
+            user.setMapPlays(Map.of());
+            changed = true;
+        }
+        if (user.getWeaponKills() == null) {
+            user.setWeaponKills(Map.of());
             changed = true;
         }
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             user.setEmail(user.getUsername() + "@deadzone.local");
+            changed = true;
+        }
+        if (user.isAdmin() && !user.isEmailVerified()) {
+            user.setEmailVerified(true);
+            user.setEmailVerifiedAt(Instant.now());
             changed = true;
         }
         return changed;
@@ -237,5 +288,63 @@ public class UserService {
             user.setWallet(Math.max(user.getWallet(), User.ADMIN_WALLET));
             user.setXp(Math.max(user.getXp(), User.ADMIN_XP));
         }
+    }
+
+    private java.util.List<String> csv(String value) {
+        if (value == null || value.isBlank()) {
+            return java.util.List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .toList();
+    }
+
+    private Map<String, Integer> weaponUpgradeMap(String value) {
+        if (value == null || value.isBlank()) {
+            return Map.of();
+        }
+        return Arrays.stream(value.split(","))
+                .filter(item -> item.contains(":"))
+                .map(item -> item.split(":", 2))
+                .collect(Collectors.toMap(parts -> parts[0], parts -> Integer.parseInt(parts[1]), (a, b) -> b));
+    }
+
+    private void applyMissionStats(User user, String missionStats) {
+        if (missionStats.isBlank()) {
+            user.setClaimedMissions(java.util.List.of());
+            user.setMapPlays(Map.of());
+            user.setWeaponKills(Map.of());
+            return;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(missionStats);
+            java.util.List<String> claimed = new ArrayList<>();
+            if (root.path("claimed").isArray()) {
+                root.path("claimed").forEach(item -> {
+                    if (item.isTextual() && !item.asText().isBlank()) {
+                        claimed.add(item.asText());
+                    }
+                });
+            }
+            user.setClaimedMissions(claimed);
+            user.setMapPlays(intMap(root.path("mapPlays")));
+            user.setWeaponKills(intMap(root.path("weaponKills")));
+        } catch (Exception ignored) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mission stats are invalid.");
+        }
+    }
+
+    private Map<String, Integer> intMap(JsonNode node) {
+        Map<String, Integer> values = new LinkedHashMap<>();
+        if (!node.isObject()) {
+            return values;
+        }
+        node.fields().forEachRemaining(entry -> {
+            if (!entry.getKey().isBlank() && entry.getValue().canConvertToInt()) {
+                values.put(entry.getKey(), Math.max(0, entry.getValue().asInt()));
+            }
+        });
+        return values;
     }
 }

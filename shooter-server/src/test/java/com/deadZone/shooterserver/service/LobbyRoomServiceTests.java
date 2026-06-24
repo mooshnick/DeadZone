@@ -1,23 +1,29 @@
 package com.deadZone.shooterserver.service;
 
 import com.deadZone.shooterserver.dto.CreateRoomRequest;
-import com.deadZone.shooterserver.model.LobbyRoom;
 import com.deadZone.shooterserver.repository.LobbyRoomRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
+@SpringBootTest
 class LobbyRoomServiceTests {
+    @Autowired
+    private LobbyRoomRepository repository;
+
+    @Autowired
+    private LobbyRoomService service;
+
+    @BeforeEach
+    void clearRooms() {
+        repository.deleteAll();
+    }
+
     @Test
     void createPreservesRequestedGameMode() {
-        LobbyRoomRepository repository = mock(LobbyRoomRepository.class);
-        when(repository.existsById(any())).thenReturn(false);
-        when(repository.save(any(LobbyRoom.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        LobbyRoomService service = new LobbyRoomService(repository);
-
         var room = service.create(new CreateRoomRequest(
                 "Objective Room",
                 "foundry",

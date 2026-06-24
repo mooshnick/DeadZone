@@ -75,7 +75,7 @@
 .menu-shell {
   position: relative;
   overflow: hidden;
-  min-height: 100svh;
+  height: 100svh;
   color: #f4f7fb;
   background:
     radial-gradient(circle at 18% 18%, rgba(69, 223, 124, 0.2), transparent 26%),
@@ -258,16 +258,25 @@
 .auth-stage,
 .main-menu {
   width: min(680px, calc(100% - 32px));
-  min-height: 100svh;
+  min-height: 0;
+  height: 100%;
   align-content: center;
 }
 
 .auth-stage {
   display: grid;
   gap: 16px;
-  grid-template-rows: auto minmax(300px, 0.8fr) auto;
+  grid-template-rows: auto minmax(220px, 1fr) auto;
   justify-items: center;
-  padding: 28px 0;
+  padding: 18px 0;
+}
+
+.auth-stage.form-mode {
+  grid-template-rows: auto minmax(170px, 0.45fr) auto;
+  align-content: center;
+  gap: 12px;
+  padding: 14px 0;
+  transform: translateY(-34px);
 }
 
 .auth-landing-art {
@@ -311,8 +320,13 @@
 
 .character-preview-canvas--hero {
   width: min(620px, 92vw);
-  height: min(610px, 62svh);
-  min-height: 430px;
+  height: min(520px, 52svh);
+  min-height: 280px;
+}
+
+.auth-stage.form-mode .character-preview-canvas--hero {
+  height: min(260px, 30svh);
+  min-height: 170px;
 }
 
 .character-preview-canvas--side {
@@ -361,9 +375,9 @@
 
 .auth-form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   width: min(420px, 100%);
-  padding: 24px;
+  padding: 20px;
   border: 1px solid #3c444d;
   border-radius: 4px;
   color: #f2f5f8;
@@ -452,9 +466,10 @@
 
 .main-menu {
   width: min(760px, calc(100% - 32px));
-  grid-template-rows: minmax(390px, 0.9fr) auto auto;
-  min-height: calc(100svh - 76px);
-  padding: 14px 0 34px;
+  grid-template-rows: minmax(250px, 0.9fr) auto auto;
+  height: calc(100svh - 76px);
+  min-height: 0;
+  padding: 12px 0 18px;
   margin: 0 auto;
   justify-items: center;
   align-content: center;
@@ -2269,6 +2284,50 @@ button {
   display: none;
 }
 
+.health-widget {
+  position: fixed;
+  z-index: 31;
+  top: 18px;
+  right: 74px;
+  display: grid;
+  gap: 4px;
+  width: 156px;
+  padding: 10px 12px;
+  border: 1px solid rgba(109, 255, 159, 0.34);
+  border-radius: 8px;
+  color: #eafff1;
+  background: rgba(7, 14, 24, 0.9);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+.health-widget span {
+  color: #95ffc0;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.health-widget strong {
+  color: #6dff9f;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.health-widget i {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(109, 255, 159, 0.14);
+}
+
+.health-widget b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #28e97b, #ffc247, #ef4354);
+  box-shadow: 0 0 14px rgba(85, 255, 145, 0.44);
+}
+
 .eyebrow {
   display: block;
   color: #8da1bc;
@@ -2669,6 +2728,18 @@ button {
   font-weight: 900;
 }
 
+.killer-focus-label {
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 194, 71, 0.3);
+  border-radius: 999px;
+  color: #ffe2a0;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
+  background: rgba(7, 14, 24, 0.74);
+}
+
 .death-screen button {
   min-width: 190px;
   color: #161006;
@@ -2703,6 +2774,45 @@ button {
   place-items: center;
   background: rgba(2, 6, 12, 0.88);
   backdrop-filter: blur(8px);
+}
+
+.exit-confirm-dialog {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.exit-confirm-dialog > div {
+  display: grid;
+  gap: 14px;
+  width: min(360px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #f7fbff;
+  text-align: center;
+  background: rgba(14, 22, 34, 0.96);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
+}
+
+.exit-confirm-dialog strong {
+  font-size: 25px;
+}
+
+.exit-confirm-dialog span {
+  color: #c6d2e2;
+  font-weight: 850;
+}
+
+.exit-confirm-dialog > div > div {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 .pause-customizer header {
@@ -3132,6 +3242,12 @@ button {
   .match-panel {
     grid-template-columns: 1fr;
     justify-items: stretch;
+  }
+
+  .health-widget {
+    top: 70px;
+    right: 12px;
+    width: 132px;
   }
 
   .combat-readout {

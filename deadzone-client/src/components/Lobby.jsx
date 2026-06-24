@@ -38,7 +38,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
 
   return (
     <main className="menu-shell auth-screen">
-      <section className="auth-stage">
+      <section className={mode ? 'auth-stage form-mode' : 'auth-stage'}>
         <div className="auth-landing-art">
           <h1 className="auth-title">DEAD ZONE</h1>
           <span className="auth-subtitle">Enter the arena</span>
@@ -61,22 +61,25 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             }}
           >
             <header>
-              <strong>{mode === 'login' ? 'Welcome back' : 'Create account'}</strong>
+              <strong>{mode === 'login' ? 'Welcome back' : mode === 'verify' ? 'Verify email' : 'Create account'}</strong>
               <button type="button" className="icon-command" title="Close" onClick={() => setAuthMode(null)}>×</button>
             </header>
-            <label>
-              Username
-              <input
-                autoFocus
-                autoComplete="username"
-                value={credentials.username}
-                onChange={(event) => setCredentials((draft) => ({ ...draft, username: event.target.value }))}
-              />
-            </label>
-            {mode === 'register' && (
+            {mode !== 'verify' && (
+              <label>
+                Username
+                <input
+                  autoFocus
+                  autoComplete="username"
+                  value={credentials.username}
+                  onChange={(event) => setCredentials((draft) => ({ ...draft, username: event.target.value }))}
+                />
+              </label>
+            )}
+            {(mode === 'register' || mode === 'verify') && (
               <label>
                 Email
                 <input
+                  autoFocus={mode === 'verify'}
                   type="email"
                   autoComplete="email"
                   value={credentials.email}
@@ -84,15 +87,17 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                 />
               </label>
             )}
-            <label>
-              Password
-              <input
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                value={credentials.password}
-                onChange={(event) => setCredentials((draft) => ({ ...draft, password: event.target.value }))}
-              />
-            </label>
+            {mode !== 'verify' && (
+              <label>
+                Password
+                <input
+                  type="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  value={credentials.password}
+                  onChange={(event) => setCredentials((draft) => ({ ...draft, password: event.target.value }))}
+                />
+              </label>
+            )}
             {mode === 'register' && (
               <label>
                 Confirm password
@@ -104,10 +109,25 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                 />
               </label>
             )}
+            {mode === 'verify' && (
+              <label>
+                6-digit code
+                <input
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={credentials.verificationCode}
+                  onChange={(event) => setCredentials((draft) => ({ ...draft, verificationCode: event.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                />
+              </label>
+            )}
             {accountStatus && <div className="form-message">{accountStatus}</div>}
             <button className="primary-command" type="submit">
-              {mode === 'login' ? 'Login' : 'Create Account'}
+              {mode === 'login' ? 'Login' : mode === 'verify' ? 'Verify Code' : 'Create Account'}
             </button>
+            {mode !== 'verify' && (
+              <button className="secondary-command" type="button" onClick={() => setAuthMode('verify')}>I have a code</button>
+            )}
           </form>
         )}
       </section>

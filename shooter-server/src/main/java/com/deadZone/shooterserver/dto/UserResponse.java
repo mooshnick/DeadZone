@@ -1,16 +1,19 @@
 package com.deadZone.shooterserver.dto;
 
 import com.deadZone.shooterserver.model.User;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public record UserResponse(
         Long id,
         String username,
         String email,
+        boolean emailVerified,
         boolean admin,
         int totalKills,
         int totalAssists,
@@ -29,29 +32,14 @@ public record UserResponse(
         Map<String, Integer> weaponUpgrades,
         String missionStats
 ) {
-    public static UserResponse from(User user) {
-        String owned = user.getOwnedOutfits() == null || user.getOwnedOutfits().isBlank()
-                ? "classic"
-                : user.getOwnedOutfits();
-        String weaponSkins = user.getOwnedWeaponSkins() == null || user.getOwnedWeaponSkins().isBlank()
-                ? "standard"
-                : user.getOwnedWeaponSkins();
-        String grenadeSkins = user.getOwnedGrenadeSkins() == null || user.getOwnedGrenadeSkins().isBlank()
-                ? "standard"
-                : user.getOwnedGrenadeSkins();
-        String accessories = user.getOwnedAccessories() == null ? "" : user.getOwnedAccessories();
-        String equippedAccessories = user.getAccessoryIds() == null ? "" : user.getAccessoryIds();
-        Map<String, Integer> upgrades = user.getWeaponUpgrades() == null || user.getWeaponUpgrades().isBlank()
-                ? Map.of()
-                : Arrays.stream(user.getWeaponUpgrades().split(","))
-                .filter(item -> item.contains(":"))
-                .map(item -> item.split(":", 2))
-                .collect(Collectors.toMap(parts -> parts[0], parts -> Integer.parseInt(parts[1]), (a, b) -> b));
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    public static UserResponse from(User user) {
         return new UserResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.isEmailVerified(),
                 user.isAdmin(),
                 user.getTotalKills(),
                 user.getTotalAssists(),
@@ -62,13 +50,37 @@ public record UserResponse(
                 user.getWeaponId() == null ? "rifle" : user.getWeaponId(),
                 user.getWeaponSkinId() == null ? "standard" : user.getWeaponSkinId(),
                 user.getGrenadeSkinId() == null ? "standard" : user.getGrenadeSkinId(),
-                Arrays.stream(owned.split(",")).filter(item -> !item.isBlank()).toList(),
-                Arrays.stream(weaponSkins.split(",")).filter(item -> !item.isBlank()).toList(),
-                Arrays.stream(grenadeSkins.split(",")).filter(item -> !item.isBlank()).toList(),
-                Arrays.stream(accessories.split(",")).filter(item -> !item.isBlank()).toList(),
-                Arrays.stream(equippedAccessories.split(",")).filter(item -> !item.isBlank()).toList(),
-                upgrades,
-                user.getMissionStats() == null ? "" : user.getMissionStats()
+                withDefault(user.getOwnedOutfits(), "classic"),
+                withDefault(user.getOwnedWeaponSkins(), "standard"),
+                withDefault(user.getOwnedGrenadeSkins(), "standard"),
+                new ArrayList<>(user.getOwnedAccessories()),
+                new ArrayList<>(user.getAccessoryIds()),
+                Map.copyOf(user.getWeaponUpgrades()),
+                missionStatsJson(user)
         );
+    }
+
+    private static List<String> withDefault(Iterable<String> values, String defaultValue) {
+        List<String> items = new ArrayList<>();
+        if (values != null) {
+            values.forEach(value -> {
+                if (value != null && !value.isBlank()) {
+                    items.add(value);
+                }
+            });
+        }
+        return items.isEmpty() ? List.of(defaultValue) : items;
+    }
+
+    private static String missionStatsJson(User user) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("claimed", new ArrayList<>(user.getClaimedMissions()));
+        stats.put("mapPlays", Map.copyOf(user.getMapPlays()));
+        stats.put("weaponKills", Map.copyOf(user.getWeaponKills()));
+        try {
+            return OBJECT_MAPPER.writeValueAsString(stats);
+        } catch (JsonProcessingException ignored) {
+            return "";
+        }
     }
 }

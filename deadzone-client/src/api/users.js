@@ -7,11 +7,12 @@ function token() {
 }
 
 async function request(path, options = {}) {
+  const { skipAuth = false, ...fetchOptions } = options;
   const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+      ...(!skipAuth && token() ? { Authorization: `Bearer ${token()}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -37,7 +38,7 @@ function storeSession(response) {
   if (response?.token) {
     localStorage.setItem(sessionTokenKey, response.token);
     localStorage.removeItem(legacyUserIdKey);
-  } else if (user.id != null) {
+  } else if (response?.legacySession && user.id != null) {
     localStorage.setItem(legacyUserIdKey, String(user.id));
     localStorage.removeItem(sessionTokenKey);
   }
@@ -57,6 +58,14 @@ export function loginUser(username, password) {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   }).then(storeSession);
+}
+
+export function verifyEmail(email, code) {
+  return request('/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+    skipAuth: true,
+  });
 }
 
 export function loadUser() {

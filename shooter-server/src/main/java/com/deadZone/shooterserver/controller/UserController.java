@@ -5,6 +5,7 @@ import com.deadZone.shooterserver.dto.LoginRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.dto.RegisterRequest;
 import com.deadZone.shooterserver.dto.UserResponse;
+import com.deadZone.shooterserver.dto.VerifyEmailRequest;
 import com.deadZone.shooterserver.service.JwtService;
 import com.deadZone.shooterserver.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,11 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(userService.login(request));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<UserResponse> verifyEmail(@RequestBody VerifyEmailRequest request) {
+        return ResponseEntity.ok(userService.verifyEmail(request));
     }
 
     @GetMapping("/me")

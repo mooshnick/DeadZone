@@ -1,11 +1,26 @@
 package com.deadZone.shooterserver.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -29,11 +44,16 @@ public class User {
     @Column(nullable = false, unique = true, length = 32)
     private String username;
 
-    @Column
+    @Column(nullable = false, unique = true, length = 120)
     private String email;
 
     @Column(nullable = false)
     private String password;
+
+    @Column(nullable = false)
+    private boolean emailVerified;
+
+    private Instant emailVerifiedAt;
 
     private int totalKills;
     private int totalAssists;
@@ -44,14 +64,60 @@ public class User {
     private String weaponId;
     private String weaponSkinId;
     private String grenadeSkinId;
-    private String ownedOutfits;
-    private String ownedWeaponSkins;
-    private String ownedGrenadeSkins;
-    private String ownedAccessories;
-    private String accessoryIds;
-    private String weaponUpgrades;
-    @Column(length = 4096)
-    private String missionStats;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_owned_outfits", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "outfit_id", nullable = false, length = 64)
+    private List<String> ownedOutfits = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_owned_weapon_skins", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "skin_id", nullable = false, length = 64)
+    private List<String> ownedWeaponSkins = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_owned_grenade_skins", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "skin_id", nullable = false, length = 64)
+    private List<String> ownedGrenadeSkins = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_owned_accessories", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "accessory_id", nullable = false, length = 64)
+    private List<String> ownedAccessories = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_equipped_accessories", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "accessory_id", nullable = false, length = 64)
+    private List<String> accessoryIds = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_weapon_upgrades", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "weapon_id", length = 64)
+    @Column(name = "upgrade_level", nullable = false)
+    private Map<String, Integer> weaponUpgrades = new LinkedHashMap<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_claimed_missions", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "mission_id", nullable = false, length = 64)
+    private List<String> claimedMissions = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_map_plays", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "map_id", length = 64)
+    @Column(name = "plays", nullable = false)
+    private Map<String, Integer> mapPlays = new LinkedHashMap<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_weapon_kills", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "weapon_id", length = 64)
+    @Column(name = "kills", nullable = false)
+    private Map<String, Integer> weaponKills = new LinkedHashMap<>();
     private boolean admin;
 
     public User() {}
@@ -69,14 +135,17 @@ public class User {
         this.weaponId = DEFAULT_WEAPON_ID;
         this.weaponSkinId = DEFAULT_WEAPON_SKIN_ID;
         this.grenadeSkinId = DEFAULT_GRENADE_SKIN_ID;
-        this.ownedOutfits = DEFAULT_OUTFIT_ID;
-        this.ownedWeaponSkins = DEFAULT_WEAPON_SKIN_ID;
-        this.ownedGrenadeSkins = DEFAULT_GRENADE_SKIN_ID;
-        this.ownedAccessories = "";
-        this.accessoryIds = "";
-        this.weaponUpgrades = "";
-        this.missionStats = "";
+        this.ownedOutfits = new ArrayList<>(List.of(DEFAULT_OUTFIT_ID));
+        this.ownedWeaponSkins = new ArrayList<>(List.of(DEFAULT_WEAPON_SKIN_ID));
+        this.ownedGrenadeSkins = new ArrayList<>(List.of(DEFAULT_GRENADE_SKIN_ID));
+        this.ownedAccessories = new ArrayList<>();
+        this.accessoryIds = new ArrayList<>();
+        this.weaponUpgrades = new LinkedHashMap<>();
+        this.claimedMissions = new ArrayList<>();
+        this.mapPlays = new LinkedHashMap<>();
+        this.weaponKills = new LinkedHashMap<>();
         this.admin = false;
+        this.emailVerified = false;
     }
 
     public Long getId() { return id; }
@@ -90,6 +159,12 @@ public class User {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
+    public void setEmailVerifiedAt(Instant emailVerifiedAt) { this.emailVerifiedAt = emailVerifiedAt; }
 
     public int getTotalKills() { return totalKills; }
     public void setTotalKills(int totalKills) { this.totalKills = totalKills; }
@@ -118,27 +193,68 @@ public class User {
     public String getGrenadeSkinId() { return grenadeSkinId; }
     public void setGrenadeSkinId(String grenadeSkinId) { this.grenadeSkinId = grenadeSkinId; }
 
-    public String getOwnedOutfits() { return ownedOutfits; }
-    public void setOwnedOutfits(String ownedOutfits) { this.ownedOutfits = ownedOutfits; }
+    public List<String> getOwnedOutfits() { return ownedOutfits; }
+    public void setOwnedOutfits(Collection<String> ownedOutfits) { this.ownedOutfits = cleanList(ownedOutfits); }
 
-    public String getOwnedWeaponSkins() { return ownedWeaponSkins; }
-    public void setOwnedWeaponSkins(String ownedWeaponSkins) { this.ownedWeaponSkins = ownedWeaponSkins; }
+    public List<String> getOwnedWeaponSkins() { return ownedWeaponSkins; }
+    public void setOwnedWeaponSkins(Collection<String> ownedWeaponSkins) { this.ownedWeaponSkins = cleanList(ownedWeaponSkins); }
 
-    public String getOwnedGrenadeSkins() { return ownedGrenadeSkins; }
-    public void setOwnedGrenadeSkins(String ownedGrenadeSkins) { this.ownedGrenadeSkins = ownedGrenadeSkins; }
+    public List<String> getOwnedGrenadeSkins() { return ownedGrenadeSkins; }
+    public void setOwnedGrenadeSkins(Collection<String> ownedGrenadeSkins) { this.ownedGrenadeSkins = cleanList(ownedGrenadeSkins); }
 
-    public String getOwnedAccessories() { return ownedAccessories; }
-    public void setOwnedAccessories(String ownedAccessories) { this.ownedAccessories = ownedAccessories; }
+    public List<String> getOwnedAccessories() { return ownedAccessories; }
+    public void setOwnedAccessories(Collection<String> ownedAccessories) { this.ownedAccessories = cleanList(ownedAccessories); }
 
-    public String getAccessoryIds() { return accessoryIds; }
-    public void setAccessoryIds(String accessoryIds) { this.accessoryIds = accessoryIds; }
+    public List<String> getAccessoryIds() { return accessoryIds; }
+    public void setAccessoryIds(Collection<String> accessoryIds) { this.accessoryIds = cleanList(accessoryIds); }
 
-    public String getWeaponUpgrades() { return weaponUpgrades; }
-    public void setWeaponUpgrades(String weaponUpgrades) { this.weaponUpgrades = weaponUpgrades; }
+    public Map<String, Integer> getWeaponUpgrades() { return weaponUpgrades; }
+    public void setWeaponUpgrades(Map<String, Integer> weaponUpgrades) {
+        this.weaponUpgrades = new LinkedHashMap<>();
+        if (weaponUpgrades == null) {
+            return;
+        }
+        weaponUpgrades.forEach((weaponId, level) -> {
+            if (weaponId != null && !weaponId.isBlank() && level != null) {
+                this.weaponUpgrades.put(weaponId.trim(), Math.max(0, level));
+            }
+        });
+    }
 
-    public String getMissionStats() { return missionStats; }
-    public void setMissionStats(String missionStats) { this.missionStats = missionStats; }
+    public List<String> getClaimedMissions() { return claimedMissions; }
+    public void setClaimedMissions(Collection<String> claimedMissions) { this.claimedMissions = cleanList(claimedMissions); }
+
+    public Map<String, Integer> getMapPlays() { return mapPlays; }
+    public void setMapPlays(Map<String, Integer> mapPlays) { this.mapPlays = cleanPositiveMap(mapPlays); }
+
+    public Map<String, Integer> getWeaponKills() { return weaponKills; }
+    public void setWeaponKills(Map<String, Integer> weaponKills) { this.weaponKills = cleanPositiveMap(weaponKills); }
 
     public boolean isAdmin() { return admin; }
     public void setAdmin(boolean admin) { this.admin = admin; }
+
+    private List<String> cleanList(Collection<String> values) {
+        Set<String> unique = new LinkedHashSet<>();
+        if (values == null) {
+            return new ArrayList<>();
+        }
+        values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .forEach(unique::add);
+        return new ArrayList<>(unique);
+    }
+
+    private Map<String, Integer> cleanPositiveMap(Map<String, Integer> values) {
+        Map<String, Integer> cleaned = new LinkedHashMap<>();
+        if (values == null) {
+            return cleaned;
+        }
+        values.forEach((key, value) -> {
+            if (key != null && !key.isBlank() && value != null && value > 0) {
+                cleaned.put(key.trim(), value);
+            }
+        });
+        return cleaned;
+    }
 }
