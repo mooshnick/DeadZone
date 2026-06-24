@@ -13,10 +13,12 @@ import com.deadZone.shooterserver.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
+import java.time.Instant;
 
 @Service
 public class SocialService {
@@ -71,6 +73,7 @@ public class SocialService {
         List<SocialDtos.RoomInviteView> invites = roomInvitationRepository
                 .findByRecipientIdAndStatusOrderByCreatedAtDesc(userId, PENDING)
                 .stream()
+                .filter(invitation -> invitation.getExpiresAt().isAfter(Instant.now()))
                 .map(this::inviteView)
                 .filter(invite -> invite.room() != null)
                 .toList();
@@ -158,6 +161,11 @@ public class SocialService {
     @Transactional
     public LobbyRoomResponse acceptRoomInvite(Long userId, Long invitationId) {
         RoomInvitation invitation = requireRoomInvite(userId, invitationId);
+        if (!invitation.getExpiresAt().isAfter(Instant.now())) {
+            invitation.setStatus(DECLINED);
+            roomInvitationRepository.save(invitation);
+            throw new ResponseStatusException(HttpStatus.GONE, "This room invitation has expired.");
+        }
         LobbyRoomResponse room = lobbyRoomService.findByCode(invitation.getRoomCode());
         if (room.players() >= room.maxPlayers()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This room is already full.");
@@ -172,6 +180,12 @@ public class SocialService {
         RoomInvitation invitation = requireRoomInvite(userId, invitationId);
         invitation.setStatus(DECLINED);
         roomInvitationRepository.save(invitation);
+    }
+
+    @Scheduled(fixedDelay = 300_000)
+    @Transactional
+    public void removeExpiredRoomInvitations() {
+        roomInvitationRepository.deleteAll(roomInvitationRepository.findByExpiresAtBefore(Instant.now()));
     }
 
     private FriendRequest requireIncomingRequest(Long userId, Long requestId) {

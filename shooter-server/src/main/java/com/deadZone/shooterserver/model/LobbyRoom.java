@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 
@@ -33,6 +34,9 @@ public class LobbyRoom {
     private boolean allowBots;
     private boolean permanent;
     private Instant lastActivityAt = Instant.now();
+
+    @Version
+    private long version;
 
     public LobbyRoom() {}
 

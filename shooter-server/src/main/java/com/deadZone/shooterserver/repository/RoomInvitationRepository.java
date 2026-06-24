@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 
 public interface RoomInvitationRepository extends JpaRepository<RoomInvitation, Long> {
     List<RoomInvitation> findByRecipientIdAndStatusOrderByCreatedAtDesc(Long recipientId, String status);
@@ -14,4 +15,5 @@ public interface RoomInvitationRepository extends JpaRepository<RoomInvitation, 
             String roomCode,
             String status
     );
+    List<RoomInvitation> findByExpiresAtBefore(Instant cutoff);
 }

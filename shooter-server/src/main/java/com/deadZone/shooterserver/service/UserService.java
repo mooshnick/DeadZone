@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -19,6 +20,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,19 +32,22 @@ public class UserService {
     private final JwtService jwtService;
     private final EmailVerificationService emailVerificationService;
     private final ObjectMapper objectMapper;
+    private final StoreCatalog storeCatalog;
 
     public UserService(
             UserRepository userRepository,
             PasswordService passwordService,
             JwtService jwtService,
             EmailVerificationService emailVerificationService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            StoreCatalog storeCatalog
     ) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.jwtService = jwtService;
         this.emailVerificationService = emailVerificationService;
         this.objectMapper = objectMapper;
+        this.storeCatalog = storeCatalog;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -86,60 +93,141 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User was not found."));
     }
 
+    @Transactional
     public UserResponse updateProgress(Long id, ProgressRequest request) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findLockedById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User was not found."));
 
-        if (request.wallet() != null && !user.isAdmin()) {
-            user.setWallet(Math.max(0, request.wallet()));
-        }
-        if (request.xp() != null && !user.isAdmin()) {
-            user.setXp(Math.max(0, request.xp()));
-        }
+        int purchaseCost = validateAndCalculatePurchaseCost(user, request);
+        applyEconomyUpdate(user, request, purchaseCost);
         if (request.totalKills() != null) {
+            requireBoundedIncrease(user.getTotalKills(), request.totalKills(), 20, "kills");
             user.setTotalKills(Math.max(user.getTotalKills(), request.totalKills()));
         }
         if (request.totalAssists() != null) {
+            requireBoundedIncrease(user.getTotalAssists(), request.totalAssists(), 20, "assists");
             user.setTotalAssists(Math.max(user.getTotalAssists(), request.totalAssists()));
         }
         if (request.totalDeaths() != null) {
+            requireBoundedIncrease(user.getTotalDeaths(), request.totalDeaths(), 20, "deaths");
             user.setTotalDeaths(Math.max(user.getTotalDeaths(), request.totalDeaths()));
         }
-        if (request.outfitId() != null && !request.outfitId().isBlank()) {
+        if (request.outfitId() != null && isOwned(user.getOwnedOutfits(), request.ownedOutfits(), request.outfitId())) {
             user.setOutfitId(request.outfitId());
         }
-        if (request.weaponId() != null && !request.weaponId().isBlank()) {
+        if (request.weaponId() != null && storeCatalog.isWeapon(request.weaponId())) {
             user.setWeaponId(request.weaponId());
         }
-        if (request.weaponSkinId() != null && !request.weaponSkinId().isBlank()) {
+        if (request.weaponSkinId() != null && isOwned(user.getOwnedWeaponSkins(), request.ownedWeaponSkins(), request.weaponSkinId())) {
             user.setWeaponSkinId(request.weaponSkinId());
         }
-        if (request.grenadeSkinId() != null && !request.grenadeSkinId().isBlank()) {
+        if (request.grenadeSkinId() != null && isOwned(user.getOwnedGrenadeSkins(), request.ownedGrenadeSkins(), request.grenadeSkinId())) {
             user.setGrenadeSkinId(request.grenadeSkinId());
         }
         if (request.ownedOutfits() != null && !request.ownedOutfits().isEmpty()) {
-            user.setOwnedOutfits(request.ownedOutfits());
+            user.setOwnedOutfits(merge(user.getOwnedOutfits(), request.ownedOutfits()));
         }
         if (request.ownedWeaponSkins() != null && !request.ownedWeaponSkins().isEmpty()) {
-            user.setOwnedWeaponSkins(request.ownedWeaponSkins());
+            user.setOwnedWeaponSkins(merge(user.getOwnedWeaponSkins(), request.ownedWeaponSkins()));
         }
         if (request.ownedGrenadeSkins() != null && !request.ownedGrenadeSkins().isEmpty()) {
-            user.setOwnedGrenadeSkins(request.ownedGrenadeSkins());
+            user.setOwnedGrenadeSkins(merge(user.getOwnedGrenadeSkins(), request.ownedGrenadeSkins()));
         }
         if (request.ownedAccessories() != null) {
-            user.setOwnedAccessories(request.ownedAccessories());
+            user.setOwnedAccessories(merge(user.getOwnedAccessories(), request.ownedAccessories()));
         }
         if (request.accessoryIds() != null) {
-            user.setAccessoryIds(request.accessoryIds());
+            List<String> effectiveAccessories = merge(user.getOwnedAccessories(), request.ownedAccessories() == null ? List.of() : request.ownedAccessories());
+            List<String> equipped = request.accessoryIds().stream()
+                    .filter(effectiveAccessories::contains)
+                    .filter(storeCatalog::isAccessory)
+                    .toList();
+            user.setAccessoryIds(equipped);
         }
         if (request.weaponUpgrades() != null) {
-            user.setWeaponUpgrades(request.weaponUpgrades());
+            Map<String, Integer> mergedUpgrades = new LinkedHashMap<>(user.getWeaponUpgrades());
+            request.weaponUpgrades().forEach((weapon, level) -> {
+                if (storeCatalog.isWeapon(weapon) && level != null) {
+                    mergedUpgrades.put(weapon, Math.max(mergedUpgrades.getOrDefault(weapon, 0), Math.min(10, level)));
+                }
+            });
+            user.setWeaponUpgrades(mergedUpgrades);
         }
         if (request.missionStats() != null) {
             applyMissionStats(user, request.missionStats());
         }
         enforceAdminBenefits(user);
         return UserResponse.from(userRepository.save(user));
+    }
+
+    private int validateAndCalculatePurchaseCost(User user, ProgressRequest request) {
+        try {
+            int cost = addedCost(user.getOwnedOutfits(), request.ownedOutfits(), storeCatalog::outfitPrice);
+            cost += addedCost(user.getOwnedWeaponSkins(), request.ownedWeaponSkins(), storeCatalog::weaponSkinPrice);
+            cost += addedCost(user.getOwnedGrenadeSkins(), request.ownedGrenadeSkins(), storeCatalog::grenadeSkinPrice);
+            cost += addedCost(user.getOwnedAccessories(), request.ownedAccessories(), storeCatalog::accessoryPrice);
+            if (request.weaponUpgrades() != null) {
+                for (var entry : request.weaponUpgrades().entrySet()) {
+                    if (!storeCatalog.isWeapon(entry.getKey()) || entry.getValue() == null) {
+                        throw new IllegalArgumentException("Unknown weapon upgrade.");
+                    }
+                    int current = user.getWeaponUpgrades().getOrDefault(entry.getKey(), 0);
+                    int requested = Math.min(10, Math.max(0, entry.getValue()));
+                    for (int level = current; level < requested; level += 1) {
+                        cost += storeCatalog.upgradePrice(level);
+                    }
+                }
+            }
+            return cost;
+        } catch (IllegalArgumentException error) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, error.getMessage());
+        }
+    }
+
+    private void applyEconomyUpdate(User user, ProgressRequest request, int purchaseCost) {
+        if (user.isAdmin()) return;
+        if (request.wallet() != null) {
+            int requestedWallet = Math.max(0, request.wallet());
+            if (purchaseCost > 0 && requestedWallet != user.getWallet() - purchaseCost) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Purchase total does not match the server catalog.");
+            }
+            int walletIncrease = requestedWallet - user.getWallet();
+            if (purchaseCost == 0 && walletIncrease > 500) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Wallet reward is larger than an allowed match update.");
+            }
+            user.setWallet(requestedWallet);
+        } else if (purchaseCost > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Wallet total is required for a purchase.");
+        }
+        if (request.xp() != null) {
+            int requestedXp = Math.max(0, request.xp());
+            if (requestedXp - user.getXp() > 1_000) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "XP reward is larger than an allowed match update.");
+            }
+            user.setXp(Math.max(user.getXp(), requestedXp));
+        }
+    }
+
+    private int addedCost(List<String> owned, List<String> requested, java.util.function.ToIntFunction<String> price) {
+        if (requested == null) return 0;
+        Set<String> existing = new HashSet<>(owned);
+        return requested.stream().filter(item -> !existing.contains(item)).distinct().mapToInt(price).sum();
+    }
+
+    private List<String> merge(List<String> existing, List<String> requested) {
+        Set<String> merged = new java.util.LinkedHashSet<>(existing);
+        merged.addAll(requested);
+        return new ArrayList<>(merged);
+    }
+
+    private boolean isOwned(List<String> existing, List<String> requested, String itemId) {
+        return existing.contains(itemId) || (requested != null && requested.contains(itemId));
+    }
+
+    private void requireBoundedIncrease(int current, int requested, int maximumDelta, String label) {
+        if (requested - current > maximumDelta) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Too many " + label + " were submitted in one update.");
+        }
     }
 
     public User repairUserDefaults(User user) {

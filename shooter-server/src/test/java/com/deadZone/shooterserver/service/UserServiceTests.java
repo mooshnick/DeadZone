@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class UserServiceTests {
@@ -48,9 +49,12 @@ class UserServiceTests {
     @Test
     void updateProgressPersistsUnlocksAndStats() {
         var auth = userService.register(new RegisterRequest("player-two", "shared@example.com", "secret"));
+        User fundedUser = userRepository.findById(auth.user().id()).orElseThrow();
+        fundedUser.setWallet(2_000);
+        userRepository.save(fundedUser);
 
         var response = userService.updateProgress(auth.user().id(), new ProgressRequest(
-                120,
+                1_161,
                 300,
                 4,
                 2,
@@ -68,7 +72,7 @@ class UserServiceTests {
                 "{\"claimed\":[\"first-bloods\"]}"
         ));
 
-        assertThat(response.wallet()).isEqualTo(120);
+        assertThat(response.wallet()).isEqualTo(1_161);
         assertThat(response.xp()).isEqualTo(300);
         assertThat(response.weaponId()).isEqualTo("shotgun");
         assertThat(response.ownedOutfits()).containsExactly("classic", "shadow");
@@ -85,5 +89,35 @@ class UserServiceTests {
 
         assertThat(userRepository.findByUsername("first-player")).isPresent();
         assertThat(userRepository.findByUsername("second-player")).isPresent();
+    }
+
+    @Test
+    void purchaseCannotAddItemsWithoutPayingServerPrice() {
+        var auth = userService.register(new RegisterRequest("shop-cheat", "shop@example.com", "secret"));
+        User fundedUser = userRepository.findById(auth.user().id()).orElseThrow();
+        fundedUser.setWallet(500);
+        userRepository.save(fundedUser);
+
+        ProgressRequest request = new ProgressRequest(
+                500,
+                0,
+                0,
+                0,
+                0,
+                "shadow",
+                "rifle",
+                "standard",
+                "standard",
+                List.of("classic", "shadow"),
+                List.of("standard"),
+                List.of("standard"),
+                List.of(),
+                List.of(),
+                Map.of(),
+                ""
+        );
+
+        assertThatThrownBy(() -> userService.updateProgress(auth.user().id(), request))
+                .hasMessageContaining("Purchase total does not match");
     }
 }

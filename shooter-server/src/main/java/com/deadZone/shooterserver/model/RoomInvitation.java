@@ -31,6 +31,9 @@ public class RoomInvitation {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(nullable = false)
+    private Instant expiresAt = Instant.now().plusSeconds(30 * 60);
+
     public RoomInvitation() {}
 
     public RoomInvitation(Long senderId, Long recipientId, String roomCode) {
@@ -45,5 +48,6 @@ public class RoomInvitation {
     public String getRoomCode() { return roomCode; }
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getExpiresAt() { return expiresAt; }
     public void setStatus(String status) { this.status = status; }
 }

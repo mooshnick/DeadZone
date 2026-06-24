@@ -7,6 +7,7 @@ import com.deadZone.shooterserver.repository.LobbyRoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
@@ -93,8 +94,9 @@ public class LobbyRoomService {
         ensurePermanentRooms();
     }
 
+    @Transactional
     public LobbyRoomResponse join(String code) {
-        LobbyRoom room = requireRoom(code);
+        LobbyRoom room = requireLockedRoom(code);
         if (room.getPlayers() >= room.getMaxPlayers()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This room is full.");
         }
@@ -110,8 +112,9 @@ public class LobbyRoomService {
         return lobbyRoomRepository.save(room).toResponse();
     }
 
+    @Transactional
     public LobbyRoomResponse leave(String code) {
-        LobbyRoom room = requireRoom(code);
+        LobbyRoom room = requireLockedRoom(code);
         room.setPlayers(Math.max(0, room.getPlayers() - 1));
         if (!"free-for-all".equals(room.getGameMode())) {
             if (room.getBluePlayers() >= room.getRedPlayers() && room.getBluePlayers() > 0) {
@@ -188,6 +191,11 @@ public class LobbyRoomService {
 
     private LobbyRoom requireRoom(String code) {
         return lobbyRoomRepository.findById(normalizeCode(code))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No open room matches that game code."));
+    }
+
+    private LobbyRoom requireLockedRoom(String code) {
+        return lobbyRoomRepository.findLockedById(normalizeCode(code))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No open room matches that game code."));
     }
 

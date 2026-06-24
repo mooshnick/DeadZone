@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -122,6 +123,9 @@ public class User {
     @Column(name = "mission_stats_json", length = 8000)
     private String missionStatsJson;
     private boolean admin;
+
+    @Version
+    private long version;
 
     public User() {}
 
