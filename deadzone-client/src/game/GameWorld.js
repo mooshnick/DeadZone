@@ -942,7 +942,7 @@ export class GameWorld {
       this.localDeathFocus = {
         killerId: shooter.id,
         killerName: shooter.name,
-        until: time + 2800,
+        until: time + 5000,
       };
       this.onHealthChange?.(0);
       this.onDeathChange?.({
@@ -950,7 +950,7 @@ export class GameWorld {
         ready: false,
         seconds: 5,
         killerName: shooter.name,
-        focusSeconds: 3,
+        focusSeconds: 5,
       });
     }
     this.handleObjectiveElimination(shooter, target);

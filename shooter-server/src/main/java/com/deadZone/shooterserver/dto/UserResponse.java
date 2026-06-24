@@ -73,6 +73,9 @@ public record UserResponse(
     }
 
     private static String missionStatsJson(User user) {
+        if (user.getMissionStatsJson() != null && !user.getMissionStatsJson().isBlank()) {
+            return user.getMissionStatsJson();
+        }
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("claimed", new ArrayList<>(user.getClaimedMissions()));
         stats.put("mapPlays", Map.copyOf(user.getMapPlays()));

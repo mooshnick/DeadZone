@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class UserServiceTests {
@@ -80,10 +79,11 @@ class UserServiceTests {
     }
 
     @Test
-    void duplicateEmailsAreRejected() {
+    void duplicateEmailsAreAllowed() {
         userService.register(new RegisterRequest("first-player", "shared@example.com", "a"));
+        userService.register(new RegisterRequest("second-player", "shared@example.com", "b"));
 
-        assertThatThrownBy(() -> userService.register(new RegisterRequest("second-player", "shared@example.com", "b")))
-                .hasMessageContaining("Email is already registered");
+        assertThat(userRepository.findByUsername("first-player")).isPresent();
+        assertThat(userRepository.findByUsername("second-player")).isPresent();
     }
 }

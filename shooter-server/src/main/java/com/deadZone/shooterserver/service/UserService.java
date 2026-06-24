@@ -50,9 +50,6 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is already taken!");
         }
         String email = request.email().trim().toLowerCase();
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered!");
-        }
 
         User user = new User(username, email, passwordService.hash(request.password()));
         user = userRepository.save(user);
@@ -181,6 +178,7 @@ public class UserService {
         user.setClaimedMissions(java.util.List.of());
         user.setMapPlays(Map.of());
         user.setWeaponKills(Map.of());
+        user.setMissionStatsJson("");
         return userRepository.save(user);
     }
 
@@ -271,6 +269,10 @@ public class UserService {
             user.setWeaponKills(Map.of());
             changed = true;
         }
+        if (user.getMissionStatsJson() == null) {
+            user.setMissionStatsJson("");
+            changed = true;
+        }
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             user.setEmail(user.getUsername() + "@deadzone.local");
             changed = true;
@@ -315,6 +317,7 @@ public class UserService {
             user.setClaimedMissions(java.util.List.of());
             user.setMapPlays(Map.of());
             user.setWeaponKills(Map.of());
+            user.setMissionStatsJson("");
             return;
         }
         try {
@@ -330,6 +333,7 @@ public class UserService {
             user.setClaimedMissions(claimed);
             user.setMapPlays(intMap(root.path("mapPlays")));
             user.setWeaponKills(intMap(root.path("weaponKills")));
+            user.setMissionStatsJson(missionStats);
         } catch (Exception ignored) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mission stats are invalid.");
         }

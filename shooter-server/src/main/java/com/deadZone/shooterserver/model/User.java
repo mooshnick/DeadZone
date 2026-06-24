@@ -44,7 +44,7 @@ public class User {
     @Column(nullable = false, unique = true, length = 32)
     private String username;
 
-    @Column(nullable = false, unique = true, length = 120)
+    @Column(nullable = false, length = 120)
     private String email;
 
     @Column(nullable = false)
@@ -118,6 +118,9 @@ public class User {
     @MapKeyColumn(name = "weapon_id", length = 64)
     @Column(name = "kills", nullable = false)
     private Map<String, Integer> weaponKills = new LinkedHashMap<>();
+
+    @Column(name = "mission_stats_json", length = 8000)
+    private String missionStatsJson;
     private boolean admin;
 
     public User() {}
@@ -144,6 +147,7 @@ public class User {
         this.claimedMissions = new ArrayList<>();
         this.mapPlays = new LinkedHashMap<>();
         this.weaponKills = new LinkedHashMap<>();
+        this.missionStatsJson = "";
         this.admin = false;
         this.emailVerified = false;
     }
@@ -229,6 +233,11 @@ public class User {
 
     public Map<String, Integer> getWeaponKills() { return weaponKills; }
     public void setWeaponKills(Map<String, Integer> weaponKills) { this.weaponKills = cleanPositiveMap(weaponKills); }
+
+    public String getMissionStatsJson() { return missionStatsJson; }
+    public void setMissionStatsJson(String missionStatsJson) {
+        this.missionStatsJson = missionStatsJson == null ? "" : missionStatsJson;
+    }
 
     public boolean isAdmin() { return admin; }
     public void setAdmin(boolean admin) { this.admin = admin; }

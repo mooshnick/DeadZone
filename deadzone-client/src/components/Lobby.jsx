@@ -125,9 +125,6 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             <button className="primary-command" type="submit">
               {mode === 'login' ? 'Login' : mode === 'verify' ? 'Verify Code' : 'Create Account'}
             </button>
-            {mode !== 'verify' && (
-              <button className="secondary-command" type="button" onClick={() => setAuthMode('verify')}>I have a code</button>
-            )}
           </form>
         )}
       </section>
@@ -138,6 +135,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
 function MainMenu({
   accessoryIds,
   account,
+  claimMissionReward,
   grenadeSkinId,
   level,
   levelProgress,
@@ -145,6 +143,7 @@ function MainMenu({
   outfitId,
   selectedGrenadeSkin,
   selectedWeaponSkin,
+  rerollMission,
   setPanel,
   signOut,
   wallet,
@@ -180,36 +179,47 @@ function MainMenu({
           <button className="secondary-command" onClick={() => setPanel('player')}>My Player</button>
           <button className="primary-command" onClick={() => setPanel('play')}>Start Playing</button>
         </div>
-        <MissionBoard missions={missionCards} />
+        <MissionBoard missions={missionCards} onClaim={claimMissionReward} onReroll={rerollMission} />
       </section>
     </main>
   );
 }
 
-function MissionBoard({ missions = [] }) {
+function MissionBoard({ missions = [], onClaim, onReroll }) {
   return (
     <aside className="mission-board">
       <header>
-        <span>Missions</span>
+        <span>Daily Missions</span>
         <strong>Earn rewards</strong>
       </header>
       <div className="mission-list">
-        {missions.slice(0, 5).map((mission) => (
-          <article className={mission.claimed ? 'mission-card claimed' : 'mission-card'} key={mission.id}>
+        {missions.map((mission) => (
+          <article className={mission.claimed ? 'mission-card claimed' : mission.ready ? 'mission-card ready' : 'mission-card'} key={mission.id}>
             <div>
               <strong>{mission.title}</strong>
               <small>{mission.description}</small>
             </div>
             <span>{Math.min(mission.progress, mission.target)}/{mission.target}</span>
             <i><b style={{ width: `${mission.percent}%` }} /></i>
-            <em>{mission.claimed ? 'Claimed' : `🪙 ${mission.rewardMoney} / ${mission.rewardXp} XP`}</em>
+            <em>
+              {mission.claimed
+                ? `New mission in ${mission.resetCountdown}`
+                : `🪙 ${mission.rewardMoney} / ${mission.rewardXp} XP`}
+            </em>
+            {mission.ready && !mission.claimed && (
+              <button className="mission-action claim" onClick={() => onClaim?.(mission.id)}>Claim Reward</button>
+            )}
+            {!mission.ready && !mission.claimed && (
+              <button className="mission-action" onClick={() => onReroll?.(mission.id)}>
+                {mission.rerollCost === 0 ? 'Change Free' : `Change 🪙 ${mission.rerollCost}`}
+              </button>
+            )}
           </article>
         ))}
       </div>
     </aside>
   );
 }
-
 function ProgressBadge({ level, levelProgress, xp }) {
   return (
     <div className="menu-progress-badge">
@@ -689,3 +699,4 @@ function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomD
     </div>
   );
 }
+

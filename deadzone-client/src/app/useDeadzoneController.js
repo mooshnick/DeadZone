@@ -26,7 +26,17 @@ const ROUTES = {
   verifyEmail: '/verify-email',
 };
 
-const EMPTY_MISSION_STATS = { claimed: [], mapPlays: {}, weaponKills: {} };
+const DAILY_MISSION_COUNT = 3;
+const EMPTY_MISSION_STATS = {
+  activeMissionIds: [],
+  claimed: [],
+  dayKey: '',
+  mapPlays: {},
+  rerolls: { dayKey: '', count: 0 },
+  totalAssists: 0,
+  totalKills: 0,
+  weaponKills: {},
+};
 
 function normalizeRoom(room, fallback = {}) {
   const gameMode = room?.gameMode || fallback.gameMode || DEFAULT_GAME_MODE;
@@ -41,50 +51,93 @@ function normalizeRoom(room, fallback = {}) {
 }
 
 function parseMissionStats(value) {
-  if (!value) return { ...EMPTY_MISSION_STATS };
+  if (!value) return normalizeMissionStats(EMPTY_MISSION_STATS);
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    return {
+    return normalizeMissionStats({
+      activeMissionIds: Array.isArray(parsed.activeMissionIds) ? parsed.activeMissionIds : [],
       claimed: Array.isArray(parsed.claimed) ? parsed.claimed : [],
+      dayKey: typeof parsed.dayKey === 'string' ? parsed.dayKey : '',
       mapPlays: parsed.mapPlays && typeof parsed.mapPlays === 'object' ? parsed.mapPlays : {},
+      rerolls: parsed.rerolls && typeof parsed.rerolls === 'object' ? parsed.rerolls : { dayKey: '', count: 0 },
+      totalAssists: Number(parsed.totalAssists) || 0,
+      totalKills: Number(parsed.totalKills) || 0,
       weaponKills: parsed.weaponKills && typeof parsed.weaponKills === 'object' ? parsed.weaponKills : {},
-    };
+    });
   } catch {
-    return { ...EMPTY_MISSION_STATS };
+    return normalizeMissionStats(EMPTY_MISSION_STATS);
   }
 }
 
-function missionProgress(mission, stats, totalKills, totalAssists) {
-  if (mission.type === 'kills') return totalKills;
-  if (mission.type === 'assists') return totalAssists;
+function todayKey() {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+function msUntilNextMidnight() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return Math.max(0, midnight.getTime() - now.getTime());
+}
+
+function formatCountdown(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function pickMissionIds(count, blockedIds = []) {
+  const blocked = new Set(blockedIds);
+  const candidates = MISSIONS.filter((mission) => !blocked.has(mission.id));
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count).map((mission) => mission.id);
+}
+
+function normalizeMissionStats(stats) {
+  const currentDay = todayKey();
+  const claimed = Array.isArray(stats.claimed) ? [...new Set(stats.claimed)] : [];
+  const claimedSet = new Set(claimed);
+  const previousActiveIds = Array.isArray(stats.activeMissionIds) ? stats.activeMissionIds : [];
+  const activeMissionIds = previousActiveIds.filter((id) => MISSIONS.some((mission) => mission.id === id));
+  const shouldRefreshCompletedSlots = stats.dayKey && stats.dayKey !== currentDay;
+  const carriedActiveIds = shouldRefreshCompletedSlots
+    ? activeMissionIds.filter((id) => !claimedSet.has(id))
+    : activeMissionIds;
+  const nextActiveIds = [...carriedActiveIds];
+  if (nextActiveIds.length < DAILY_MISSION_COUNT) {
+    nextActiveIds.push(...pickMissionIds(DAILY_MISSION_COUNT - nextActiveIds.length, [
+      ...nextActiveIds,
+      ...(shouldRefreshCompletedSlots ? [] : claimed),
+    ]));
+  }
+  return {
+    activeMissionIds: nextActiveIds.slice(0, DAILY_MISSION_COUNT),
+    claimed: shouldRefreshCompletedSlots ? [] : claimed,
+    dayKey: currentDay,
+    mapPlays: { ...(stats.mapPlays || {}) },
+    rerolls: {
+      dayKey: stats.rerolls?.dayKey === currentDay ? currentDay : currentDay,
+      count: stats.rerolls?.dayKey === currentDay ? Number(stats.rerolls?.count) || 0 : 0,
+    },
+    totalAssists: Number(stats.totalAssists) || 0,
+    totalKills: Number(stats.totalKills) || 0,
+    weaponKills: { ...(stats.weaponKills || {}) },
+  };
+}
+
+function missionProgress(mission, stats) {
+  if (mission.type === 'kills') return stats.totalKills || 0;
+  if (mission.type === 'assists') return stats.totalAssists || 0;
   if (mission.type === 'weaponKills') return stats.weaponKills?.[mission.weaponId] || 0;
   if (mission.type === 'mapPlays') return stats.mapPlays?.[mission.mapId] || 0;
   return 0;
 }
 
-function awardReadyMissions(stats, totalKills, totalAssists) {
-  const nextStats = {
-    claimed: [...(stats.claimed || [])],
-    mapPlays: { ...(stats.mapPlays || {}) },
-    weaponKills: { ...(stats.weaponKills || {}) },
-  };
-  const claimed = new Set(nextStats.claimed);
-  const completed = [];
-  let money = 0;
-  let xp = 0;
-
-  MISSIONS.forEach((mission) => {
-    if (claimed.has(mission.id) || missionProgress(mission, nextStats, totalKills, totalAssists) < mission.target) {
-      return;
-    }
-    claimed.add(mission.id);
-    nextStats.claimed.push(mission.id);
-    completed.push(mission);
-    money += mission.rewardMoney;
-    xp += mission.rewardXp;
-  });
-
-  return { completed, money, stats: nextStats, xp };
+function rerollCost(count = 0) {
+  if (count <= 0) return 0;
+  return 50 * count;
 }
 
 function routeStateFromPath(pathname = window.location.pathname) {
@@ -180,6 +233,7 @@ export function useDeadzoneController() {
   const [grenadeCharge, setGrenadeCharge] = useState(0);
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
+  const [missionClock, setMissionClock] = useState(Date.now());
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
@@ -204,15 +258,32 @@ export function useDeadzoneController() {
   const nextLevelXp = xpForLevel(level + 1);
   const currentLevelXp = xpForLevel(level);
   const levelProgress = nextLevelXp === currentLevelXp ? 0 : Math.round(((xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100);
-  const missionCards = MISSIONS.map((mission) => {
-    const progress = missionProgress(mission, missionStats, totalKills, totalAssists);
+  const normalizedMissionStats = useMemo(() => normalizeMissionStats(missionStats), [missionStats, missionClock]);
+  const missionResetCountdown = formatCountdown(msUntilNextMidnight());
+  const missionCards = normalizedMissionStats.activeMissionIds
+    .map((missionId) => MISSIONS.find((mission) => mission.id === missionId))
+    .filter(Boolean)
+    .map((mission) => {
+    const progress = missionProgress(mission, normalizedMissionStats);
+    const claimed = normalizedMissionStats.claimed.includes(mission.id);
     return {
       ...mission,
-      claimed: missionStats.claimed.includes(mission.id),
+      claimed,
+      ready: !claimed && progress >= mission.target,
+      rerollCost: rerollCost(normalizedMissionStats.rerolls.count),
+      resetCountdown: missionResetCountdown,
       progress,
       percent: Math.min(100, Math.round((progress / mission.target) * 100)),
     };
   });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMissionClock(Date.now());
+      setMissionStats((current) => normalizeMissionStats(current));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const applyBrowserRoute = () => {
@@ -445,19 +516,24 @@ export function useDeadzoneController() {
   function handleProgressChange(progress) {
     const nextTotalKills = progress.reason === 'kill' ? totalKills + 1 : totalKills;
     const nextTotalAssists = progress.reason === 'assist' ? totalAssists + 1 : totalAssists;
-    const nextMissionStats = parseMissionStats(missionStats);
+    const nextMissionStats = normalizeMissionStats(missionStats);
+    if (progress.reason === 'kill') {
+      nextMissionStats.totalKills = (nextMissionStats.totalKills || 0) + 1;
+    }
+    if (progress.reason === 'assist') {
+      nextMissionStats.totalAssists = (nextMissionStats.totalAssists || 0) + 1;
+    }
     if (progress.reason === 'kill' && progress.weaponId) {
       nextMissionStats.weaponKills[progress.weaponId] = (nextMissionStats.weaponKills[progress.weaponId] || 0) + 1;
     }
-    const missionAwards = awardReadyMissions(nextMissionStats, nextTotalKills, nextTotalAssists);
-    setMissionStats(missionAwards.stats);
+    setMissionStats(nextMissionStats);
     const walletBase = progress.wallet ?? wallet;
-    const nextWallet = account?.admin ? ADMIN_WALLET : walletBase + missionAwards.money;
+    const nextWallet = account?.admin ? ADMIN_WALLET : walletBase;
     setWallet(nextWallet);
     setTotalKills(nextTotalKills);
     setTotalAssists(nextTotalAssists);
     setXp((currentXp) => {
-      const nextXp = account?.admin ? ADMIN_XP : currentXp + progress.xp + missionAwards.xp;
+      const nextXp = account?.admin ? ADMIN_XP : currentXp + progress.xp;
       saveProgress({
         wallet: nextWallet,
         xp: nextXp,
@@ -474,12 +550,15 @@ export function useDeadzoneController() {
         weaponId,
         weaponSkinId,
         grenadeSkinId,
-        missionStats: JSON.stringify(missionAwards.stats),
+        missionStats: JSON.stringify(nextMissionStats),
       });
       return nextXp;
     });
-    const missionMessages = missionAwards.completed.map((mission) => `Mission complete: ${mission.title} +🪙 ${mission.rewardMoney} +${mission.rewardXp} XP`);
-    setEvents((items) => [`+${progress.xp} XP for ${progress.reason}`, ...missionMessages, ...items].slice(0, 5));
+    const readyMissions = nextMissionStats.activeMissionIds
+      .map((missionId) => MISSIONS.find((mission) => mission.id === missionId))
+      .filter((mission) => mission && !nextMissionStats.claimed.includes(mission.id) && missionProgress(mission, nextMissionStats) >= mission.target)
+      .map((mission) => `Mission ready: ${mission.title}`);
+    setEvents((items) => [`+${progress.xp} XP for ${progress.reason}`, ...readyMissions, ...items].slice(0, 5));
   }
 
   async function handleAccountAction(action) {
@@ -723,18 +802,49 @@ export function useDeadzoneController() {
   };
 
   function recordMapMission(mapId) {
-    const nextMissionStats = parseMissionStats(missionStats);
+    const nextMissionStats = normalizeMissionStats(missionStats);
     nextMissionStats.mapPlays[mapId] = (nextMissionStats.mapPlays[mapId] || 0) + 1;
-    const missionAwards = awardReadyMissions(nextMissionStats, totalKills, totalAssists);
-    setMissionStats(missionAwards.stats);
-    const nextWallet = account?.admin ? ADMIN_WALLET : wallet + missionAwards.money;
-    const nextXp = account?.admin ? ADMIN_XP : xp + missionAwards.xp;
-    if (missionAwards.money > 0) {
-      setWallet(nextWallet);
+    setMissionStats(nextMissionStats);
+    saveProgress({
+      wallet,
+      xp,
+      totalKills,
+      totalAssists,
+      totalDeaths,
+      ownedOutfits,
+      ownedWeaponSkins,
+      ownedGrenadeSkins,
+      ownedAccessories,
+      accessoryIds,
+      weaponUpgrades,
+      outfitId,
+      weaponId,
+      weaponSkinId,
+      grenadeSkinId,
+      missionStats: JSON.stringify(nextMissionStats),
+    });
+    const readyMissions = nextMissionStats.activeMissionIds
+      .map((missionId) => MISSIONS.find((mission) => mission.id === missionId))
+      .filter((mission) => mission && !nextMissionStats.claimed.includes(mission.id) && missionProgress(mission, nextMissionStats) >= mission.target)
+      .map((mission) => `Mission ready: ${mission.title}`);
+    if (readyMissions.length) {
+      setEvents((items) => [...readyMissions, ...items].slice(0, 5));
     }
-    if (missionAwards.xp > 0) {
-      setXp(nextXp);
+  }
+
+  function claimMissionReward(missionId) {
+    const mission = MISSIONS.find((item) => item.id === missionId);
+    if (!mission) return;
+    const nextMissionStats = normalizeMissionStats(missionStats);
+    if (nextMissionStats.claimed.includes(mission.id) || missionProgress(mission, nextMissionStats) < mission.target) {
+      return;
     }
+    nextMissionStats.claimed = [...nextMissionStats.claimed, mission.id];
+    const nextWallet = account?.admin ? ADMIN_WALLET : wallet + mission.rewardMoney;
+    const nextXp = account?.admin ? ADMIN_XP : xp + mission.rewardXp;
+    setMissionStats(nextMissionStats);
+    setWallet(nextWallet);
+    setXp(nextXp);
     saveProgress({
       wallet: nextWallet,
       xp: nextXp,
@@ -751,14 +861,55 @@ export function useDeadzoneController() {
       weaponId,
       weaponSkinId,
       grenadeSkinId,
-      missionStats: JSON.stringify(missionAwards.stats),
+      missionStats: JSON.stringify(nextMissionStats),
     });
-    if (missionAwards.completed.length) {
-      setEvents((items) => [
-        ...missionAwards.completed.map((mission) => `Mission complete: ${mission.title} +🪙 ${mission.rewardMoney} +${mission.rewardXp} XP`),
-        ...items,
-      ].slice(0, 5));
+    setEvents((items) => [`Claimed ${mission.title}: +🪙 ${mission.rewardMoney} +${mission.rewardXp} XP`, ...items].slice(0, 5));
+  }
+
+  function rerollMission(missionId) {
+    const nextMissionStats = normalizeMissionStats(missionStats);
+    const currentMission = MISSIONS.find((mission) => mission.id === missionId);
+    if (!currentMission || nextMissionStats.claimed.includes(missionId) || missionProgress(currentMission, nextMissionStats) >= currentMission.target) {
+      return;
     }
+    const cost = rerollCost(nextMissionStats.rerolls.count);
+    if (!account?.admin && wallet < cost) {
+      setAccountStatus(`You need 🪙 ${cost} to change this mission.`);
+      return;
+    }
+    const blocked = [...nextMissionStats.activeMissionIds, ...nextMissionStats.claimed];
+    const replacementId = pickMissionIds(1, blocked)[0];
+    if (!replacementId) {
+      setAccountStatus('No other daily missions are available right now.');
+      return;
+    }
+    nextMissionStats.activeMissionIds = nextMissionStats.activeMissionIds.map((id) => (id === missionId ? replacementId : id));
+    nextMissionStats.rerolls = {
+      dayKey: todayKey(),
+      count: nextMissionStats.rerolls.count + 1,
+    };
+    const nextWallet = account?.admin ? ADMIN_WALLET : wallet - cost;
+    setMissionStats(nextMissionStats);
+    setWallet(nextWallet);
+    saveProgress({
+      wallet: nextWallet,
+      xp,
+      totalKills,
+      totalAssists,
+      totalDeaths,
+      ownedOutfits,
+      ownedWeaponSkins,
+      ownedGrenadeSkins,
+      ownedAccessories,
+      accessoryIds,
+      weaponUpgrades,
+      outfitId,
+      weaponId,
+      weaponSkinId,
+      grenadeSkinId,
+      missionStats: JSON.stringify(nextMissionStats),
+    });
+    setAccountStatus(cost === 0 ? 'Mission changed for free.' : `Mission changed for 🪙 ${cost}.`);
   }
 
   const joinMatch = () => {
@@ -968,6 +1119,7 @@ export function useDeadzoneController() {
       levelProgress,
       mapUnlocked,
       missionCards,
+      claimMissionReward,
       name,
       outfitId,
       ownedOutfits,
@@ -984,6 +1136,7 @@ export function useDeadzoneController() {
       previewedGrenadeSkin,
       previewedAccessories,
       resetKeybinds,
+      rerollMission,
       roomDraft,
       rooms,
       selectedMap,

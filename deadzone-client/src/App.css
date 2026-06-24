@@ -74,8 +74,9 @@
 
 .menu-shell {
   position: relative;
-  overflow: hidden;
   height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
   color: #f4f7fb;
   background:
     radial-gradient(circle at 18% 18%, rgba(69, 223, 124, 0.2), transparent 26%),
@@ -580,6 +581,29 @@
 .mission-card.claimed {
   border-color: rgba(72, 242, 166, 0.36);
   background: rgba(19, 45, 38, 0.82);
+}
+
+.mission-card.ready {
+  border-color: rgba(255, 194, 71, 0.56);
+  background: rgba(64, 48, 18, 0.88);
+  box-shadow: 0 0 22px rgba(255, 194, 71, 0.12);
+}
+
+.mission-action {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: #e8f1ff !important;
+  font-size: 12px;
+  font-weight: 950;
+  background: #26313f;
+}
+
+.mission-action.claim {
+  color: #101318 !important;
+  border-color: rgba(255, 194, 71, 0.45);
+  background: #ffc247;
 }
 
 .player-customizer {
@@ -1111,13 +1135,19 @@
 
 .play-lobby {
   display: grid;
+  height: calc(100svh - 76px);
+  min-height: 0;
   place-items: start center;
-  min-height: calc(100svh - 76px);
   padding: 36px 20px;
+  overflow: hidden;
 }
 
 .room-browser {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(900px, 100%);
+  max-height: calc(100svh - 148px);
+  min-height: 0;
   border: 1px solid #35404d;
   border-radius: 8px;
   background: #181f28;
@@ -1160,7 +1190,11 @@
 .room-list-clean {
   display: grid;
   gap: 8px;
+  min-height: 0;
   padding: 18px 22px;
+  overflow-y: auto;
+  scrollbar-color: #ffc247 rgba(255, 255, 255, 0.1);
+  scrollbar-width: thin;
 }
 
 .room-card {
@@ -1229,7 +1263,31 @@
 .create-room-form {
   display: grid;
   gap: 18px;
+  min-height: 0;
   padding: 22px;
+  overflow-y: auto;
+  scrollbar-color: #ffc247 rgba(255, 255, 255, 0.1);
+  scrollbar-width: thin;
+}
+
+.create-room-form::-webkit-scrollbar,
+.room-list-clean::-webkit-scrollbar,
+.settings-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+.create-room-form::-webkit-scrollbar-track,
+.room-list-clean::-webkit-scrollbar-track,
+.settings-card::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.create-room-form::-webkit-scrollbar-thumb,
+.room-list-clean::-webkit-scrollbar-thumb,
+.settings-card::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #ffc247;
 }
 
 .room-rule-grid {
@@ -1403,7 +1461,9 @@
   display: grid;
   gap: 18px;
   width: min(680px, 100%);
+  max-height: calc(100svh - 144px);
   padding: 24px;
+  overflow-y: auto;
   border: 1px solid #35404d;
   border-radius: 8px;
   background: #181f28;
@@ -2071,6 +2131,7 @@ button {
 
 .hud {
   top: 14px;
+  grid-template-columns: minmax(280px, 1fr) auto minmax(120px, 160px);
   transition: transform 180ms ease, opacity 180ms ease;
 }
 
@@ -2179,18 +2240,6 @@ button {
   transform: translateY(2px) rotate(225deg);
 }
 
-.hud-minimized .hud {
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(calc(-100% - 24px));
-}
-
-.hud-minimized .objective-status {
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, -24px);
-}
-
 .compact-combat-widget {
   position: fixed;
   z-index: 4;
@@ -2287,17 +2336,19 @@ button {
 .health-widget {
   position: fixed;
   z-index: 31;
-  top: 18px;
-  right: 74px;
+  left: 50%;
+  top: auto;
+  right: auto;
+  bottom: 60px;
   display: grid;
-  gap: 4px;
-  width: 156px;
-  padding: 10px 12px;
-  border: 1px solid rgba(109, 255, 159, 0.34);
-  border-radius: 8px;
+  width: min(560px, calc(100vw - 36px));
+  padding: 3px;
+  border: 1px solid rgba(109, 255, 159, 0.38);
+  border-radius: 999px;
   color: #eafff1;
-  background: rgba(7, 14, 24, 0.9);
+  background: rgba(7, 14, 24, 0.84);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  transform: translateX(-50%);
 }
 
 .health-widget span {
@@ -2314,10 +2365,10 @@ button {
 }
 
 .health-widget i {
-  height: 7px;
+  height: 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(109, 255, 159, 0.14);
+  background: rgba(109, 255, 159, 0.16);
 }
 
 .health-widget b {
@@ -2702,6 +2753,48 @@ button {
   border-radius: 50%;
 }
 
+.kill-cam-overlay {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kill-cam-banner {
+  position: absolute;
+  left: 50%;
+  top: 92px;
+  display: grid;
+  gap: 5px;
+  min-width: min(520px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 194, 71, 0.34);
+  border-radius: 8px;
+  color: #ffffff;
+  text-align: center;
+  background: rgba(7, 14, 24, 0.78);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  transform: translateX(-50%);
+}
+
+.kill-cam-banner span {
+  color: #ffc247;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.kill-cam-banner strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.kill-cam-banner small {
+  color: #c8d4e3;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .death-screen {
   position: fixed;
   z-index: 20;
@@ -2738,6 +2831,49 @@ button {
   font-weight: 950;
   text-transform: uppercase;
   background: rgba(7, 14, 24, 0.74);
+}
+
+.death-player-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.death-player-stats > div {
+  display: grid;
+  gap: 5px;
+  min-height: 70px;
+  padding: 12px 14px;
+  border: 1px solid rgba(85, 255, 145, 0.2);
+  border-radius: 8px;
+  background: rgba(9, 20, 18, 0.78);
+}
+
+.death-player-stats span {
+  color: #a8ffc2;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.death-player-stats strong {
+  color: #56ff91;
+  font-size: 16px;
+}
+
+.death-player-stats i {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(85, 255, 145, 0.13);
+}
+
+.death-player-stats b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #23e879, #adff72);
 }
 
 .death-screen button {
@@ -3052,7 +3188,7 @@ button {
 
 .combat-readout {
   display: grid;
-  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  grid-template-columns: repeat(5, minmax(88px, 1fr));
   gap: 8px;
 }
 
@@ -3098,6 +3234,21 @@ button {
   height: 4px;
   background: #f5a524;
   box-shadow: 0 0 16px rgba(245, 165, 36, 0.58);
+}
+
+.health-card strong {
+  color: #6dff9f;
+  font-size: 28px;
+}
+
+.health-card i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--health);
+  height: 4px;
+  background: linear-gradient(90deg, #28e97b, #ffc247, #ef4354);
+  box-shadow: 0 0 14px rgba(85, 255, 145, 0.42);
 }
 
 .ammo-card.reloading {
@@ -3245,9 +3396,8 @@ button {
   }
 
   .health-widget {
-    top: 70px;
-    right: 12px;
-    width: 132px;
+    bottom: 58px;
+    width: min(440px, calc(100vw - 28px));
   }
 
   .combat-readout {

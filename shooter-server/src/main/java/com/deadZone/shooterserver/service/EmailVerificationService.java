@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -73,7 +74,12 @@ public class EmailVerificationService {
                 Enter this 6-digit code in the DeadZone verification screen.
                 The code expires in 15 minutes.
                 """.formatted(token.getToken()));
-        sender.send(message);
+        try {
+            sender.send(message);
+        } catch (MailException error) {
+            log.error("Failed to send email verification code to {}", user.getEmail(), error);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. Please check SMTP settings.");
+        }
     }
 
     @Transactional

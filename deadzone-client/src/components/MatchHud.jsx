@@ -87,7 +87,6 @@ export function MatchHud({
     'game-3d-shell',
     isScoped ? 'scoped' : '',
     sniperScoped ? 'sniper-scoped' : '',
-    compactHud ? 'hud-minimized' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -105,7 +104,17 @@ export function MatchHud({
         <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
       </div>
 
-      {deathInfo.isDead && (
+      {deathInfo.isDead && deathInfo.focusSeconds > 0 && !showDeathCustomizer && (
+        <div className="kill-cam-overlay">
+          <div className="kill-cam-banner">
+            <span>KILL CAM</span>
+            <strong>{deathInfo.killerName ? `${deathInfo.killerName} eliminated you` : 'You were eliminated'}</strong>
+            <small>{deathInfo.ready ? 'Ready to return' : `Respawn in ${deathInfo.seconds}s`}</small>
+          </div>
+        </div>
+      )}
+
+      {deathInfo.isDead && (deathInfo.focusSeconds <= 0 || showDeathCustomizer) && (
         <div className="death-screen">
           {!showDeathCustomizer ? (
             <>
@@ -117,6 +126,17 @@ export function MatchHud({
                 </em>
               )}
               <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
+              <div className="death-player-stats">
+                <div>
+                  <span>Cash</span>
+                  <strong>🪙 {wallet}</strong>
+                </div>
+                <div>
+                  <span>Level {level}</span>
+                  <strong>{xp} XP</strong>
+                  <i><b style={{ width: `${levelProgress}%` }} /></i>
+                </div>
+              </div>
               <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.respawnLocal()}>Return to Match</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>Exit to Lobby</button>
@@ -295,11 +315,6 @@ export function MatchHud({
           <strong>{remainingMinutes}:{remainingClockSeconds}</strong>
           <span>Target {score.target || currentMatch.scoreLimit}</span>
         </div>
-        <div className="hud-progression">
-          <span>Level {level}</span>
-          <strong>{xp} XP</strong>
-          <i><b style={{ width: `${levelProgress}%` }} /></i>
-        </div>
       </header>
 
       <button
@@ -314,9 +329,7 @@ export function MatchHud({
       </button>
 
       {compactHud && (
-        <aside className="health-widget" aria-label="Health">
-          <span>Health</span>
-          <strong>{Math.max(0, Math.min(100, Math.round(health ?? 100)))} HP</strong>
+        <aside className="health-widget compact-health-bar" aria-label="Health">
           <i><b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} /></i>
         </aside>
       )}
@@ -372,6 +385,12 @@ export function MatchHud({
             <div className="grenade-pips">
               {[0, 1, 2].map((slot) => <b className={slot < grenadeCount ? 'filled' : ''} key={slot} />)}
             </div>
+          </div>
+          <div className="readout-card health-card">
+            <span>Health</span>
+            <strong>{Math.max(0, Math.min(100, Math.round(health ?? 100)))}</strong>
+            <small>HP</small>
+            <i style={{ '--health': `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} />
           </div>
           <div className="readout-card wallet-card">
             <span>Cash</span>
