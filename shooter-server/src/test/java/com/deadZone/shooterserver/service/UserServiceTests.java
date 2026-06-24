@@ -92,6 +92,17 @@ class UserServiceTests {
     }
 
     @Test
+    void unverifiedUserCanRequestANewCodeByRegisteringAgain() {
+        userService.register(new RegisterRequest("pending-player", "pending@example.com", "old"));
+        var response = userService.register(new RegisterRequest("pending-player", "pending@example.com", "new"));
+
+        assertThat(response.user().username()).isEqualTo("pending-player");
+        assertThat(response.user().emailVerified()).isFalse();
+        assertThat(userRepository.count()).isEqualTo(1);
+        assertThat(emailVerificationTokenRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void purchaseCannotAddItemsWithoutPayingServerPrice() {
         var auth = userService.register(new RegisterRequest("shop-cheat", "shop@example.com", "secret"));
         User fundedUser = userRepository.findById(auth.user().id()).orElseThrow();

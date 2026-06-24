@@ -28,6 +28,7 @@ public class EmailVerificationService {
     private final ObjectProvider<JavaMailSender> mailSender;
     private final String mailFrom;
     private final String mailHost;
+    private final String mailUsername;
     private final String mailPassword;
 
     public EmailVerificationService(
@@ -35,19 +36,21 @@ public class EmailVerificationService {
             ObjectProvider<JavaMailSender> mailSender,
             @Value("${deadzone.email.from:noreply@deadzone.local}") String mailFrom,
             @Value("${spring.mail.host:}") String mailHost,
+            @Value("${spring.mail.username:}") String mailUsername,
             @Value("${spring.mail.password:}") String mailPassword
     ) {
         this.tokenRepository = tokenRepository;
         this.mailSender = mailSender;
         this.mailFrom = mailFrom;
         this.mailHost = mailHost;
-        this.mailPassword = mailPassword;
+        this.mailUsername = mailUsername;
+        this.mailPassword = mailPassword == null ? "" : mailPassword.replaceAll("\\s+", "");
     }
 
     @Transactional
-    public void sendVerification(User user) {
+    public boolean sendVerification(User user) {
         if (user.isEmailVerified()) {
-            return;
+            return false;
         }
         tokenRepository.deleteByUserAndUsedAtIsNull(user);
         String code = verificationCode();
@@ -57,9 +60,9 @@ public class EmailVerificationService {
                 Instant.now().plus(15, ChronoUnit.MINUTES)
         ));
         JavaMailSender sender = mailSender.getIfAvailable();
-        if (sender == null || mailHost == null || mailHost.isBlank() || mailPassword == null || mailPassword.isBlank()) {
+        if (sender == null || mailHost == null || mailHost.isBlank() || mailUsername == null || mailUsername.isBlank() || mailPassword == null || mailPassword.isBlank()) {
             log.warn("Email verification code for {}: {}", user.getEmail(), token.getToken());
-            return;
+            return false;
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
@@ -76,9 +79,11 @@ public class EmailVerificationService {
                 """.formatted(token.getToken()));
         try {
             sender.send(message);
+            return true;
         } catch (MailException error) {
             log.error("Failed to send email verification code to {}", user.getEmail(), error);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. Please check SMTP settings.");
+            String detail = error.getMostSpecificCause() == null ? error.getMessage() : error.getMostSpecificCause().getMessage();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. SMTP error: " + detail);
         }
     }
 

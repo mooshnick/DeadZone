@@ -50,18 +50,26 @@ public class UserService {
         this.storeCatalog = storeCatalog;
     }
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         validateRegistration(request);
         String username = request.username().trim();
-        if (userRepository.findByUsername(username).isPresent()) {
+        String email = request.email().trim().toLowerCase();
+        var existingUser = userRepository.findByUsername(username);
+        if (existingUser.isPresent() && !existingUser.get().isEmailVerified() && email.equalsIgnoreCase(existingUser.get().getEmail())) {
+            User user = existingUser.get();
+            user.setPassword(passwordService.hash(request.password()));
+            boolean verificationEmailSent = emailVerificationService.sendVerification(user);
+            return new AuthResponse(null, UserResponse.from(userRepository.save(user)), verificationEmailSent);
+        }
+        if (existingUser.isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is already taken!");
         }
-        String email = request.email().trim().toLowerCase();
 
         User user = new User(username, email, passwordService.hash(request.password()));
         user = userRepository.save(user);
-        emailVerificationService.sendVerification(user);
-        return new AuthResponse(null, UserResponse.from(user));
+        boolean verificationEmailSent = emailVerificationService.sendVerification(user);
+        return new AuthResponse(null, UserResponse.from(user), verificationEmailSent);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -293,7 +301,7 @@ public class UserService {
     }
 
     private AuthResponse authResponse(User user) {
-        return new AuthResponse(jwtService.createToken(user.getId(), user.getUsername()), UserResponse.from(user));
+        return new AuthResponse(jwtService.createToken(user.getId(), user.getUsername()), UserResponse.from(user), false);
     }
 
     private void upgradePasswordHashIfNeeded(User user, String password) {

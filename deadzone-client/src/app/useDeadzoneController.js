@@ -629,7 +629,9 @@ export function useDeadzoneController() {
         setCredentials({ username: '', email: credentials.email.trim(), password: '', confirmPassword: '', verificationCode: '' });
         setAuthMode('verify');
         setScreen('auth');
-        setAccountStatus('Account created. Enter the 6-digit code we sent to your email.');
+        setAccountStatus(user.verificationEmailSent
+          ? 'Account created. Enter the 6-digit code we sent to your email.'
+          : 'Account created. SMTP is not configured locally. Check the backend terminal for your 6-digit code.');
         return;
       }
       applyUser(user, action === 'register' ? 'Account created and saved.' : 'Logged in.');

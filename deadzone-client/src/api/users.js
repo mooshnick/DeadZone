@@ -10,14 +10,19 @@ function token() {
 
 async function request(path, options = {}) {
   const { skipAuth = false, ...fetchOptions } = options;
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...fetchOptions,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(!skipAuth && token() ? { Authorization: `Bearer ${token()}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...fetchOptions,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(!skipAuth && token() ? { Authorization: `Bearer ${token()}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (error) {
+    throw new Error(`Cannot reach the server at ${API_BASE}. Start the backend on port 8080 and try again.`);
+  }
 
   if (!response.ok) {
     const message = await response.text();
@@ -45,7 +50,10 @@ function storeSession(response) {
     localStorage.removeItem(sessionTokenKey);
   }
 
-  return user;
+  return {
+    ...user,
+    verificationEmailSent: Boolean(response?.verificationEmailSent),
+  };
 }
 
 export function registerUser(username, email, password) {
