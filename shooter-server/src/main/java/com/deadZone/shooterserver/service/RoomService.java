@@ -35,16 +35,36 @@ public class RoomService {
     public GameRoom join(String sessionId, String roomId, GameMessage message) {
         GameRoom room = rooms.computeIfAbsent(roomId, key -> new GameRoom(roomId, sanitizer.mapId(message.getMapId())));
         sessionRooms.put(sessionId, roomId);
-        room.putPlayer(sessionId, new Player(
+        Player player = new Player(
                 message.getPlayerId(),
                 sanitizer.playerName(message.getName()),
                 sanitizer.team(message.getTeam()),
                 sanitizer.weaponId(message.getWeaponId()),
-                message.getX(),
-                message.getY(),
+                (int) Math.round(message.getX()),
+                (int) Math.round(message.getY()),
                 message.getFacing() == 0 ? 1 : message.getFacing()
-        ));
+        );
+        applyPlayerDetails(player, message);
+        room.putPlayer(sessionId, player);
         return room;
+    }
+
+    public void applyPlayerDetails(Player player, GameMessage message) {
+        player.setWeaponId(sanitizer.weaponId(message.getWeaponId()));
+        player.setWeaponSkinId(message.getWeaponSkinId() == null || message.getWeaponSkinId().isBlank() ? "standard" : message.getWeaponSkinId().trim());
+        player.setOutfitId(message.getOutfitId() == null || message.getOutfitId().isBlank() ? "classic" : message.getOutfitId().trim());
+        player.setAccessoryIds(message.getAccessoryIds() == null ? java.util.List.of() : message.getAccessoryIds());
+        player.setX(message.getX());
+        player.setY(message.getY());
+        player.setZ(message.getZ());
+        player.setYaw(message.getYaw());
+        player.setPitch(message.getPitch());
+        player.setHealth(message.getHealth() <= 0 && !message.isDead() ? player.getHealth() : Math.max(0, message.getHealth()));
+        player.setDead(message.isDead());
+        player.setKills(Math.max(0, message.getKills()));
+        player.setAssists(Math.max(0, message.getAssists()));
+        player.setDeaths(Math.max(0, message.getDeaths()));
+        player.setScore(Math.max(0, message.getScore()));
     }
 
     public Player playerForSession(String sessionId) {

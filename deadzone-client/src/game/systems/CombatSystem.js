@@ -3,7 +3,7 @@ import { ASSIST_REWARD, ASSIST_SCORE, ASSIST_WINDOW, ASSIST_XP, KILL_REWARD, KIL
 import { nowMs } from '../utils';
 
 export class CombatSystem {
-  constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil, onElimination }) {
+  constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil, onDamage, onElimination }) {
     this.scene = scene;
     this.players = players;
     this.localId = localId;
@@ -14,6 +14,7 @@ export class CombatSystem {
     this.onProgressChange = onProgressChange;
     this.onEvent = onEvent;
     this.onRecoil = onRecoil;
+    this.onDamage = onDamage;
     this.onElimination = onElimination;
     this.bullets = [];
   }
@@ -156,6 +157,7 @@ export class CombatSystem {
     const time = nowMs();
     target.recordDamage(shooterId, time);
     const damage = Math.round(baseDamage * (target.buffs.shield ? 0.58 : 1));
+    this.onDamage?.({ shooterId, targetId: target.id, damage });
     if (!target.applyDamage(damage)) {
       return;
     }

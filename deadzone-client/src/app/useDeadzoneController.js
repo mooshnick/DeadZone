@@ -930,6 +930,7 @@ export function useDeadzoneController() {
       weaponSkinId,
       weaponLevel: weaponUpgrades[allowedWeaponId] || 0,
       mapId: room.mapId,
+      roomId: room.id,
       gameMode: room.gameMode || DEFAULT_GAME_MODE,
       scoreLimit: room.scoreLimit,
       timeLimitMinutes: room.timeLimitMinutes,

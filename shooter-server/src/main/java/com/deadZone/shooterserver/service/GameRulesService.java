@@ -10,10 +10,22 @@ import java.util.Collection;
 @Service
 public class GameRulesService {
     public void move(Player player, GameMessage message) {
+        player.setWeaponId(message.getWeaponId() == null || message.getWeaponId().isBlank() ? player.getWeaponId() : message.getWeaponId());
+        player.setWeaponSkinId(message.getWeaponSkinId() == null || message.getWeaponSkinId().isBlank() ? player.getWeaponSkinId() : message.getWeaponSkinId());
+        player.setOutfitId(message.getOutfitId() == null || message.getOutfitId().isBlank() ? player.getOutfitId() : message.getOutfitId());
+        player.setAccessoryIds(message.getAccessoryIds() == null ? player.getAccessoryIds() : message.getAccessoryIds());
         player.setX(message.getX());
         player.setY(message.getY());
+        player.setZ(message.getZ());
+        player.setYaw(message.getYaw());
+        player.setPitch(message.getPitch());
         player.setFacing(message.getFacing() == 0 ? player.getFacing() : message.getFacing());
-        player.setHealth(message.getHealth() <= 0 ? player.getHealth() : message.getHealth());
+        player.setHealth(message.getHealth() <= 0 && !message.isDead() ? player.getHealth() : Math.max(0, message.getHealth()));
+        player.setDead(message.isDead());
+        player.setKills(Math.max(player.getKills(), message.getKills()));
+        player.setAssists(Math.max(player.getAssists(), message.getAssists()));
+        player.setDeaths(Math.max(player.getDeaths(), message.getDeaths()));
+        player.setScore(Math.max(player.getScore(), message.getScore()));
     }
 
     public void applyHit(GameRoom room, GameMessage message) {
@@ -31,9 +43,9 @@ public class GameRulesService {
         target.setHealth(Math.max(0, target.getHealth() - damage));
         if (target.getHealth() == 0) {
             shooter.setKills(shooter.getKills() + 1);
+            shooter.setScore(shooter.getScore() + 100);
             target.setDeaths(target.getDeaths() + 1);
-            target.setHealth(100);
-            respawn(target);
+            target.setDead(true);
         }
     }
 
@@ -42,17 +54,5 @@ public class GameRulesService {
                 .filter(player -> player.getId().equals(playerId))
                 .findFirst()
                 .orElse(null);
-    }
-
-    private void respawn(Player player) {
-        if ("red".equals(player.getTeam())) {
-            player.setX(985);
-            player.setY(420);
-            player.setFacing(-1);
-            return;
-        }
-        player.setX(175);
-        player.setY(420);
-        player.setFacing(1);
     }
 }

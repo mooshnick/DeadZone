@@ -10,6 +10,7 @@ import { CombatSystem } from './systems/CombatSystem';
 import { GrenadeSystem } from './systems/GrenadeSystem';
 import { PowerupSystem } from './systems/PowerupSystem';
 import { PlayerCollisionSystem } from './systems/PlayerCollisionSystem';
+import { RealtimeClient } from './network/RealtimeClient';
 import { ArenaLayouts } from './world/ArenaLayouts';
 import { clamp, nowMs } from './utils';
 
@@ -86,6 +87,7 @@ export class GameWorld {
     this.jumpWasDown = false;
     this.deathInputReleased = false;
     this.localDeathFocus = null;
+    this.realtimeClient = null;
   }
 
   start() {
@@ -93,12 +95,14 @@ export class GameWorld {
     this.setupScene();
     this.setupSystems();
     this.addPlayers();
+    this.setupRealtime();
     this.inputController.bind();
     this.animate();
   }
 
   dispose() {
     cancelAnimationFrame(this.frame);
+    this.realtimeClient?.dispose();
     this.inputController?.dispose();
     this.renderer?.dispose();
     this.scene?.traverse((object) => {
@@ -234,6 +238,7 @@ export class GameWorld {
       },
       onEvent: this.onEvent,
       onRecoil: (player, weapon) => this.applyRecoil(player, weapon),
+      onDamage: (hit) => this.reportHit(hit),
       onElimination: (shooter, target, time) => this.handleElimination(shooter, target, time),
     });
     this.powerupSystem = new PowerupSystem({
@@ -301,6 +306,143 @@ export class GameWorld {
     this.players.set(player.id, player);
   }
 
+  setupRealtime() {
+    if (!this.config.roomId) {
+      return;
+    }
+    const localPlayer = this.localPlayer();
+    if (!localPlayer) {
+      return;
+    }
+    this.realtimeClient = new RealtimeClient({
+      localId: this.localId,
+      roomId: this.config.roomId,
+      onEvent: this.onEvent,
+      onMessage: (message) => this.handleRealtimeMessage(message),
+    });
+    this.realtimeClient.connect(this.networkPayloadFor(localPlayer));
+  }
+
+  networkPayloadFor(player) {
+    return {
+      name: player.name,
+      team: player.team,
+      weaponId: player.weaponId,
+      weaponSkinId: player.weaponSkinId,
+      outfitId: player.outfitId,
+      accessoryIds: player.accessoryIds || [],
+      mapId: this.config.mapId,
+      x: player.position.x,
+      y: player.position.y,
+      z: player.position.z,
+      yaw: player.yaw,
+      pitch: player.pitch,
+      health: Math.round(player.health),
+      dead: player.isDead,
+      kills: player.kills,
+      assists: player.assists,
+      deaths: player.deaths,
+      score: player.score,
+    };
+  }
+
+  handleRealtimeMessage(message) {
+    if (message.type === 'ERROR') {
+      this.onEvent?.(message.message || 'Online room error');
+      return;
+    }
+    if (message.type === 'STATE') {
+      this.applyRealtimeState(message.players || []);
+    }
+  }
+
+  applyRealtimeState(remotePlayers) {
+    const seenIds = new Set();
+    remotePlayers.forEach((remote, index) => {
+      if (!remote?.id) {
+        return;
+      }
+      seenIds.add(remote.id);
+      if (remote.id === this.localId) {
+        this.applyLocalServerState(remote);
+        return;
+      }
+      let player = this.players.get(remote.id);
+      if (!player) {
+        player = makePlayer({
+          id: remote.id,
+          name: remote.name || 'Player',
+          team: remote.team || 'blue',
+          gameMode: this.gameMode,
+          weaponId: remote.weaponId || 'rifle',
+          outfitId: remote.outfitId || 'classic',
+          accessoryIds: remote.accessoryIds || [],
+          weaponSkinId: remote.weaponSkinId || 'standard',
+          mapId: this.config.mapId,
+          index,
+        });
+        this.addPlayer(player);
+        this.onEvent?.(`${player.name} joined the arena`);
+      }
+      this.applyRemotePlayerState(player, remote);
+    });
+
+    for (const [id, player] of this.players.entries()) {
+      if (id === this.localId || player.isBot || seenIds.has(id)) {
+        continue;
+      }
+      this.scene.remove(player.mesh);
+      this.players.delete(id);
+      this.onEvent?.(`${player.name} left the arena`);
+    }
+  }
+
+  applyLocalServerState(remote) {
+    const player = this.localPlayer();
+    if (!player) {
+      return;
+    }
+    if (typeof remote.health === 'number' && remote.health < player.health) {
+      player.health = Math.max(0, remote.health);
+      this.onHealthChange?.(player.health);
+      if (player.health <= 0 && !player.isDead) {
+        player.kill(nowMs());
+      }
+    }
+  }
+
+  applyRemotePlayerState(player, remote) {
+    const previousWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
+    player.name = remote.name || player.name;
+    player.team = remote.team || player.team;
+    player.weaponId = remote.weaponId || player.weaponId;
+    player.weaponSkinId = remote.weaponSkinId || player.weaponSkinId;
+    player.outfitId = remote.outfitId || player.outfitId;
+    player.accessoryIds = remote.accessoryIds || player.accessoryIds;
+    player.health = typeof remote.health === 'number' ? remote.health : player.health;
+    player.kills = remote.kills || 0;
+    player.assists = remote.assists || 0;
+    player.deaths = remote.deaths || 0;
+    player.score = remote.score || 0;
+    player.isDead = Boolean(remote.dead) || player.health <= 0;
+    player.position.set(remote.x ?? player.position.x, remote.y ?? player.position.y, remote.z ?? player.position.z);
+    player.velocity.set(0, 0, 0);
+    player.yaw = remote.yaw ?? player.yaw;
+    player.pitch = remote.pitch ?? player.pitch;
+
+    const nextWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
+    if (previousWeaponKey !== nextWeaponKey) {
+      const previousMesh = player.mesh;
+      const nextMesh = new PlayerMeshFactory(this.localId).create(player);
+      nextMesh.position.copy(player.position);
+      nextMesh.rotation.y = player.yaw;
+      if (previousMesh) {
+        this.scene.remove(previousMesh);
+      }
+      this.scene.add(nextMesh);
+    }
+  }
+
   updateLocalCosmetics({ accessoryIds, outfitId, weaponId, weaponLevel, weaponSkinId }) {
     const player = this.localPlayer();
     if (!player) return;
@@ -353,6 +495,17 @@ export class GameWorld {
     const player = this.localPlayer();
     if (!player || this.matchEnded) return;
     this.combatSystem.shoot(player, this.aimDirectionFromCrosshair(player), this.shotOriginForLocalWeapon(player));
+  }
+
+  reportHit({ shooterId, targetId, damage }) {
+    if (shooterId !== this.localId || !this.realtimeClient || targetId === this.localId) {
+      return;
+    }
+    this.realtimeClient.sendHit({
+      shooterId,
+      playerId: targetId,
+      damage,
+    });
   }
 
   applyRecoil(player, weapon) {
@@ -922,6 +1075,7 @@ export class GameWorld {
     this.resize();
     if (!this.isPaused) {
       this.updateLocal(dt, time);
+      this.sendRealtimeMove(time);
     }
     if (!this.matchEnded && !this.isPaused) {
       this.botSystem.update(dt, time);
@@ -935,6 +1089,14 @@ export class GameWorld {
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());
+  }
+
+  sendRealtimeMove(time) {
+    const player = this.localPlayer();
+    if (!player || !this.realtimeClient) {
+      return;
+    }
+    this.realtimeClient.sendMove(this.networkPayloadFor(player), time);
   }
 
   handleElimination(shooter, target, time) {

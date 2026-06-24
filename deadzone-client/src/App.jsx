@@ -4,6 +4,7 @@ import { useDeadzoneController } from './app/useDeadzoneController';
 import { Lobby } from './components/Lobby';
 import { LoadingScreen } from './components/LoadingScreen';
 import { MatchHud } from './components/MatchHud';
+import { apiBase } from './api/config';
 
 const INITIAL_ASSETS = [
   '/deadZone_Logo.png',
@@ -21,7 +22,7 @@ function App() {
     return (
       <LoadingScreen
         assetUrls={INITIAL_ASSETS}
-        backendUrl="http://127.0.0.1:8080/api/rooms"
+        backendUrl={apiBase('/api/rooms')}
         timedProgressMs={4200}
         onComplete={handleLoadingComplete}
       />

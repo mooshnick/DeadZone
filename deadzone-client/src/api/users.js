@@ -1,4 +1,6 @@
-const API_BASE = 'http://127.0.0.1:8080/api/users';
+import { apiBase } from './config';
+
+const API_BASE = apiBase('/api/users');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
 

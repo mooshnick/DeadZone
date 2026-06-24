@@ -15,6 +15,9 @@ class GameRulesServiceTests {
         GameMessage message = new GameMessage();
         message.setX(25);
         message.setY(45);
+        message.setZ(-12);
+        message.setYaw(1.4);
+        message.setPitch(-0.2);
         message.setFacing(-1);
         message.setHealth(80);
 
@@ -22,6 +25,9 @@ class GameRulesServiceTests {
 
         assertThat(player.getX()).isEqualTo(25);
         assertThat(player.getY()).isEqualTo(45);
+        assertThat(player.getZ()).isEqualTo(-12);
+        assertThat(player.getYaw()).isEqualTo(1.4);
+        assertThat(player.getPitch()).isEqualTo(-0.2);
         assertThat(player.getFacing()).isEqualTo(-1);
         assertThat(player.getHealth()).isEqualTo(80);
     }
@@ -42,8 +48,9 @@ class GameRulesServiceTests {
         gameRulesService.applyHit(room, message);
 
         assertThat(shooter.getKills()).isEqualTo(1);
+        assertThat(shooter.getScore()).isEqualTo(100);
         assertThat(target.getDeaths()).isEqualTo(1);
-        assertThat(target.getHealth()).isEqualTo(100);
-        assertThat(target.getX()).isEqualTo(985);
+        assertThat(target.getHealth()).isEqualTo(0);
+        assertThat(target.isDead()).isTrue();
     }
 }
