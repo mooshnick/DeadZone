@@ -30,6 +30,7 @@ public class EmailVerificationService {
     private final String mailHost;
     private final String mailUsername;
     private final String mailPassword;
+    private final boolean consoleFallback;
 
     public EmailVerificationService(
             EmailVerificationTokenRepository tokenRepository,
@@ -37,7 +38,8 @@ public class EmailVerificationService {
             @Value("${deadzone.email.from:noreply@deadzone.local}") String mailFrom,
             @Value("${spring.mail.host:}") String mailHost,
             @Value("${spring.mail.username:}") String mailUsername,
-            @Value("${spring.mail.password:}") String mailPassword
+            @Value("${spring.mail.password:}") String mailPassword,
+            @Value("${deadzone.email.console-fallback:false}") boolean consoleFallback
     ) {
         this.tokenRepository = tokenRepository;
         this.mailSender = mailSender;
@@ -45,6 +47,7 @@ public class EmailVerificationService {
         this.mailHost = mailHost;
         this.mailUsername = mailUsername;
         this.mailPassword = mailPassword == null ? "" : mailPassword.replaceAll("\\s+", "");
+        this.consoleFallback = consoleFallback;
     }
 
     @Transactional
@@ -61,8 +64,11 @@ public class EmailVerificationService {
         ));
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null || mailHost == null || mailHost.isBlank() || mailUsername == null || mailUsername.isBlank() || mailPassword == null || mailPassword.isBlank()) {
-            log.warn("Email verification code for {}: {}", user.getEmail(), token.getToken());
-            return false;
+            if (consoleFallback) {
+                log.warn("Email verification code for {}: {}", user.getEmail(), token.getToken());
+                return false;
+            }
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email delivery is not configured. Check SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, and MAIL_FROM.");
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
