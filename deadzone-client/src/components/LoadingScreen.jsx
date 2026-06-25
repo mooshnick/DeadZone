@@ -11,14 +11,34 @@ function loadImage(url) {
   });
 }
 
+function withTimeout(task, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(
+      () => resolve({ ok: false, timedOut: true }),
+      timeoutMs,
+    );
+
+    Promise.resolve(task).then(
+      (result) => {
+        window.clearTimeout(timer);
+        resolve(result);
+      },
+      () => {
+        window.clearTimeout(timer);
+        resolve({ ok: false });
+      },
+    );
+  });
+}
+
 function loadAsset(url) {
   if (IMAGE_PATTERN.test(url)) {
-    return loadImage(url);
+    return withTimeout(loadImage(url));
   }
 
-  return fetch(url)
+  return withTimeout(fetch(url)
     .then((response) => ({ ok: response.ok, url }))
-    .catch(() => ({ ok: false, url }));
+    .catch(() => ({ ok: false, url })));
 }
 
 export function LoadingScreen({
@@ -93,9 +113,9 @@ export function LoadingScreen({
         const url = typeof step === 'string' ? step : step.url;
         const task = typeof step === 'string'
           ? loadAsset(url)
-          : fetch(url, {
+          : withTimeout(fetch(url, {
             headers: { 'Content-Type': 'application/json' },
-          }).catch(() => null);
+          }).catch(() => null));
 
         Promise.resolve(task).finally(completeStep);
       });

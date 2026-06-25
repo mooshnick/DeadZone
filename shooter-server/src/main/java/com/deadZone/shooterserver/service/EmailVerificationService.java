@@ -102,7 +102,7 @@ public class EmailVerificationService {
             String detail = "SMTP configuration is incomplete. host=%s port=%s usernameConfigured=%s passwordConfigured=%s from=%s"
                     .formatted(display(mailHost), display(mailPort), isConfigured(mailUsername), isConfigured(mailPassword), display(mailFrom));
             log.error("Failed to send email verification code to {}. {}", user.getEmail(), detail);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not send verification email. " + detail);
+            throw deliveryUnavailable();
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
@@ -117,13 +117,7 @@ public class EmailVerificationService {
             String detail = rootMessage(error);
             log.error("Failed to send email verification code to {} via SMTP. host={} port={} usernameConfigured={} from={} error={}",
                     user.getEmail(), display(mailHost), display(mailPort), isConfigured(mailUsername), display(mailFrom), detail, error);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Could not send verification email. SMTP error: " + detail
-                            + " [host=" + display(mailHost)
-                            + ", port=" + display(mailPort)
-                            + ", usernameConfigured=" + isConfigured(mailUsername)
-                            + ", from=" + display(mailFrom)
-                            + "]");
+            throw deliveryUnavailable();
         }
     }
 
@@ -147,16 +141,21 @@ public class EmailVerificationService {
             }
             String detail = "status=" + response.statusCode() + " body=" + response.body();
             log.error("Failed to send email verification code to {} via Resend. from={} {}", to, display(mailFrom), detail);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Could not send verification email. Resend API error: " + detail + " [from=" + display(mailFrom) + "]");
+            throw deliveryUnavailable();
         } catch (ResponseStatusException error) {
             throw error;
         } catch (Exception error) {
             String detail = rootMessage(error);
             log.error("Failed to send email verification code to {} via Resend. from={} error={}", to, display(mailFrom), detail, error);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Could not send verification email. Resend API error: " + detail + " [from=" + display(mailFrom) + "]");
+            throw deliveryUnavailable();
         }
+    }
+
+    private ResponseStatusException deliveryUnavailable() {
+        return new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "We could not send the verification code. Please try again shortly."
+        );
     }
 
     private String rootMessage(Throwable error) {

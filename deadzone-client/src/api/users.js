@@ -25,7 +25,14 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    const message = await response.text();
+    const body = await response.text();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      message = parsed.detail || parsed.message || parsed.error || body;
+    } catch {
+      // Keep plain-text server errors unchanged.
+    }
     throw new Error(message || 'Server request failed.');
   }
 
