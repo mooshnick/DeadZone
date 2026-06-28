@@ -270,6 +270,7 @@ export class GameWorld {
       onLook: (movementX, movementY) => this.look(movementX, movementY),
       onFire: () => this.fireLocalWeapon(),
       onScopeChange: (value) => this.setScoped(value),
+      canCapturePointer: () => this.canCapturePointer(),
     });
   }
 
@@ -497,6 +498,13 @@ export class GameWorld {
     this.combatSystem.shoot(player, this.aimDirectionFromCrosshair(player), this.shotOriginForLocalWeapon(player));
   }
 
+  interactLocal() {
+    const player = this.localPlayer();
+    if (!player || player.isDead || this.matchEnded || this.isPaused) return false;
+    this.onEvent?.('No interactable object nearby');
+    return false;
+  }
+
   reportHit({ shooterId, targetId, damage }) {
     if (shooterId !== this.localId || !this.realtimeClient || targetId === this.localId) {
       return;
@@ -557,15 +565,16 @@ export class GameWorld {
     this.camera.updateProjectionMatrix();
   }
 
-  respawnLocal() {
+  respawnLocal(capturePointer = false) {
     const player = this.localPlayer();
     if (!player || !player.isDead || nowMs() < player.respawnReadyAt) {
-      return;
+      return false;
     }
     player.respawn();
     this.deathInputReleased = false;
     this.jumpWasDown = false;
     this.qWasDown = false;
+    this.interactWasDown = false;
     this.grenadeChargeStartedAt = 0;
     this.grenadeCharge = 0;
     this.onGrenadeChargeChange?.(0);
@@ -573,6 +582,24 @@ export class GameWorld {
     this.onHealthChange?.(player.health);
     this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
+    if (capturePointer) {
+      this.capturePointer();
+    }
+    return true;
+  }
+
+  canCapturePointer() {
+    const player = this.localPlayer();
+    return Boolean(player && !player.isDead && !this.isPaused && !this.matchEnded);
+  }
+
+  capturePointer() {
+    if (!this.canCapturePointer() || document.pointerLockElement === this.canvas) {
+      return false;
+    }
+    const request = this.canvas.requestPointerLock?.();
+    request?.catch?.(() => {});
+    return Boolean(request);
   }
 
   setPaused(value) {
@@ -612,6 +639,11 @@ export class GameWorld {
     if (this.keys.current.has(this.keybinds.reload || 'KeyR')) {
       this.combatSystem.startReload(player, time);
     }
+    const interactDown = this.keys.current.has(this.keybinds.interact || 'KeyE');
+    if (interactDown && !this.interactWasDown) {
+      this.interactLocal();
+    }
+    this.interactWasDown = interactDown;
     if (player.isDead) {
       if (!this.deathInputReleased) {
         document.exitPointerLock?.();
@@ -622,6 +654,7 @@ export class GameWorld {
         this.grenadeCharge = 0;
         this.onGrenadeChargeChange?.(0);
         this.qWasDown = false;
+        this.interactWasDown = false;
       }
       const remaining = Math.max(0, Math.ceil((player.respawnReadyAt - time) / 1000));
       const focusRemaining = Math.max(0, Math.ceil(((this.localDeathFocus?.until || 0) - time) / 1000));
@@ -1101,6 +1134,9 @@ export class GameWorld {
 
   handleElimination(shooter, target, time) {
     if (target.id === this.localId) {
+      document.exitPointerLock?.();
+      this.mouse.current.down = false;
+      this.setScoped(false);
       this.localDeathFocus = {
         killerId: shooter.id,
         killerName: shooter.name,

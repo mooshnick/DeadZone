@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MatchPauseMenu } from './MatchPauseMenu';
+import { MobileTouchControls } from './MobileTouchControls';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 export function MatchHud({
@@ -33,6 +34,12 @@ export function MatchHud({
   level,
   levelProgress,
   matchResult,
+  onMobileInteract,
+  onMobileLook,
+  onMobileMove,
+  onMobileShootEnd,
+  onMobileShootStart,
+  onMobileSwitchWeapon,
   showScoreboard,
   worldRef,
   xp,
@@ -77,6 +84,12 @@ export function MatchHud({
     setShowPauseMenu(value);
     worldRef.current?.setPaused(value);
   };
+  const returnToMatch = () => {
+    const returned = worldRef.current?.respawnLocal(true);
+    if (returned) {
+      setShowDeathCustomizer(false);
+    }
+  };
   const exitPausedMatch = () => {
     worldRef.current?.setPaused(false);
     setShowPauseMenu(false);
@@ -99,6 +112,17 @@ export function MatchHud({
         <span />
       </div>
       <div className="crosshair" />
+      <MobileTouchControls
+        disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
+        grenadeCharge={grenadeCharge}
+        grenadeCount={grenadeCount}
+        onInteract={onMobileInteract}
+        onLook={onMobileLook}
+        onMove={onMobileMove}
+        onShootEnd={onMobileShootEnd}
+        onShootStart={onMobileShootStart}
+        onSwitchWeapon={onMobileSwitchWeapon}
+      />
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
         <span>{grenadeCharge > 0.82 ? 'Perfect throw' : 'Grenade power'}</span>
         <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
@@ -109,7 +133,10 @@ export function MatchHud({
           <div className="kill-cam-banner">
             <span>KILL CAM</span>
             <strong>{deathInfo.killerName ? `${deathInfo.killerName} eliminated you` : 'You were eliminated'}</strong>
-            <small>{deathInfo.ready ? 'Ready to return' : `Respawn in ${deathInfo.seconds}s`}</small>
+            <div className="kill-cam-countdown" aria-label={`${deathInfo.seconds} seconds until respawn`}>
+              <b>{deathInfo.seconds}</b>
+              <small>SECONDS TO RESPAWN</small>
+            </div>
           </div>
         </div>
       )}
@@ -137,7 +164,7 @@ export function MatchHud({
                   <i><b style={{ width: `${levelProgress}%` }} /></i>
                 </div>
               </div>
-              <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.respawnLocal()}>Return to Match</button>
+              <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>Return to Match</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>Exit to Lobby</button>
             </>
@@ -229,7 +256,7 @@ export function MatchHud({
                       className="primary-command"
                       disabled={!deathInfo.ready}
                       onMouseDown={(event) => event.stopPropagation()}
-                      onClick={() => worldRef.current?.respawnLocal()}
+                      onClick={returnToMatch}
                     >
                       {deathInfo.ready ? 'Continue' : `Ready in ${deathInfo.seconds}s`}
                     </button>

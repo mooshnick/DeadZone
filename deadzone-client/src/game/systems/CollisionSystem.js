@@ -1,5 +1,5 @@
-import { ARENA_LIMIT, FLOOR_Y, GRAVITY, JUMP_SPEED, PLAYER_HEIGHT, PLAYER_RADIUS } from '../config';
-import { clamp } from '../utils';
+import { ARENA_LIMIT, FLOOR_Y, GRAVITY, JUMP_SPEED, PLAYER_HEIGHT, PLAYER_RADIUS } from '../config.js';
+import { clamp } from '../utils.js';
 
 const MAX_STEP_UP = 0.9;
 const FLOOR_SNAP_DOWN = 1.15;
@@ -128,6 +128,69 @@ export class CollisionSystem {
     this.resolve(position, null, 0);
     position.z += movement.z;
     return this.resolve(position, velocity, dt);
+  }
+
+  horizontalClearance(position, direction, distance) {
+    if (distance <= 0 || direction.lengthSq() < 0.0001) {
+      return 1;
+    }
+
+    const normalized = direction.clone().setY(0).normalize();
+    const sampleCount = Math.max(2, Math.ceil(distance / 0.45));
+    for (let sample = 1; sample <= sampleCount; sample += 1) {
+      const progress = sample / sampleCount;
+      const probeX = position.x + normalized.x * distance * progress;
+      const probeZ = position.z + normalized.z * distance * progress;
+      if (this.blocksHorizontalPosition(position, probeX, probeZ)) {
+        return Math.max(0, (sample - 1) / sampleCount);
+      }
+    }
+    return 1;
+  }
+
+  blocksHorizontalPosition(position, probeX, probeZ) {
+    if (Math.abs(probeX) > ARENA_LIMIT || Math.abs(probeZ) > ARENA_LIMIT) {
+      return true;
+    }
+
+    return this.blocks.some((block) => {
+      const insideX = Math.abs(probeX - block.x) < block.w / 2 + PLAYER_RADIUS;
+      const insideZ = Math.abs(probeZ - block.z) < block.d / 2 + PLAYER_RADIUS;
+      if (!insideX || !insideZ) {
+        return false;
+      }
+
+      const blockTop = block.y + block.h / 2 + PLAYER_RADIUS;
+      const blockBottom = block.y - block.h / 2;
+      const verticalGap = blockTop - position.y;
+      const canStepOnto = this.isWalkableTop(block)
+        && verticalGap <= MAX_STEP_UP
+        && verticalGap >= -FLOOR_SNAP_DOWN;
+      if (canStepOnto) {
+        return false;
+      }
+      if (this.isFloorLike(block) && (verticalGap > MAX_STEP_UP || verticalGap < -FLOOR_SNAP_DOWN)) {
+        return false;
+      }
+      return position.y <= blockTop + PLAYER_HEIGHT
+        && position.y >= blockBottom - PLAYER_RADIUS;
+    });
+  }
+
+  hasJumpableObstacleAhead(position, direction, distance) {
+    const probeX = position.x + direction.x * distance;
+    const probeZ = position.z + direction.z * distance;
+    return this.blocks.some((block) => {
+      const insideX = Math.abs(probeX - block.x) < block.w / 2 + PLAYER_RADIUS;
+      const insideZ = Math.abs(probeZ - block.z) < block.d / 2 + PLAYER_RADIUS;
+      if (!insideX || !insideZ || !this.isWalkableTop(block)) {
+        return false;
+      }
+
+      const blockTop = block.y + block.h / 2 + PLAYER_RADIUS;
+      const climbHeight = blockTop - position.y;
+      return climbHeight > MAX_STEP_UP && climbHeight <= 2.8;
+    });
   }
 
   jump(player) {

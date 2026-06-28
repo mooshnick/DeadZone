@@ -13,7 +13,7 @@ import java.util.List;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
-    Optional<User> findByEmail(String email);
+    List<User> findAllByEmailIgnoreCaseOrderByIdAsc(String email);
 
     List<User> findTop10ByUsernameContainingIgnoreCaseOrderByUsernameAsc(String username);
 

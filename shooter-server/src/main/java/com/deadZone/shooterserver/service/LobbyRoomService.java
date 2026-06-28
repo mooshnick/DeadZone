@@ -2,6 +2,7 @@ package com.deadZone.shooterserver.service;
 
 import com.deadZone.shooterserver.dto.CreateRoomRequest;
 import com.deadZone.shooterserver.dto.LobbyRoomResponse;
+import com.deadZone.shooterserver.game.GameConstants;
 import com.deadZone.shooterserver.model.LobbyRoom;
 import com.deadZone.shooterserver.repository.LobbyRoomRepository;
 import org.springframework.http.HttpStatus;
@@ -55,8 +56,8 @@ public class LobbyRoomService {
         String mapId = request == null || !MAP_IDS.contains(request.mapId()) ? "foundry" : request.mapId();
         String gameMode = request == null || !GAME_MODES.contains(request.gameMode()) ? "team-deathmatch" : request.gameMode();
         int maxPlayers = request == null || request.maxPlayers() == null
-                ? 6
-                : Math.max(2, Math.min(6, request.maxPlayers()));
+                ? GameConstants.MAX_PLAYERS_PER_ROOM
+                : Math.max(2, Math.min(GameConstants.MAX_PLAYERS_PER_ROOM, request.maxPlayers()));
         boolean allowBots = request == null || request.allowBots() == null || request.allowBots();
         int scoreLimit = validScoreLimit(gameMode, request == null ? null : request.scoreLimit());
         int timeLimitMinutes = Math.max(5, Math.min(20, request == null || request.timeLimitMinutes() == null ? 20 : request.timeLimitMinutes()));
@@ -139,8 +140,8 @@ public class LobbyRoomService {
     }
 
     private synchronized void ensurePermanentRooms() {
-        seed(new LobbyRoom("TEAM01", "Frontline Teams", "foundry", "team-deathmatch", 30, 20, 0, 6, 0, 0, true, true), true);
-        seed(new LobbyRoom("FFA001", "Solo Mayhem", "apocalyptic", "free-for-all", 25, 20, 0, 6, 0, 0, true, true), true);
+        seed(new LobbyRoom("TEAM01", "Frontline Teams", "foundry", "team-deathmatch", 30, 20, 0, GameConstants.MAX_PLAYERS_PER_ROOM, 0, 0, true, true), true);
+        seed(new LobbyRoom("FFA001", "Solo Mayhem", "apocalyptic", "free-for-all", 25, 20, 0, GameConstants.MAX_PLAYERS_PER_ROOM, 0, 0, true, true), true);
         seed(randomPermanentRoom(), false);
     }
 
@@ -148,7 +149,7 @@ public class LobbyRoomService {
         List<String> modes = List.of("capture-flag", "attack-defend", "circle-control");
         String mode = modes.get(random.nextInt(modes.size()));
         String map = MAP_IDS.get(random.nextInt(MAP_IDS.size()));
-        return new LobbyRoom("RANDOM", "Random Objective", map, mode, validScoreLimit(mode, null), 20, 0, 6, 0, 0, true, true);
+        return new LobbyRoom("RANDOM", "Random Objective", map, mode, validScoreLimit(mode, null), 20, 0, GameConstants.MAX_PLAYERS_PER_ROOM, 0, 0, true, true);
     }
 
     private void seed(LobbyRoom room, boolean syncConfiguration) {

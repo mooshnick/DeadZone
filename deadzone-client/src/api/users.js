@@ -3,6 +3,7 @@ import { apiBase } from './config';
 const API_BASE = apiBase('/api/users');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
+export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 function token() {
   return localStorage.getItem(sessionTokenKey);
@@ -21,7 +22,7 @@ async function request(path, options = {}) {
       },
     });
   } catch (error) {
-    throw new Error(`Cannot reach the server at ${API_BASE}. Start the backend on port 8080 and try again.`);
+    throw new Error(`Cannot reach the server at ${API_BASE}. Start the backend on port 8080 and try again.`, { cause: error });
   }
 
   if (!response.ok) {
@@ -49,10 +50,18 @@ function storeSession(response) {
     throw new Error('The server returned an invalid login response.');
   }
 
-  if (response?.token) {
+  if (!response?.token && !response?.legacySession) {
+    clearSession();
+    return {
+      ...user,
+      verificationEmailSent: Boolean(response?.verificationEmailSent),
+    };
+  }
+
+  if (response.token) {
     localStorage.setItem(sessionTokenKey, response.token);
     localStorage.removeItem(legacyUserIdKey);
-  } else if (response?.legacySession && user.id != null) {
+  } else if (response.legacySession && user.id != null) {
     localStorage.setItem(legacyUserIdKey, String(user.id));
     localStorage.removeItem(sessionTokenKey);
   }
@@ -74,6 +83,14 @@ export function loginUser(username, password) {
   return request('/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
+  }).then(storeSession);
+}
+
+export function loginWithGoogle(idToken) {
+  return request('/google-login', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
+    skipAuth: true,
   }).then(storeSession);
 }
 

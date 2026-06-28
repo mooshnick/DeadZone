@@ -1,4 +1,4 @@
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 10;
 export const BOT_NAMES = ['Byte', 'Nova', 'Rift', 'Vex', 'Echo'];
 export const PLAYER_RADIUS = 1.15;
 export const ARENA_LIMIT = 66;

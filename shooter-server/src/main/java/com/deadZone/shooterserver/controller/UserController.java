@@ -1,6 +1,7 @@
 package com.deadZone.shooterserver.controller;
 
 import com.deadZone.shooterserver.dto.AuthResponse;
+import com.deadZone.shooterserver.dto.GoogleLoginRequest;
 import com.deadZone.shooterserver.dto.LoginRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.dto.RegisterRequest;
@@ -38,6 +39,11 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(userService.login(request));
+    }
+
+    @PostMapping("/google-login")
+    public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleLoginRequest request) {
+        return ResponseEntity.ok(userService.googleLogin(request));
     }
 
     @PostMapping("/verify-email")

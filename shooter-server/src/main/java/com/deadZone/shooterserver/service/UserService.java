@@ -1,6 +1,7 @@
 package com.deadZone.shooterserver.service;
 
 import com.deadZone.shooterserver.dto.AuthResponse;
+import com.deadZone.shooterserver.dto.GoogleLoginRequest;
 import com.deadZone.shooterserver.dto.LoginRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.dto.RegisterRequest;
@@ -11,10 +12,17 @@ import com.deadZone.shooterserver.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,6 +31,7 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +42,8 @@ public class UserService {
     private final EmailVerificationService emailVerificationService;
     private final ObjectMapper objectMapper;
     private final StoreCatalog storeCatalog;
+    private final HttpClient httpClient;
+    private final String googleClientId;
 
     public UserService(
             UserRepository userRepository,
@@ -40,7 +51,8 @@ public class UserService {
             JwtService jwtService,
             EmailVerificationService emailVerificationService,
             ObjectMapper objectMapper,
-            StoreCatalog storeCatalog
+            StoreCatalog storeCatalog,
+            @Value("${deadzone.google.client-id:}") String googleClientId
     ) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
@@ -48,6 +60,8 @@ public class UserService {
         this.emailVerificationService = emailVerificationService;
         this.objectMapper = objectMapper;
         this.storeCatalog = storeCatalog;
+        this.httpClient = HttpClient.newHttpClient();
+        this.googleClientId = googleClientId == null ? "" : googleClientId.trim();
     }
 
     @Transactional
@@ -85,6 +99,21 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before logging in. We sent you a new 6-digit code.");
         }
         upgradePasswordHashIfNeeded(user, request.password());
+        return authResponse(user);
+    }
+
+    @Transactional
+    public AuthResponse googleLogin(GoogleLoginRequest request) {
+        GoogleProfile profile = verifyGoogleToken(request);
+        User user = userRepository.findAllByEmailIgnoreCaseOrderByIdAsc(profile.email()).stream()
+                .findFirst()
+                .orElseGet(() -> new User(uniqueGoogleUsername(profile), profile.email(), passwordService.hash(UUID.randomUUID().toString())));
+        user.setEmail(profile.email());
+        user.setEmailVerified(true);
+        if (user.getEmailVerifiedAt() == null) {
+            user.setEmailVerifiedAt(Instant.now());
+        }
+        user = repairUserDefaults(userRepository.save(user));
         return authResponse(user);
     }
 
@@ -300,6 +329,62 @@ public class UserService {
         }
     }
 
+    private GoogleProfile verifyGoogleToken(GoogleLoginRequest request) {
+        if (googleClientId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google login is not configured on the server.");
+        }
+        if (request == null || request.idToken() == null || request.idToken().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Google token is required.");
+        }
+        try {
+            String url = "https://oauth2.googleapis.com/tokeninfo?id_token="
+                    + URLEncoder.encode(request.idToken().trim(), StandardCharsets.UTF_8);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google login token is invalid.");
+            }
+            JsonNode root = objectMapper.readTree(response.body());
+            String audience = root.path("aud").asText("");
+            String email = root.path("email").asText("").trim().toLowerCase();
+            boolean emailVerified = root.path("email_verified").asBoolean("true".equalsIgnoreCase(root.path("email_verified").asText("")));
+            if (!googleClientId.equals(audience) || email.isBlank() || !emailVerified) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google account could not be verified.");
+            }
+            return new GoogleProfile(email, root.path("name").asText(""), root.path("given_name").asText(""));
+        } catch (ResponseStatusException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not verify Google login right now.");
+        }
+    }
+
+    private String uniqueGoogleUsername(GoogleProfile profile) {
+        String base = profile.givenName().isBlank() ? profile.name() : profile.givenName();
+        if (base.isBlank()) {
+            base = profile.email().split("@", 2)[0];
+        }
+        base = base.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-+|-+$)", "");
+        if (base.isBlank()) {
+            base = "google-player";
+        }
+        base = base.length() > 24 ? base.substring(0, 24) : base;
+        String candidate = base;
+        int suffix = 2;
+        while (userRepository.findByUsername(candidate).isPresent()) {
+            String ending = "-" + suffix;
+            int maxBase = Math.min(base.length(), 32 - ending.length());
+            candidate = base.substring(0, maxBase) + ending;
+            suffix += 1;
+        }
+        return candidate;
+    }
+
     private AuthResponse authResponse(User user) {
         return new AuthResponse(jwtService.createToken(user.getId(), user.getUsername()), UserResponse.from(user), false);
     }
@@ -447,4 +532,6 @@ public class UserService {
         });
         return values;
     }
+
+    private record GoogleProfile(String email, String name, String givenName) {}
 }

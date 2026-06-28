@@ -38,4 +38,29 @@ class LobbyRoomServiceTests {
         assertThat(room.scoreLimit()).isEqualTo(9);
         assertThat(room.timeLimitMinutes()).isEqualTo(15);
     }
+
+    @Test
+    void createAllowsUpToTenPlayersAndClampsHigherValues() {
+        var tenPlayerRoom = service.create(new CreateRoomRequest(
+                "Ten Player Room",
+                "foundry",
+                "team-deathmatch",
+                10,
+                true,
+                30,
+                20
+        ));
+        var clampedRoom = service.create(new CreateRoomRequest(
+                "Oversized Room",
+                "foundry",
+                "team-deathmatch",
+                15,
+                true,
+                30,
+                20
+        ));
+
+        assertThat(tenPlayerRoom.maxPlayers()).isEqualTo(10);
+        assertThat(clampedRoom.maxPlayers()).isEqualTo(10);
+    }
 }

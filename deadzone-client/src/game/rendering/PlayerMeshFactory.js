@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ACCESSORIES, OUTFITS, PLAYER_RADIUS, WEAPON_SKINS } from '../config';
-import { NameSpriteFactory } from './NameSpriteFactory';
+import { ACCESSORIES, OUTFITS, PLAYER_RADIUS, WEAPON_SKINS } from '../config.js';
+import { NameSpriteFactory } from './NameSpriteFactory.js';
 
 export class PlayerMeshFactory {
   constructor(localId) {
@@ -27,6 +27,8 @@ export class PlayerMeshFactory {
 
     const weaponSkin = WEAPON_SKINS.find((item) => item.id === player.weaponSkinId) || WEAPON_SKINS[0];
     const weapon = this.createWeapon(player.weaponId, weaponSkin.color || outfit.trim);
+    player.weaponModel = weapon;
+    player.weaponMuzzle = weapon.userData.muzzle;
     const healthBar = this.createHealthBar(player);
     const accessories = this.createAccessories(player.accessoryIds || []);
 
@@ -84,7 +86,7 @@ export class PlayerMeshFactory {
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 0.68), dark);
       stock.position.z = 0.92;
       group.add(receiver, barrel, muzzle, scope, stock);
-      return group;
+      return this.attachMuzzle(group, [0, 0, -3.15]);
     }
 
     if (weaponId === 'shotgun') {
@@ -102,7 +104,7 @@ export class PlayerMeshFactory {
       grip.rotation.x = -0.35;
       grip.position.set(0, -0.35, 0.32);
       group.add(body, leftBarrel, rightBarrel, pump, grip);
-      return group;
+      return this.attachMuzzle(group, [0, 0.08, -1.58]);
     }
 
     if (weaponId === 'smg') {
@@ -117,7 +119,7 @@ export class PlayerMeshFactory {
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.45), dark);
       stock.position.z = 0.58;
       group.add(body, shortBarrel, mag, stock);
-      return group;
+      return this.attachMuzzle(group, [0, 0, -1.12]);
     }
 
     if (weaponId === 'blaster') {
@@ -131,7 +133,7 @@ export class PlayerMeshFactory {
       const ringB = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.03, 10, 24), dark);
       ringB.position.z = -1.18;
       group.add(core, barrel, ringA, ringB);
-      return group;
+      return this.attachMuzzle(group, [0, 0, -1.42]);
     }
 
     if (weaponId === 'rpg') {
@@ -148,7 +150,7 @@ export class PlayerMeshFactory {
       const sight = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.46), dark);
       sight.position.set(0, 0.42, -0.2);
       group.add(tube, rear, cone, handle, sight);
-      return group;
+      return this.attachMuzzle(group, [0, 0, -1.94]);
     }
 
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.34, 1.45), material);
@@ -164,6 +166,15 @@ export class PlayerMeshFactory {
     const sight = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.36), dark);
     sight.position.set(0, 0.28, -0.36);
     group.add(body, barrel, magazine, stock, sight);
+    return this.attachMuzzle(group, [0, 0, -1.62]);
+  }
+
+  attachMuzzle(group, [x, y, z]) {
+    const muzzle = new THREE.Object3D();
+    muzzle.name = 'weapon-muzzle';
+    muzzle.position.set(x, y, z);
+    group.add(muzzle);
+    group.userData.muzzle = muzzle;
     return group;
   }
 

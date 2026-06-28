@@ -343,6 +343,33 @@
   justify-content: center;
 }
 
+.auth-choice .google-login,
+.auth-choice .google-login-hint {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+.google-login {
+  display: grid;
+  justify-content: center;
+  margin-top: 4px;
+  min-height: 44px;
+}
+
+.google-login.compact {
+  margin-top: 2px;
+}
+
+.google-login-hint {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 194, 71, 0.32);
+  border-radius: 6px;
+  color: #ffc247;
+  background: rgba(11, 15, 22, 0.72);
+  text-align: center;
+}
+
 .primary-command,
 .secondary-command,
 .logout-command,
@@ -2718,6 +2745,255 @@ button {
   transition: width 70ms linear;
 }
 
+.mobile-touch-layer {
+  position: fixed;
+  z-index: 18;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.mobile-look-pad {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mobile-joystick {
+  position: absolute;
+  z-index: 3;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: max(96px, calc(env(safe-area-inset-bottom) + 78px));
+  display: grid;
+  width: 132px;
+  height: 132px;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mobile-joystick-ring,
+.mobile-joystick-thumb {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.mobile-joystick-ring {
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background:
+    radial-gradient(circle, rgba(255, 194, 71, 0.12), transparent 62%),
+    rgba(7, 14, 24, 0.48);
+  box-shadow: inset 0 0 24px rgba(83, 216, 255, 0.14), 0 12px 30px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-joystick-thumb {
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  background: linear-gradient(180deg, rgba(255, 194, 71, 0.96), rgba(245, 122, 36, 0.92));
+  box-shadow: 0 0 18px rgba(255, 194, 71, 0.42), 0 8px 18px rgba(0, 0, 0, 0.34);
+  transition: transform 80ms linear;
+}
+
+.mobile-joystick-thumb.active {
+  transition: none;
+}
+
+.mobile-joystick.disabled,
+.mobile-action-pad button:disabled {
+  opacity: 0.42;
+}
+
+.mobile-action-pad {
+  position: absolute;
+  z-index: 4;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+  display: grid;
+  grid-template-columns: 74px 74px;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.mobile-action {
+  display: grid;
+  min-width: 0;
+  width: 74px;
+  height: 62px;
+  padding: 0 8px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #f3f7ff;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  background: rgba(14, 24, 38, 0.68);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+  touch-action: none;
+}
+
+.mobile-action--shoot {
+  grid-row: span 2;
+  width: 92px;
+  height: 134px;
+  color: #101318;
+  font-size: 13px;
+  background: linear-gradient(180deg, #ffc247, #ff8b2e);
+  box-shadow: 0 0 24px rgba(255, 194, 71, 0.32), 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-action:active {
+  transform: scale(0.96);
+}
+
+.mobile-grenade-power {
+  position: absolute;
+  z-index: 5;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(236px, calc(env(safe-area-inset-bottom) + 218px));
+  display: grid;
+  gap: 5px;
+  width: 132px;
+  pointer-events: none;
+}
+
+.mobile-grenade-power span {
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 950;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  text-transform: uppercase;
+}
+
+.mobile-grenade-power i {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(7, 14, 24, 0.7);
+}
+
+.mobile-grenade-power b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #53d8ff, #4cff91 72%, #ffc247 92%);
+}
+
+@media (pointer: coarse) {
+  .mobile-touch-layer {
+    display: block;
+  }
+
+  .world-canvas {
+    cursor: default;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 820px) {
+  .hud {
+    top: max(8px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    width: calc(100% - 16px);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .hud-brand-block {
+    gap: 8px;
+  }
+
+  .hud-game-logo {
+    width: 82px;
+    height: 32px;
+  }
+
+  .hud-brand-block small,
+  .match-rules-status {
+    display: none;
+  }
+
+  .scoreboard {
+    font-size: 18px;
+  }
+
+  .pause-match {
+    top: max(70px, calc(env(safe-area-inset-top) + 58px));
+    right: max(10px, env(safe-area-inset-right));
+  }
+
+  .match-panel:not(.compact) {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100% - 16px);
+    padding: 8px;
+  }
+
+  .combat-readout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .combat-readout .weapon-card,
+  .combat-readout .wallet-card,
+  .feed {
+    display: none;
+  }
+
+  .readout-card {
+    min-height: 48px;
+    padding: 7px 8px;
+  }
+
+  .ammo-card strong,
+  .health-card strong,
+  .grenade-card strong {
+    font-size: 22px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 700px) and (orientation: portrait) {
+  .mobile-joystick {
+    bottom: max(132px, calc(env(safe-area-inset-bottom) + 112px));
+    width: 118px;
+    height: 118px;
+  }
+
+  .mobile-joystick-thumb {
+    width: 52px;
+    height: 52px;
+  }
+
+  .mobile-action-pad {
+    bottom: max(126px, calc(env(safe-area-inset-bottom) + 106px));
+    grid-template-columns: 66px 66px;
+  }
+
+  .mobile-action {
+    width: 66px;
+    height: 56px;
+    font-size: 10px;
+  }
+
+  .mobile-action--shoot {
+    width: 82px;
+    height: 122px;
+  }
+}
+
 .scoreboard-overlay {
   position: fixed;
   z-index: 16;
@@ -2976,6 +3252,38 @@ button {
   color: #c8d4e3;
   font-size: 13px;
   font-weight: 900;
+}
+
+.kill-cam-countdown {
+  display: grid;
+  grid-template-columns: 52px auto;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  margin: 5px auto 0;
+  padding: 7px 13px 7px 7px;
+  border: 1px solid rgba(255, 194, 71, 0.38);
+  border-radius: 7px;
+  background: rgba(1, 5, 10, 0.7);
+}
+
+.kill-cam-countdown b {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid #ffc247;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1;
+  box-shadow: inset 0 0 14px rgba(255, 194, 71, 0.2);
+}
+
+.kill-cam-countdown small {
+  color: #ffd982;
+  font-size: 11px;
+  letter-spacing: 0;
 }
 
 .death-screen {

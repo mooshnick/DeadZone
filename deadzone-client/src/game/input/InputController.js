@@ -1,11 +1,12 @@
 export class InputController {
-  constructor({ canvas, keys, mouse, onLook, onFire, onScopeChange }) {
+  constructor({ canvas, keys, mouse, onLook, onFire, onScopeChange, canCapturePointer }) {
     this.canvas = canvas;
     this.keys = keys;
     this.mouse = mouse;
     this.onLook = onLook;
     this.onFire = onFire;
     this.onScopeChange = onScopeChange;
+    this.canCapturePointer = canCapturePointer;
 
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -39,6 +40,10 @@ export class InputController {
 
   handleMouseDown(event) {
     event.preventDefault();
+    if (this.canCapturePointer && !this.canCapturePointer()) {
+      this.mouse.current.down = false;
+      return;
+    }
     const pointerLockRequest = this.canvas.requestPointerLock?.();
     pointerLockRequest?.catch?.(() => {});
 

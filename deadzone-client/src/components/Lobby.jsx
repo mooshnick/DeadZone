@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
+import { googleClientId } from '../api/users';
 import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
 
@@ -32,7 +33,7 @@ export function Lobby(props) {
   return <MainMenu {...props} />;
 }
 
-function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, setAuthMode, setCredentials }) {
+function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, handleGoogleLogin, setAuthMode, setCredentials }) {
   const mode = authMode || null;
   const outfit = OUTFITS[0];
 
@@ -49,6 +50,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
           <div className="auth-choice">
             <button className="primary-command" onClick={() => setAuthMode('login')}>Login</button>
             <button className="secondary-command" onClick={() => setAuthMode('register')}>Register</button>
+            <GoogleSignInButton onLogin={handleGoogleLogin} />
           </div>
         )}
 
@@ -125,10 +127,79 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             <button className="primary-command" type="submit">
               {mode === 'login' ? 'Login' : mode === 'verify' ? 'Verify Code' : 'Create Account'}
             </button>
+            {mode !== 'verify' && <GoogleSignInButton onLogin={handleGoogleLogin} compact />}
           </form>
         )}
       </section>
     </main>
+  );
+}
+
+function GoogleSignInButton({ compact = false, onLogin }) {
+  const buttonRef = useRef(null);
+  const renderedRef = useRef(false);
+
+  useEffect(() => {
+    if (!googleClientId || renderedRef.current) return undefined;
+
+    let cancelled = false;
+    const renderButton = () => {
+      if (cancelled || renderedRef.current || !buttonRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => onLogin?.(response?.credential),
+      });
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: 'filled_black',
+        size: compact ? 'medium' : 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: compact ? 260 : 320,
+      });
+      renderedRef.current = true;
+    };
+
+    if (window.google?.accounts?.id) {
+      renderButton();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', renderButton, { once: true });
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener('load', renderButton);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.addEventListener('load', renderButton, { once: true });
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.removeEventListener('load', renderButton);
+    };
+  }, [compact, onLogin]);
+
+  if (!googleClientId) {
+    return (
+      <small className="google-login-hint">
+        Google login needs VITE_GOOGLE_CLIENT_ID.
+      </small>
+    );
+  }
+
+  return (
+    <div className={compact ? 'google-login compact' : 'google-login'}>
+      <div ref={buttonRef} />
+    </div>
   );
 }
 
@@ -508,7 +579,6 @@ function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, o
 }
 
 function PlayScreen({
-  accountStatus,
   answerFriendRequest,
   answerRoomInvite,
   createRoom,
@@ -518,6 +588,7 @@ function PlayScreen({
   joinRoomByCode,
   level,
   levelProgress,
+  lobbyStatus,
   mapUnlocked,
   panel,
   roomDraft,
@@ -605,7 +676,7 @@ function PlayScreen({
               </form>
             </>
           )}
-          {accountStatus && <div className="lobby-message">{accountStatus}</div>}
+          {panel !== 'create' && lobbyStatus && <div className="lobby-message">{lobbyStatus}</div>}
           </div>
           <SocialPanel
             answerFriendRequest={answerFriendRequest}
@@ -809,11 +880,11 @@ function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomD
         <input
           type="number"
           min="2"
-          max="6"
+          max="10"
           value={roomDraft.maxPlayers}
           onChange={(event) => setRoomDraft((draft) => ({
             ...draft,
-            maxPlayers: Math.max(2, Math.min(6, Number(event.target.value) || 2)),
+            maxPlayers: Math.max(2, Math.min(10, Number(event.target.value) || 2)),
           }))}
         />
       </label>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoomOnServer, fetchRooms, findRoomByCode, joinRoomOnServer, leaveRoomOnServer } from '../api/rooms';
-import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress, verifyEmail } from '../api/users';
+import { clearSession, hasSession, loadUser, loginUser, loginWithGoogle, registerUser, saveUserProgress, verifyEmail } from '../api/users';
 import {
   acceptFriendRequest,
   acceptRoomInvite,
@@ -197,7 +197,7 @@ export function useDeadzoneController() {
     gameMode: DEFAULT_GAME_MODE,
     scoreLimit: GAME_MODE_RULES[DEFAULT_GAME_MODE].defaultScore,
     timeLimitMinutes: 20,
-    maxPlayers: 6,
+    maxPlayers: 10,
     allowBots: true,
   });
   const [name, setName] = useState('Player ' + makeId().toUpperCase().slice(0, 3));
@@ -210,6 +210,7 @@ export function useDeadzoneController() {
     verificationCode: '',
   });
   const [accountStatus, setAccountStatus] = useState('');
+  const [lobbyStatus, setLobbyStatus] = useState('');
   const [team, setTeam] = useState('blue');
   const [weaponId, setWeaponId] = useState('rifle');
   const [outfitId, setOutfitId] = useState('classic');
@@ -257,7 +258,7 @@ export function useDeadzoneController() {
   const keys = useRef(new Set());
   const mouse = useRef({ down: false });
   const localId = useMemo(() => 'player-' + makeId(), []);
-  const matchConfig = useRef({ name, team, weaponId, mapId: 'foundry', gameMode: DEFAULT_GAME_MODE, maps: MAPS, maxPlayers: 6, outfitId, accessoryIds, weaponSkinId, keybinds, money: wallet });
+  const matchConfig = useRef({ name, team, weaponId, mapId: 'foundry', gameMode: DEFAULT_GAME_MODE, maps: MAPS, maxPlayers: 10, outfitId, accessoryIds, weaponSkinId, keybinds, money: wallet });
 
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) || rooms[0];
   const selectedMap = MAPS.find((map) => map.id === selectedRoom?.mapId) || MAPS[0];
@@ -647,6 +648,23 @@ export function useDeadzoneController() {
     }
   }
 
+  async function handleGoogleLogin(idToken) {
+    if (!idToken) {
+      setAccountStatus('Google login did not return a valid token.');
+      return;
+    }
+    try {
+      const user = await loginWithGoogle(idToken);
+      applyUser(user, 'Logged in with Google.');
+      setCredentials({ username: '', email: '', password: '', confirmPassword: '', verificationCode: '' });
+      setPanel('main');
+      setScreen('lobby');
+      updateRoute(ROUTES.main, true);
+    } catch (error) {
+      setAccountStatus(error.message);
+    }
+  }
+
   function signOut() {
     setAccount(null);
     clearSession();
@@ -678,6 +696,12 @@ export function useDeadzoneController() {
   }
 
   function openPanel(nextPanel, replace = false) {
+    if (nextPanel === 'create' || nextPanel === 'play') {
+      setLobbyStatus('');
+    }
+    if (nextPanel === 'create') {
+      setAccountStatus('');
+    }
     setPanel(nextPanel);
     setScreen('lobby');
     updateRoute(routeForPanel(nextPanel), replace);
@@ -735,6 +759,51 @@ export function useDeadzoneController() {
     saveProgress({ wallet, xp, totalKills, totalAssists, totalDeaths, ownedOutfits, ownedWeaponSkins, ownedGrenadeSkins, ownedAccessories, accessoryIds, weaponUpgrades, outfitId, weaponId: nextWeaponId, weaponSkinId, grenadeSkinId });
   }
 
+  function setVirtualMovement({ x = 0, y = 0 } = {}) {
+    const movementKeys = [
+      keybinds.forward || 'KeyW',
+      keybinds.backward || 'KeyS',
+      keybinds.left || 'KeyA',
+      keybinds.right || 'KeyD',
+    ];
+    movementKeys.forEach((code) => keys.current.delete(code));
+    if (screen !== 'match') return;
+    const threshold = 0.28;
+    if (y < -threshold) keys.current.add(keybinds.forward || 'KeyW');
+    if (y > threshold) keys.current.add(keybinds.backward || 'KeyS');
+    if (x < -threshold) keys.current.add(keybinds.left || 'KeyA');
+    if (x > threshold) keys.current.add(keybinds.right || 'KeyD');
+  }
+
+  function setVirtualShoot(active) {
+    mouse.current.down = Boolean(active && screen === 'match');
+    if (active && screen === 'match') {
+      worldRef.current?.fireLocalWeapon();
+    }
+  }
+
+  function pulseVirtualInteract() {
+    if (screen !== 'match') return;
+    const code = keybinds.interact || 'KeyE';
+    keys.current.add(code);
+    window.setTimeout(() => keys.current.delete(code), 120);
+    worldRef.current?.interactLocal?.();
+  }
+
+  function lookWithTouch(dx, dy) {
+    if (screen !== 'match') return;
+    worldRef.current?.look(dx * 1.15, dy * 1.15);
+  }
+
+  function switchToNextUnlockedWeapon() {
+    const unlockedIds = Object.keys(WEAPONS).filter((id) => weaponUnlocked(WEAPONS[id]));
+    if (unlockedIds.length <= 1) return;
+    const currentIndex = Math.max(0, unlockedIds.indexOf(weaponId));
+    const nextWeaponId = unlockedIds[(currentIndex + 1) % unlockedIds.length];
+    equipWeaponDuringMatch(nextWeaponId);
+    setEvents((items) => [`Switched to ${WEAPONS[nextWeaponId].name}`, ...items].slice(0, 5));
+  }
+
   function autoTeamForRoom(room) {
     if (!room) return 'blue';
     const blue = room.bluePlayers ?? Math.ceil((room.players || 0) / 2);
@@ -787,7 +856,7 @@ export function useDeadzoneController() {
     const roomPayload = {
       name: roomDraft.name.trim() || 'Custom Arena',
       mapId: roomDraft.mapId,
-      maxPlayers: Math.max(2, Math.min(6, Number(roomDraft.maxPlayers) || 6)),
+      maxPlayers: Math.max(2, Math.min(10, Number(roomDraft.maxPlayers) || 10)),
       allowBots: roomDraft.allowBots,
       gameMode: roomDraft.gameMode || DEFAULT_GAME_MODE,
       scoreLimit: roomDraft.scoreLimit,
@@ -799,20 +868,20 @@ export function useDeadzoneController() {
       setSelectedRoomId(room.id);
       setPanel('play');
       updateRoute(ROUTES.play);
-      setAccountStatus(message);
+      setLobbyStatus(message);
     };
 
     try {
       const room = await createRoomOnServer(roomPayload);
       applyCreatedRoom(room, `Room created. Invite code: ${room.id}`);
     } catch (error) {
-      setAccountStatus(`Room was not created: ${error.message}`);
+      setLobbyStatus(`Room was not created: ${error.message}`);
     }
   };
 
   const joinRoomByCode = async (code) => {
     if (!code.trim()) {
-      setAccountStatus('Enter a game code.');
+      setLobbyStatus('Enter a game code.');
       return;
     }
     try {
@@ -820,9 +889,9 @@ export function useDeadzoneController() {
       const normalizedRoom = normalizeRoom(room);
       setRooms((items) => [normalizedRoom, ...items.filter((item) => item.id !== normalizedRoom.id)]);
       setSelectedRoomId(normalizedRoom.id);
-      setAccountStatus(`Room ${normalizedRoom.id} selected.`);
+      setLobbyStatus(`Room ${normalizedRoom.id} selected.`);
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   };
 
@@ -940,7 +1009,7 @@ export function useDeadzoneController() {
   const joinMatch = async () => {
     const room = rooms.find((item) => item.id === selectedRoomId) || rooms[0];
     if (!room) {
-      setAccountStatus('Select or create a room first.');
+      setLobbyStatus('Select or create a room first.');
       return;
     }
     const trimmedName = name.trim() || 'Player';
@@ -951,7 +1020,7 @@ export function useDeadzoneController() {
       joinedRoom = normalizeRoom(await joinRoomOnServer(room.id), room);
       setRooms((items) => items.map((item) => (item.id === joinedRoom.id ? joinedRoom : item)));
     } catch (error) {
-      setAccountStatus(`Could not join room: ${error.message}`);
+      setLobbyStatus(`Could not join room: ${error.message}`);
       return;
     }
     matchConfig.current = {
@@ -1003,7 +1072,7 @@ export function useDeadzoneController() {
     try {
       setPlayerSearchResults(await searchPlayers(username));
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   }
 
@@ -1012,9 +1081,9 @@ export function useDeadzoneController() {
       await sendFriendRequest(username);
       await refreshSocial();
       setPlayerSearchResults([]);
-      setAccountStatus(`Friend request sent to ${username}.`);
+      setLobbyStatus(`Friend request sent to ${username}.`);
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   }
 
@@ -1022,22 +1091,22 @@ export function useDeadzoneController() {
     try {
       await (accept ? acceptFriendRequest(requestId) : declineFriendRequest(requestId));
       await refreshSocial();
-      setAccountStatus(accept ? 'Friend request accepted.' : 'Friend request declined.');
+      setLobbyStatus(accept ? 'Friend request accepted.' : 'Friend request declined.');
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   }
 
   async function inviteFriend(friendId) {
     if (!selectedRoomId) {
-      setAccountStatus('Select or create a room before inviting a friend.');
+      setLobbyStatus('Select or create a room before inviting a friend.');
       return;
     }
     try {
       await inviteFriendToRoom(friendId, selectedRoomId);
-      setAccountStatus('Room invitation sent.');
+      setLobbyStatus('Room invitation sent.');
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   }
 
@@ -1046,7 +1115,7 @@ export function useDeadzoneController() {
       if (!accept) {
         await declineRoomInvite(invitationId);
         await refreshSocial();
-        setAccountStatus('Room invitation declined.');
+        setLobbyStatus('Room invitation declined.');
         return;
       }
       const room = normalizeRoom(await acceptRoomInvite(invitationId));
@@ -1055,9 +1124,9 @@ export function useDeadzoneController() {
       await refreshSocial();
       setPanel('play');
       updateRoute(ROUTES.play);
-      setAccountStatus(`Invitation accepted. Room ${room.id} is selected.`);
+      setLobbyStatus(`Invitation accepted. Room ${room.id} is selected.`);
     } catch (error) {
-      setAccountStatus(error.message);
+      setLobbyStatus(error.message);
     }
   }
 
@@ -1205,6 +1274,7 @@ export function useDeadzoneController() {
       credentials,
       editingKeybind,
       handleAccountAction,
+      handleGoogleLogin,
       joinMatch,
       joinRoomByCode,
       findPlayers,
@@ -1212,6 +1282,7 @@ export function useDeadzoneController() {
       keybinds,
       level,
       levelProgress,
+      lobbyStatus,
       mapUnlocked,
       missionCards,
       claimMissionReward,
@@ -1295,6 +1366,12 @@ export function useDeadzoneController() {
       level,
       levelProgress,
       matchResult,
+      onMobileInteract: pulseVirtualInteract,
+      onMobileLook: lookWithTouch,
+      onMobileMove: setVirtualMovement,
+      onMobileShootEnd: () => setVirtualShoot(false),
+      onMobileShootStart: () => setVirtualShoot(true),
+      onMobileSwitchWeapon: switchToNextUnlockedWeapon,
       showScoreboard,
       worldRef,
     },
