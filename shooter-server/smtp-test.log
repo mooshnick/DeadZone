@@ -1,0 +1,61 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.0)
+
+2026-06-25T13:32:58.113+03:00  INFO 2256 --- [shooter-server] [           main] c.d.s.ShooterServerApplication           : Starting ShooterServerApplication v0.0.1-SNAPSHOT using Java 25.0.1 with PID 2256 (C:\Users\moosh\OneDrive\שולחן העבודה\deadZone\shooter-server\target\shooter-server-0.0.1-SNAPSHOT.jar started by moosh in C:\Users\moosh\OneDrive\שולחן העבודה\deadZone\shooter-server)
+2026-06-25T13:32:58.126+03:00  INFO 2256 --- [shooter-server] [           main] c.d.s.ShooterServerApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-06-25T13:33:00.702+03:00  INFO 2256 --- [shooter-server] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-25T13:33:00.951+03:00  INFO 2256 --- [shooter-server] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 216 ms. Found 6 JPA repository interfaces.
+2026-06-25T13:33:02.889+03:00  INFO 2256 --- [shooter-server] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8081 (http)
+2026-06-25T13:33:02.947+03:00  INFO 2256 --- [shooter-server] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-06-25T13:33:02.948+03:00  INFO 2256 --- [shooter-server] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-06-25T13:33:03.072+03:00  INFO 2256 --- [shooter-server] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 4763 ms
+2026-06-25T13:33:03.911+03:00  INFO 2256 --- [shooter-server] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-06-25T13:33:04.259+03:00  INFO 2256 --- [shooter-server] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.4.1.Final
+2026-06-25T13:33:08.086+03:00  INFO 2256 --- [shooter-server] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-25T13:33:08.504+03:00  INFO 2256 --- [shooter-server] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-25T13:33:13.729+03:00  INFO 2256 --- [shooter-server] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@3d718248
+2026-06-25T13:33:13.749+03:00  INFO 2256 --- [shooter-server] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-25T13:33:14.089+03:00  WARN 2256 --- [shooter-server] [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-06-25T13:33:14.684+03:00  INFO 2256 --- [shooter-server] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 17.6
+	Default catalog/schema: postgres/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-25T13:33:22.873+03:00  INFO 2256 --- [shooter-server] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-25T13:33:23.527+03:00  INFO 2256 --- [shooter-server] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-06-25T13:33:24.077+03:00  INFO 2256 --- [shooter-server] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-06-25T13:33:32.782+03:00  WARN 2256 --- [shooter-server] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-06-25T13:33:32.786+03:00  INFO 2256 --- [shooter-server] [           main] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-06-25T13:33:32.794+03:00  INFO 2256 --- [shooter-server] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-06-25T13:33:32.978+03:00  INFO 2256 --- [shooter-server] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-06-25T13:33:33.097+03:00  INFO 2256 --- [shooter-server] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-06-25T13:33:33.184+03:00 ERROR 2256 --- [shooter-server] [           main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8081 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8081 or configure this application to listen on another port.
+
