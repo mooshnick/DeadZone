@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const JOYSTICK_RADIUS = 56;
 const DEAD_ZONE = 0.18;
+
+function requestMobileFullscreen() {
+  if (document.fullscreenElement) return;
+  document.documentElement.requestFullscreen?.().catch?.(() => {});
+}
 
 function isTouchDevice() {
   if (typeof window === 'undefined') return false;
@@ -15,6 +20,8 @@ export function MobileTouchControls({
   onInteract,
   onLook,
   onMove,
+  onScopeEnd,
+  onScopeStart,
   onShootEnd,
   onShootStart,
   onSwitchWeapon,
@@ -32,6 +39,8 @@ export function MobileTouchControls({
       onInteract,
       onLook,
       onMove,
+      onScopeEnd,
+      onScopeStart,
       onShootEnd,
       onShootStart,
       onSwitchWeapon,
@@ -45,19 +54,43 @@ export function MobileTouchControls({
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  useEffect(() => () => {
-    callbacks.current.onMove?.({ x: 0, y: 0 });
-    callbacks.current.onShootEnd?.();
-  }, []);
-
-  if (!enabled || disabled) return null;
-
-  const resetJoystick = () => {
+  const resetJoystick = useCallback(() => {
     activeStickPointer.current = null;
     joystickOrigin.current = null;
     setStick({ active: false, x: 0, y: 0 });
     callbacks.current.onMove?.({ x: 0, y: 0 });
-  };
+  }, []);
+
+  const resetAllTouches = useCallback(() => {
+    resetJoystick();
+    activeLookPointer.current = null;
+    lastLookPoint.current = null;
+    callbacks.current.onShootEnd?.();
+    callbacks.current.onScopeEnd?.();
+  }, [resetJoystick]);
+
+  useEffect(() => {
+    const clear = () => resetAllTouches();
+    window.addEventListener('blur', clear);
+    window.addEventListener('pagehide', clear);
+    document.addEventListener('visibilitychange', clear);
+    window.addEventListener('pointercancel', clear);
+    return () => {
+      clear();
+      window.removeEventListener('blur', clear);
+      window.removeEventListener('pagehide', clear);
+      document.removeEventListener('visibilitychange', clear);
+      window.removeEventListener('pointercancel', clear);
+    };
+  }, [resetAllTouches]);
+
+  useEffect(() => {
+    if (disabled) {
+      window.setTimeout(resetAllTouches, 0);
+    }
+  }, [disabled, resetAllTouches]);
+
+  if (!enabled || disabled) return null;
 
   const updateJoystick = (event) => {
     if (!joystickOrigin.current) return;
@@ -80,6 +113,7 @@ export function MobileTouchControls({
   const handleJoystickDown = (event) => {
     if (disabled || activeStickPointer.current != null) return;
     event.preventDefault();
+    requestMobileFullscreen();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     activeStickPointer.current = event.pointerId;
     joystickOrigin.current = { x: event.clientX, y: event.clientY };
@@ -101,6 +135,7 @@ export function MobileTouchControls({
   const handleLookDown = (event) => {
     if (disabled || activeLookPointer.current != null) return;
     event.preventDefault();
+    requestMobileFullscreen();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     activeLookPointer.current = event.pointerId;
     lastLookPoint.current = { x: event.clientX, y: event.clientY };
@@ -148,11 +183,27 @@ export function MobileTouchControls({
 
       <section className="mobile-action-pad">
         <button
+          className="mobile-action mobile-action--aim"
+          disabled={disabled}
+          onPointerCancel={() => callbacks.current.onScopeEnd?.()}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            requestMobileFullscreen();
+            callbacks.current.onScopeStart?.();
+          }}
+          onPointerLeave={() => callbacks.current.onScopeEnd?.()}
+          onPointerUp={() => callbacks.current.onScopeEnd?.()}
+          type="button"
+        >
+          Aim
+        </button>
+        <button
           className="mobile-action mobile-action--shoot"
           disabled={disabled}
           onPointerCancel={() => callbacks.current.onShootEnd?.()}
           onPointerDown={(event) => {
             event.preventDefault();
+            requestMobileFullscreen();
             callbacks.current.onShootStart?.();
           }}
           onPointerLeave={() => callbacks.current.onShootEnd?.()}

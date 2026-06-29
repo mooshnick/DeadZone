@@ -3,6 +3,7 @@ import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MatchPauseMenu } from './MatchPauseMenu';
 import { MobileTouchControls } from './MobileTouchControls';
+import { MobileOrientationGate } from './MobileOrientationGate';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 export function MatchHud({
@@ -37,6 +38,8 @@ export function MatchHud({
   onMobileInteract,
   onMobileLook,
   onMobileMove,
+  onMobileScopeEnd,
+  onMobileScopeStart,
   onMobileShootEnd,
   onMobileShootStart,
   onMobileSwitchWeapon,
@@ -112,6 +115,7 @@ export function MatchHud({
         <span />
       </div>
       <div className="crosshair" />
+      <MobileOrientationGate paused={showPauseMenu || deathInfo.isDead || Boolean(matchResult)} />
       <MobileTouchControls
         disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
         grenadeCharge={grenadeCharge}
@@ -119,6 +123,8 @@ export function MatchHud({
         onInteract={onMobileInteract}
         onLook={onMobileLook}
         onMove={onMobileMove}
+        onScopeEnd={onMobileScopeEnd}
+        onScopeStart={onMobileScopeStart}
         onShootEnd={onMobileShootEnd}
         onShootStart={onMobileShootStart}
         onSwitchWeapon={onMobileSwitchWeapon}

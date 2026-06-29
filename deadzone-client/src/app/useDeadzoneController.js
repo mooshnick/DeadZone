@@ -782,6 +782,11 @@ export function useDeadzoneController() {
     }
   }
 
+  function setVirtualScope(active) {
+    if (screen !== 'match') return;
+    worldRef.current?.setScoped(Boolean(active));
+  }
+
   function pulseVirtualInteract() {
     if (screen !== 'match') return;
     const code = keybinds.interact || 'KeyE';
@@ -1369,6 +1374,8 @@ export function useDeadzoneController() {
       onMobileInteract: pulseVirtualInteract,
       onMobileLook: lookWithTouch,
       onMobileMove: setVirtualMovement,
+      onMobileScopeEnd: () => setVirtualScope(false),
+      onMobileScopeStart: () => setVirtualScope(true),
       onMobileShootEnd: () => setVirtualShoot(false),
       onMobileShootStart: () => setVirtualShoot(true),
       onMobileSwitchWeapon: switchToNextUnlockedWeapon,
