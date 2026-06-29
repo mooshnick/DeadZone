@@ -51,7 +51,7 @@ function databaseConfig() {
   const connectionString = parsedUrl.toString();
   const username = env('DB_USERNAME');
   const password = env('DB_PASSWORD');
-  if (username && password && !connectionString.includes('@')) {
+  if (username && password) {
     return {
       connectionString,
       user: username,
