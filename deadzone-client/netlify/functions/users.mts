@@ -48,19 +48,21 @@ function databaseConfig() {
   parsedUrl.searchParams.delete('sslcert');
   parsedUrl.searchParams.delete('sslrootcert');
   parsedUrl.searchParams.delete('sslkey');
-  const connectionString = parsedUrl.toString();
   const username = env('DB_USERNAME');
   const password = env('DB_PASSWORD');
   if (username && password) {
+    parsedUrl.username = username;
+    parsedUrl.password = password;
     return {
-      connectionString,
-      user: username,
-      password,
+      connectionString: parsedUrl.toString(),
       ssl: { rejectUnauthorized: false },
     };
   }
+  if (parsedUrl.username === 'postgres' && parsedUrl.hostname.includes('supabase.com')) {
+    throw new Error('DB_USERNAME and DB_PASSWORD are required for the Supabase pooler.');
+  }
   return {
-    connectionString,
+    connectionString: parsedUrl.toString(),
     ssl: { rejectUnauthorized: false },
   };
 }
