@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 @Service
 public class EmailVerificationService {
@@ -105,20 +107,57 @@ public class EmailVerificationService {
             throw deliveryUnavailable();
         }
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(user.getEmail());
-        message.setSubject(subject);
-        message.setText(text);
         try {
-            sender.send(message);
+            sender.send(message(user.getEmail(), subject, text));
             return true;
         } catch (MailException error) {
+            if (shouldTrySslFallback()) {
+                try {
+                    sslFallbackSender().send(message(user.getEmail(), subject, text));
+                    return true;
+                } catch (MailException fallbackError) {
+                    log.error("Failed to send email verification code to {} via SMTP SSL fallback. host={} port=465 usernameConfigured={} from={} error={}",
+                            user.getEmail(), display(mailHost), isConfigured(mailUsername), display(mailFrom), rootMessage(fallbackError), fallbackError);
+                }
+            }
             String detail = rootMessage(error);
             log.error("Failed to send email verification code to {} via SMTP. host={} port={} usernameConfigured={} from={} error={}",
                     user.getEmail(), display(mailHost), display(mailPort), isConfigured(mailUsername), display(mailFrom), detail, error);
             throw deliveryUnavailable();
         }
+    }
+
+    private SimpleMailMessage message(String to, String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailFrom);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(text);
+        return message;
+    }
+
+    private boolean shouldTrySslFallback() {
+        return mailHost != null
+                && mailHost.equalsIgnoreCase("smtp.gmail.com")
+                && !"465".equals(mailPort)
+                && !mailUsername.isBlank()
+                && !mailPassword.isBlank();
+    }
+
+    private JavaMailSenderImpl sslFallbackSender() {
+        JavaMailSenderImpl sender = new JavaMailSenderImpl();
+        sender.setHost(mailHost);
+        sender.setPort(465);
+        sender.setUsername(mailUsername);
+        sender.setPassword(mailPassword);
+        Properties properties = sender.getJavaMailProperties();
+        properties.put("mail.smtp.auth", "true");
+        properties.put("mail.smtp.ssl.enable", "true");
+        properties.put("mail.smtp.starttls.enable", "false");
+        properties.put("mail.smtp.connectiontimeout", "12000");
+        properties.put("mail.smtp.timeout", "12000");
+        properties.put("mail.smtp.writetimeout", "12000");
+        return sender;
     }
 
     private boolean sendWithResend(String to, String subject, String text) {
