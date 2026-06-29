@@ -43,7 +43,12 @@ function databaseConfig() {
   if (!rawUrl) {
     throw new Error('Database URL is not configured.');
   }
-  const connectionString = rawUrl.replace(/^jdbc:/, '');
+  const parsedUrl = new URL(rawUrl.replace(/^jdbc:/, ''));
+  parsedUrl.searchParams.delete('sslmode');
+  parsedUrl.searchParams.delete('sslcert');
+  parsedUrl.searchParams.delete('sslrootcert');
+  parsedUrl.searchParams.delete('sslkey');
+  const connectionString = parsedUrl.toString();
   const username = env('DB_USERNAME');
   const password = env('DB_PASSWORD');
   if (username && password && !connectionString.includes('@')) {
