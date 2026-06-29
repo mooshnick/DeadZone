@@ -5,6 +5,8 @@
 
 [build.environment]
   VITE_API_ORIGIN = "https://deadzone-fvcb.onrender.com"
+  VITE_SUPABASE_URL = "https://hrkyzclzsjvbuxfzytxr.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_e1tzjPkYjaO8zIqNV1jIFQ_Ffq_pLXp"
 
 [functions]
   directory = "netlify/functions"

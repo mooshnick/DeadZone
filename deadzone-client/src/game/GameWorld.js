@@ -357,9 +357,50 @@ export class GameWorld {
       this.onEvent?.(message.message || 'Online room error');
       return;
     }
+    if (message.type === 'HIT') {
+      this.applyRealtimeHit(message);
+      return;
+    }
     if (message.type === 'STATE') {
       this.applyRealtimeState(message.players || []);
     }
+  }
+
+  applyRealtimeHit(message) {
+    if (message.playerId !== this.localId) {
+      return;
+    }
+    const target = this.localPlayer();
+    const shooter = this.players.get(message.shooterId);
+    if (!target || target.isDead || this.matchEnded) {
+      return;
+    }
+    const damage = Math.max(1, Math.min(100, Math.round(Number(message.damage) || 0)));
+    if (!target.applyDamage(damage)) {
+      this.onHealthChange?.(Math.round(target.health));
+      return;
+    }
+    const time = nowMs();
+    if (shooter) {
+      target.recordDamage(shooter.id, time);
+      this.localDeathFocus = {
+        killerId: shooter.id,
+        killerName: shooter.name,
+        until: time + 5000,
+      };
+    } else {
+      this.localDeathFocus = null;
+    }
+    target.kill(time);
+    this.onHealthChange?.(0);
+    this.onDeathChange?.({
+      isDead: true,
+      ready: false,
+      seconds: 5,
+      killerName: shooter?.name || 'Enemy',
+      focusSeconds: 5,
+    });
+    this.onEvent?.(`${shooter?.name || 'Enemy'} eliminated you`);
   }
 
   applyRealtimeState(remotePlayers) {
