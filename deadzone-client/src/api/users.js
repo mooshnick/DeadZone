@@ -1,6 +1,6 @@
-import { apiBase } from './config';
+import { sameOriginApiBase } from './config';
 
-const API_BASE = apiBase('/api/users');
+const API_BASE = sameOriginApiBase('/api/users');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';

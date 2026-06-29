@@ -38,6 +38,10 @@ export function apiBase(path) {
   return `${serverOrigin()}${path}`;
 }
 
+export function sameOriginApiBase(path) {
+  return path;
+}
+
 export function gameSocketUrl() {
   const origin = serverOrigin();
   const url = new URL(origin);
