@@ -2,9 +2,10 @@ import { gameSocketUrl, sameOriginApiBase } from '../../api/config';
 import { sessionTokenKey } from '../../api/users';
 
 const SOCKET_SEND_INTERVAL_MS = 50;
-const HTTP_SEND_INTERVAL_MS = 140;
-const HTTP_POLL_INTERVAL_MS = 220;
+const HTTP_SEND_INTERVAL_MS = 80;
+const HTTP_POLL_INTERVAL_MS = 95;
 const SOCKET_FALLBACK_MS = 2200;
+const MAX_REPORTED_SPEED = 34;
 
 export class RealtimeClient {
   constructor({ localId, onEvent, onMessage, roomId }) {
@@ -23,6 +24,8 @@ export class RealtimeClient {
     this.pollInFlight = false;
     this.stateInFlight = false;
     this.pendingState = null;
+    this.lastVelocityPayload = null;
+    this.lastVelocityAt = 0;
   }
 
   connect(joinPayload) {
@@ -81,7 +84,7 @@ export class RealtimeClient {
       return;
     }
     this.lastMoveSentAt = time;
-    this.send({ ...payload, type: 'MOVE' });
+    this.send({ ...this.payloadWithVelocity(payload, time), type: 'MOVE' });
   }
 
   sendHit(payload) {
@@ -110,6 +113,38 @@ export class RealtimeClient {
       playerId: this.localId,
       ...payload,
     }));
+  }
+
+  payloadWithVelocity(payload, time) {
+    const previous = this.lastVelocityPayload;
+    const elapsed = this.lastVelocityAt ? Math.max(0.016, (time - this.lastVelocityAt) / 1000) : 0;
+    let vx = 0;
+    let vy = 0;
+    let vz = 0;
+    if (previous && elapsed > 0) {
+      vx = ((payload.x ?? previous.x ?? 0) - (previous.x ?? 0)) / elapsed;
+      vy = ((payload.y ?? previous.y ?? 0) - (previous.y ?? 0)) / elapsed;
+      vz = ((payload.z ?? previous.z ?? 0) - (previous.z ?? 0)) / elapsed;
+      const horizontalSpeed = Math.hypot(vx, vz);
+      if (horizontalSpeed > MAX_REPORTED_SPEED) {
+        const scale = MAX_REPORTED_SPEED / horizontalSpeed;
+        vx *= scale;
+        vz *= scale;
+      }
+    }
+    this.lastVelocityPayload = {
+      x: payload.x ?? 0,
+      y: payload.y ?? 0,
+      z: payload.z ?? 0,
+    };
+    this.lastVelocityAt = time;
+    return {
+      ...payload,
+      vx,
+      vy,
+      vz,
+      clientSentAt: time,
+    };
   }
 
   startHttpSync(message) {

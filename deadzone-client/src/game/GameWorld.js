@@ -18,10 +18,11 @@ const MIN_LOOK_PITCH = -1.15;
 const MAX_LOOK_PITCH = 1.18;
 const TEAM_MODES = new Set(['team-deathmatch', 'capture-flag', 'attack-defend', 'circle-control']);
 const WIN_BONUS = { score: 75, xp: 100, money: 20 };
-const REMOTE_INTERPOLATION_SPEED = 13;
-const REMOTE_EXTRAPOLATION_MS = 260;
+const REMOTE_INTERPOLATION_SPEED = 10;
+const REMOTE_EXTRAPOLATION_MS = 900;
 const REMOTE_SNAP_DISTANCE = 18;
 const REMOTE_STOP_SPEED = 0.25;
+const REMOTE_MAX_SPEED = 36;
 const OBJECTIVE_REWARDS = {
   flagCapture: { score: 300, xp: 180, money: 30, label: 'flag capture' },
   flagReturn: { score: 120, xp: 75, money: 12, label: 'flag return' },
@@ -426,9 +427,17 @@ export class GameWorld {
       remote.z ?? player.position.z,
     );
     const elapsedSeconds = player.networkUpdatedAt ? Math.max(0.05, (time - player.networkUpdatedAt) / 1000) : 0;
-    const networkVelocity = elapsedSeconds > 0
+    const inferredVelocity = elapsedSeconds > 0
       ? targetPosition.clone().sub(previousNetworkPosition).divideScalar(elapsedSeconds)
       : new THREE.Vector3();
+    const reportedVelocity = new THREE.Vector3(
+      remote.vx ?? inferredVelocity.x,
+      remote.vy ?? inferredVelocity.y,
+      remote.vz ?? inferredVelocity.z,
+    );
+    const networkVelocity = reportedVelocity.length() > REMOTE_MAX_SPEED
+      ? reportedVelocity.setLength(REMOTE_MAX_SPEED)
+      : reportedVelocity;
 
     player.name = remote.name || player.name;
     player.team = remote.team || player.team;
@@ -443,7 +452,7 @@ export class GameWorld {
     player.score = remote.score || 0;
     player.isDead = Boolean(remote.dead) || player.health <= 0;
     player.networkTargetPosition = targetPosition;
-    player.networkVelocity = networkVelocity.length() > 42 ? networkVelocity.setLength(42) : networkVelocity;
+    player.networkVelocity = networkVelocity;
     player.networkUpdatedAt = time;
     player.networkTargetYaw = remote.yaw ?? player.yaw;
     player.networkTargetPitch = remote.pitch ?? player.pitch;
@@ -482,7 +491,11 @@ export class GameWorld {
       const extrapolateSeconds = Math.min(REMOTE_EXTRAPOLATION_MS, sinceUpdate) / 1000;
       const target = player.networkTargetPosition.clone();
       if (player.networkVelocity && player.networkVelocity.length() > REMOTE_STOP_SPEED) {
-        target.add(player.networkVelocity.clone().multiplyScalar(extrapolateSeconds));
+        const velocity = player.networkVelocity.clone();
+        if (sinceUpdate > 550) {
+          velocity.multiplyScalar(Math.max(0.15, 1 - ((sinceUpdate - 550) / 800)));
+        }
+        target.add(velocity.multiplyScalar(extrapolateSeconds));
       }
 
       const distance = player.position.distanceTo(target);
