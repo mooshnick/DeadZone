@@ -2694,6 +2694,18 @@ button {
   font-size: 15px;
 }
 
+.mobile-controls-dialog .primary-command.active {
+  color: #101318;
+  background: #4cff91;
+}
+
+.mobile-controls-hint {
+  color: #aab8c9;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 .health-widget span {
   color: #95ffc0;
   font-size: 10px;
@@ -2888,6 +2900,16 @@ button {
   user-select: none;
 }
 
+.mobile-touch-editing {
+  z-index: 96;
+  background: rgba(3, 7, 12, 0.18);
+  pointer-events: auto;
+}
+
+.mobile-touch-editing .mobile-look-pad {
+  pointer-events: none;
+}
+
 .mobile-look-pad {
   position: absolute;
   inset: 0;
@@ -2907,6 +2929,54 @@ button {
   place-items: center;
   pointer-events: auto;
   touch-action: none;
+}
+
+.mobile-control-free {
+  position: absolute !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) scale(var(--control-size, 1));
+  transform-origin: center;
+}
+
+.mobile-control-free.mobile-joystick {
+  width: 132px;
+  height: 132px;
+}
+
+.mobile-control-free.mobile-action {
+  z-index: 4;
+  pointer-events: auto;
+  width: 74px;
+  height: 58px;
+}
+
+.mobile-control-free.mobile-action--shoot {
+  width: 104px;
+  height: 104px;
+}
+
+.mobile-control-free.editable {
+  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: 4px;
+}
+
+.mobile-control-free.selected {
+  outline: 3px solid rgba(255, 194, 71, 0.9);
+  outline-offset: 5px;
+}
+
+.mobile-joystick.editable em {
+  position: absolute;
+  left: 50%;
+  top: -26px;
+  color: #ffc247;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .mobile-joystick-ring,
@@ -3277,6 +3347,65 @@ button {
     max-height: 42svh;
   }
 
+  .customizer-preview {
+    gap: 8px;
+  }
+
+  .customizer-preview .character-preview-canvas {
+    height: min(240px, 32svh);
+    width: min(260px, 72vw);
+  }
+
+  .store-panel {
+    gap: 10px;
+    max-height: none;
+    padding: 12px;
+    overflow: visible;
+  }
+
+  .store-scroll-area {
+    gap: 14px;
+    max-height: 52svh;
+    padding-right: 4px;
+  }
+
+  .store-section h2 {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .store-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .store-preview {
+    min-height: 82px;
+    padding: 9px;
+    gap: 5px;
+  }
+
+  .store-preview strong {
+    font-size: 13px;
+    line-height: 1.05;
+  }
+
+  .store-preview small {
+    font-size: 9px;
+  }
+
+  .store-visual {
+    width: 72px;
+    height: 42px;
+    transform: scale(0.82);
+    transform-origin: left top;
+  }
+
+  .store-buy {
+    min-height: 30px;
+    font-size: 10px !important;
+  }
+
   .scoreboard-overlay {
     width: calc(100vw - 18px);
     max-height: calc(100svh - 24px);
@@ -3309,19 +3438,24 @@ button {
     padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
-  .death-screen > :not(.death-customizer) {
+  .death-screen > :not(.death-customizer),
+  .pause-screen > * {
     justify-self: center;
+    max-width: 100%;
   }
 
   .death-customizer,
   .pause-customizer {
     width: min(100%, 760px);
-    max-height: none;
+    max-height: calc(100svh - 24px);
     min-height: 0;
     justify-self: center;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .death-customizer-preview .character-preview-canvas {
@@ -3330,6 +3464,8 @@ button {
 
   .death-customizer-scroll {
     max-height: 44svh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

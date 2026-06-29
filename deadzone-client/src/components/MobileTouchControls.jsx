@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const JOYSTICK_RADIUS = 56;
 const DEAD_ZONE = 0.18;
+const CONTROL_LABELS = {
+  aim: 'Aim',
+  grenade: 'Grenade',
+  joystick: 'Move',
+  jump: 'Jump',
+  reload: 'Reload',
+  shoot: 'Shoot',
+};
 
 function requestMobileFullscreen() {
   if (document.fullscreenElement) return;
@@ -14,11 +22,14 @@ function isTouchDevice() {
 }
 
 export function MobileTouchControls({
+  controlConfig,
   disabled = false,
+  editMode = false,
   grenadeCharge = 0,
   grenadeCount = 0,
-  layout = 'default',
-  scale = 1,
+  onControlChange,
+  onSelectControl,
+  selectedControl,
   scoped = false,
   onGrenadeEnd,
   onGrenadeStart,
@@ -39,6 +50,7 @@ export function MobileTouchControls({
   const activeShootPointer = useRef(null);
   const lastLookPoint = useRef(null);
   const lastShootPoint = useRef(null);
+  const editDrag = useRef(null);
 
   useEffect(() => {
     callbacks.current = {
@@ -99,7 +111,50 @@ export function MobileTouchControls({
     }
   }, [disabled, resetAllTouches]);
 
-  if (!enabled || disabled) return null;
+  if (!enabled || (disabled && !editMode)) return null;
+
+  const controlStyle = (id) => {
+    const control = controlConfig?.[id];
+    if (!control) return undefined;
+    return {
+      left: `${control.x}%`,
+      top: `${control.y}%`,
+      '--control-size': control.size || 1,
+    };
+  };
+
+  const updateControlPosition = (id, event) => {
+    const rect = event.currentTarget.closest('.mobile-touch-layer')?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.max(5, Math.min(95, ((event.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(8, Math.min(92, ((event.clientY - rect.top) / rect.height) * 100));
+    onControlChange?.(id, { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) });
+  };
+
+  const beginEditDrag = (id, event) => {
+    if (!editMode) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    editDrag.current = { id, pointerId: event.pointerId };
+    onSelectControl?.(id);
+    updateControlPosition(id, event);
+    return true;
+  };
+
+  const moveEditDrag = (id, event) => {
+    if (!editMode || editDrag.current?.id !== id || editDrag.current?.pointerId !== event.pointerId) return false;
+    event.preventDefault();
+    updateControlPosition(id, event);
+    return true;
+  };
+
+  const endEditDrag = (id, event) => {
+    if (!editMode || editDrag.current?.id !== id || editDrag.current?.pointerId !== event.pointerId) return false;
+    event.preventDefault();
+    editDrag.current = null;
+    return true;
+  };
 
   const updateJoystick = (event) => {
     if (!joystickOrigin.current) return;
@@ -120,6 +175,7 @@ export function MobileTouchControls({
   };
 
   const handleJoystickDown = (event) => {
+    if (beginEditDrag('joystick', event)) return;
     if (disabled || activeStickPointer.current != null) return;
     event.preventDefault();
     requestMobileFullscreen();
@@ -130,12 +186,14 @@ export function MobileTouchControls({
   };
 
   const handleJoystickMove = (event) => {
+    if (moveEditDrag('joystick', event)) return;
     if (event.pointerId !== activeStickPointer.current) return;
     event.preventDefault();
     updateJoystick(event);
   };
 
   const handleJoystickEnd = (event) => {
+    if (endEditDrag('joystick', event)) return;
     if (event.pointerId !== activeStickPointer.current) return;
     event.preventDefault();
     resetJoystick();
@@ -167,6 +225,7 @@ export function MobileTouchControls({
   };
 
   const handleShootDown = (event) => {
+    if (beginEditDrag('shoot', event)) return;
     if (disabled || activeShootPointer.current != null) return;
     event.preventDefault();
     requestMobileFullscreen();
@@ -177,6 +236,7 @@ export function MobileTouchControls({
   };
 
   const handleShootMove = (event) => {
+    if (moveEditDrag('shoot', event)) return;
     if (event.pointerId !== activeShootPointer.current || !lastShootPoint.current) return;
     event.preventDefault();
     const dx = event.clientX - lastShootPoint.current.x;
@@ -186,6 +246,7 @@ export function MobileTouchControls({
   };
 
   const handleShootEnd = (event) => {
+    if (endEditDrag('shoot', event)) return;
     if (event.pointerId !== activeShootPointer.current) return;
     event.preventDefault();
     activeShootPointer.current = null;
@@ -195,9 +256,8 @@ export function MobileTouchControls({
 
   return (
     <div
-      className={`mobile-touch-layer mobile-layout-${layout}`}
+      className={editMode ? 'mobile-touch-layer mobile-touch-editing' : 'mobile-touch-layer'}
       aria-hidden={disabled ? 'true' : 'false'}
-      style={{ '--mobile-control-scale': scale }}
     >
       <div
         className="mobile-look-pad"
@@ -208,12 +268,19 @@ export function MobileTouchControls({
       />
 
       <section
-        className={disabled ? 'mobile-joystick disabled' : 'mobile-joystick'}
+        className={[
+          disabled ? 'mobile-joystick disabled' : 'mobile-joystick',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'joystick' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
         onPointerCancel={handleJoystickEnd}
         onPointerDown={handleJoystickDown}
         onPointerMove={handleJoystickMove}
         onPointerUp={handleJoystickEnd}
+        style={controlStyle('joystick')}
       >
+        {editMode && <em>{CONTROL_LABELS.joystick}</em>}
         <span className="mobile-joystick-ring" />
         <span
           className={stick.active ? 'mobile-joystick-thumb active' : 'mobile-joystick-thumb'}
@@ -221,48 +288,104 @@ export function MobileTouchControls({
         />
       </section>
 
-      <section className="mobile-action-pad">
-        <button
-          className={scoped ? 'mobile-action mobile-action--aim active' : 'mobile-action mobile-action--aim'}
-          disabled={disabled}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            requestMobileFullscreen();
-            callbacks.current.onScopeToggle?.();
-          }}
-          type="button"
-        >
-          Aim
-        </button>
-        <button
-          className="mobile-action mobile-action--shoot"
-          disabled={disabled}
-          onPointerCancel={handleShootEnd}
-          onPointerDown={handleShootDown}
-          onPointerMove={handleShootMove}
-          onPointerUp={handleShootEnd}
-          type="button"
-        >
-          Shoot
-        </button>
-        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onJump?.()} type="button">Jump</button>
-        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onReload?.()} type="button">Reload</button>
-        <button
-          className="mobile-action mobile-action--grenade"
-          disabled={disabled || grenadeCount <= 0}
-          onPointerCancel={() => callbacks.current.onGrenadeEnd?.()}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            requestMobileFullscreen();
-            callbacks.current.onGrenadeStart?.();
-          }}
-          onPointerLeave={() => callbacks.current.onGrenadeEnd?.()}
-          onPointerUp={() => callbacks.current.onGrenadeEnd?.()}
-          type="button"
-        >
-          Grenade
-        </button>
-      </section>
+      <button
+        className={[
+          scoped ? 'mobile-action mobile-action--aim active' : 'mobile-action mobile-action--aim',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'aim' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
+        disabled={disabled && !editMode}
+        onPointerDown={(event) => {
+          if (beginEditDrag('aim', event)) return;
+          event.preventDefault();
+          requestMobileFullscreen();
+          callbacks.current.onScopeToggle?.();
+        }}
+        onPointerMove={(event) => moveEditDrag('aim', event)}
+        onPointerUp={(event) => endEditDrag('aim', event)}
+        style={controlStyle('aim')}
+        type="button"
+      >
+        Aim
+      </button>
+      <button
+        className={[
+          'mobile-action mobile-action--shoot',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'shoot' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
+        disabled={disabled && !editMode}
+        onPointerCancel={handleShootEnd}
+        onPointerDown={handleShootDown}
+        onPointerMove={handleShootMove}
+        onPointerUp={handleShootEnd}
+        style={controlStyle('shoot')}
+        type="button"
+      >
+        Shoot
+      </button>
+      <button
+        className={[
+          'mobile-action',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'jump' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
+        disabled={disabled && !editMode}
+        onClick={() => !editMode && callbacks.current.onJump?.()}
+        onPointerDown={(event) => beginEditDrag('jump', event)}
+        onPointerMove={(event) => moveEditDrag('jump', event)}
+        onPointerUp={(event) => endEditDrag('jump', event)}
+        style={controlStyle('jump')}
+        type="button"
+      >
+        Jump
+      </button>
+      <button
+        className={[
+          'mobile-action',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'reload' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
+        disabled={disabled && !editMode}
+        onClick={() => !editMode && callbacks.current.onReload?.()}
+        onPointerDown={(event) => beginEditDrag('reload', event)}
+        onPointerMove={(event) => moveEditDrag('reload', event)}
+        onPointerUp={(event) => endEditDrag('reload', event)}
+        style={controlStyle('reload')}
+        type="button"
+      >
+        Reload
+      </button>
+      <button
+        className={[
+          'mobile-action mobile-action--grenade',
+          controlConfig ? 'mobile-control-free' : '',
+          editMode ? 'editable' : '',
+          selectedControl === 'grenade' ? 'selected' : '',
+        ].filter(Boolean).join(' ')}
+        disabled={(disabled || grenadeCount <= 0) && !editMode}
+        onPointerCancel={() => callbacks.current.onGrenadeEnd?.()}
+        onPointerDown={(event) => {
+          if (beginEditDrag('grenade', event)) return;
+          event.preventDefault();
+          requestMobileFullscreen();
+          callbacks.current.onGrenadeStart?.();
+        }}
+        onPointerLeave={() => !editMode && callbacks.current.onGrenadeEnd?.()}
+        onPointerMove={(event) => moveEditDrag('grenade', event)}
+        onPointerUp={(event) => {
+          if (endEditDrag('grenade', event)) return;
+          callbacks.current.onGrenadeEnd?.();
+        }}
+        style={controlStyle('grenade')}
+        type="button"
+      >
+        Grenade
+      </button>
 
       {grenadeCount > 0 && grenadeCharge > 0 && (
         <div className="mobile-grenade-power">

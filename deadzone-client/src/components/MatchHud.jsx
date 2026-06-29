@@ -5,6 +5,35 @@ import { MatchPauseMenu } from './MatchPauseMenu';
 import { MobileTouchControls } from './MobileTouchControls';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
+const MOBILE_CONTROL_DEFAULTS = {
+  aim: { x: 76, y: 25, size: 1 },
+  grenade: { x: 76, y: 72, size: 1 },
+  joystick: { x: 14, y: 72, size: 1 },
+  jump: { x: 76, y: 41, size: 1 },
+  reload: { x: 76, y: 56, size: 1 },
+  shoot: { x: 89, y: 49, size: 1 },
+};
+
+const MOBILE_CONTROL_NAMES = {
+  aim: 'Aim',
+  grenade: 'Grenade',
+  joystick: 'Movement',
+  jump: 'Jump',
+  reload: 'Reload',
+  shoot: 'Shoot',
+};
+
+function loadMobileControls() {
+  try {
+    return {
+      ...MOBILE_CONTROL_DEFAULTS,
+      ...(JSON.parse(localStorage.getItem('deadzone-mobile-controls')) || {}),
+    };
+  } catch {
+    return MOBILE_CONTROL_DEFAULTS;
+  }
+}
+
 export function MatchHud({
   activeBuffs,
   ammo,
@@ -55,8 +84,9 @@ export function MatchHud({
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [compactHud, setCompactHud] = useState(false);
   const [showMobileSettings, setShowMobileSettings] = useState(false);
-  const [mobileLayout, setMobileLayout] = useState(() => localStorage.getItem('deadzone-mobile-layout') || 'default');
-  const [mobileScale, setMobileScale] = useState(() => Number(localStorage.getItem('deadzone-mobile-scale') || 1));
+  const [mobileEditMode, setMobileEditMode] = useState(false);
+  const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
+  const [mobileControls, setMobileControls] = useState(loadMobileControls);
   const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
   const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
   const previewAccessories = equippedAccessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
@@ -98,6 +128,7 @@ export function MatchHud({
     onMobileReset?.();
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
+      window.setTimeout(() => onMobileReset?.(), 0);
       setShowDeathCustomizer(false);
     }
   };
@@ -112,14 +143,20 @@ export function MatchHud({
     isScoped ? 'scoped' : '',
     sniperScoped ? 'sniper-scoped' : '',
   ].filter(Boolean).join(' ');
-  const updateMobileLayout = (value) => {
-    setMobileLayout(value);
-    localStorage.setItem('deadzone-mobile-layout', value);
+  const updateMobileControl = (id, patch) => {
+    setMobileControls((current) => {
+      const next = {
+        ...current,
+        [id]: { ...current[id], ...patch },
+      };
+      localStorage.setItem('deadzone-mobile-controls', JSON.stringify(next));
+      return next;
+    });
   };
-  const updateMobileScale = (value) => {
-    const next = Math.max(0.82, Math.min(1.25, Number(value) || 1));
-    setMobileScale(next);
-    localStorage.setItem('deadzone-mobile-scale', String(next));
+  const resetMobileControls = () => {
+    setMobileControls(MOBILE_CONTROL_DEFAULTS);
+    setSelectedMobileControl('shoot');
+    localStorage.setItem('deadzone-mobile-controls', JSON.stringify(MOBILE_CONTROL_DEFAULTS));
   };
 
   useEffect(() => {
@@ -139,10 +176,12 @@ export function MatchHud({
       </div>
       <div className="crosshair" />
       <MobileTouchControls
+        controlConfig={mobileControls}
         disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
+        editMode={showMobileSettings && mobileEditMode}
         grenadeCharge={grenadeCharge}
         grenadeCount={grenadeCount}
-        layout={mobileLayout}
+        onControlChange={updateMobileControl}
         onGrenadeEnd={onMobileGrenadeEnd}
         onGrenadeStart={onMobileGrenadeStart}
         onJump={onMobileJump}
@@ -150,9 +189,10 @@ export function MatchHud({
         onMove={onMobileMove}
         onReload={onMobileReload}
         onScopeToggle={onMobileScopeToggle}
+        onSelectControl={setSelectedMobileControl}
         onShootEnd={onMobileShootEnd}
         onShootStart={onMobileShootStart}
-        scale={mobileScale}
+        selectedControl={selectedMobileControl}
         scoped={isScoped}
       />
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
@@ -406,26 +446,34 @@ export function MatchHud({
               <button type="button" onClick={() => setShowMobileSettings(false)}>Close</button>
             </header>
             <label>
-              Layout
-              <select value={mobileLayout} onChange={(event) => updateMobileLayout(event.target.value)}>
-                <option value="default">Default</option>
-                <option value="low">Low buttons</option>
-                <option value="spread">Wide spacing</option>
+              Control
+              <select value={selectedMobileControl} onChange={(event) => setSelectedMobileControl(event.target.value)}>
+                {Object.entries(MOBILE_CONTROL_NAMES).map(([id, label]) => (
+                  <option value={id} key={id}>{label}</option>
+                ))}
               </select>
             </label>
+            <button
+              className={mobileEditMode ? 'primary-command active' : 'secondary-command'}
+              type="button"
+              onClick={() => setMobileEditMode((value) => !value)}
+            >
+              {mobileEditMode ? 'Dragging enabled' : 'Drag buttons'}
+            </button>
             <label>
-              Button size
+              {MOBILE_CONTROL_NAMES[selectedMobileControl]} size
               <input
-                max="1.25"
-                min="0.82"
-                onChange={(event) => updateMobileScale(event.target.value)}
+                max="1.45"
+                min="0.72"
+                onChange={(event) => updateMobileControl(selectedMobileControl, { size: Math.max(0.72, Math.min(1.45, Number(event.target.value) || 1)) })}
                 step="0.01"
                 type="range"
-                value={mobileScale}
+                value={mobileControls[selectedMobileControl]?.size || 1}
               />
-              <span>{Math.round(mobileScale * 100)}%</span>
+              <span>{Math.round((mobileControls[selectedMobileControl]?.size || 1) * 100)}%</span>
             </label>
-            <button className="secondary-command" type="button" onClick={() => { updateMobileLayout('default'); updateMobileScale(1); }}>
+            <small className="mobile-controls-hint">Open this panel, press "Drag buttons", then drag each control to your favorite spot.</small>
+            <button className="secondary-command" type="button" onClick={resetMobileControls}>
               Reset Layout
             </button>
           </div>
