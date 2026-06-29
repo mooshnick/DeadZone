@@ -3,7 +3,6 @@ import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MatchPauseMenu } from './MatchPauseMenu';
 import { MobileTouchControls } from './MobileTouchControls';
-import { MobileOrientationGate } from './MobileOrientationGate';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 export function MatchHud({
@@ -38,11 +37,10 @@ export function MatchHud({
   onMobileInteract,
   onMobileLook,
   onMobileMove,
-  onMobileScopeEnd,
-  onMobileScopeStart,
+  onMobileReset,
+  onMobileScopeToggle,
   onMobileShootEnd,
   onMobileShootStart,
-  onMobileSwitchWeapon,
   showScoreboard,
   worldRef,
   xp,
@@ -84,10 +82,14 @@ export function MatchHud({
 
   const sniperScoped = isScoped && weaponId === 'sniper';
   const setPaused = (value) => {
+    if (!value) {
+      onMobileReset?.();
+    }
     setShowPauseMenu(value);
     worldRef.current?.setPaused(value);
   };
   const returnToMatch = () => {
+    onMobileReset?.();
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
       setShowDeathCustomizer(false);
@@ -115,7 +117,6 @@ export function MatchHud({
         <span />
       </div>
       <div className="crosshair" />
-      <MobileOrientationGate paused={showPauseMenu || deathInfo.isDead || Boolean(matchResult)} />
       <MobileTouchControls
         disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
         grenadeCharge={grenadeCharge}
@@ -123,11 +124,10 @@ export function MatchHud({
         onInteract={onMobileInteract}
         onLook={onMobileLook}
         onMove={onMobileMove}
-        onScopeEnd={onMobileScopeEnd}
-        onScopeStart={onMobileScopeStart}
+        onScopeToggle={onMobileScopeToggle}
         onShootEnd={onMobileShootEnd}
         onShootStart={onMobileShootStart}
-        onSwitchWeapon={onMobileSwitchWeapon}
+        scoped={isScoped}
       />
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
         <span>{grenadeCharge > 0.82 ? 'Perfect throw' : 'Grenade power'}</span>
@@ -387,9 +387,8 @@ export function MatchHud({
       )}
 
       <aside className={compactHud ? 'compact-combat-widget minimized' : 'compact-combat-widget'}>
-          <span>Ammo / Grenades</span>
           <strong>{ammo.reloading ? `${reloadPercent}%` : `${ammo.ammo}/${ammo.magazineSize}`}</strong>
-          <small>Grenades {grenadeCount}/3</small>
+          <small><span aria-hidden="true">💣</span>{grenadeCount}</small>
       </aside>
 
       <footer className={compactHud ? 'match-panel overlay compact' : 'match-panel overlay'}>

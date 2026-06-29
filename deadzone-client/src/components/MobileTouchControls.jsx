@@ -18,13 +18,12 @@ export function MobileTouchControls({
   grenadeCharge = 0,
   grenadeCount = 0,
   onInteract,
+  scoped = false,
   onLook,
   onMove,
-  onScopeEnd,
-  onScopeStart,
+  onScopeToggle,
   onShootEnd,
   onShootStart,
-  onSwitchWeapon,
 }) {
   const [enabled, setEnabled] = useState(false);
   const [stick, setStick] = useState({ active: false, x: 0, y: 0 });
@@ -39,11 +38,9 @@ export function MobileTouchControls({
       onInteract,
       onLook,
       onMove,
-      onScopeEnd,
-      onScopeStart,
+      onScopeToggle,
       onShootEnd,
       onShootStart,
-      onSwitchWeapon,
     };
   });
 
@@ -66,7 +63,6 @@ export function MobileTouchControls({
     activeLookPointer.current = null;
     lastLookPoint.current = null;
     callbacks.current.onShootEnd?.();
-    callbacks.current.onScopeEnd?.();
   }, [resetJoystick]);
 
   useEffect(() => {
@@ -183,16 +179,13 @@ export function MobileTouchControls({
 
       <section className="mobile-action-pad">
         <button
-          className="mobile-action mobile-action--aim"
+          className={scoped ? 'mobile-action mobile-action--aim active' : 'mobile-action mobile-action--aim'}
           disabled={disabled}
-          onPointerCancel={() => callbacks.current.onScopeEnd?.()}
           onPointerDown={(event) => {
             event.preventDefault();
             requestMobileFullscreen();
-            callbacks.current.onScopeStart?.();
+            callbacks.current.onScopeToggle?.();
           }}
-          onPointerLeave={() => callbacks.current.onScopeEnd?.()}
-          onPointerUp={() => callbacks.current.onScopeEnd?.()}
           type="button"
         >
           Aim
@@ -213,7 +206,6 @@ export function MobileTouchControls({
           Shoot
         </button>
         <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onInteract?.()} type="button">Interact</button>
-        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onSwitchWeapon?.()} type="button">Switch</button>
       </section>
 
       {grenadeCount > 0 && grenadeCharge > 0 && (

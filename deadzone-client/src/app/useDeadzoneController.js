@@ -782,9 +782,18 @@ export function useDeadzoneController() {
     }
   }
 
-  function setVirtualScope(active) {
+  function clearVirtualControls() {
+    setVirtualMovement({ x: 0, y: 0 });
+    mouse.current.down = false;
+    worldRef.current?.setScoped(false);
+    setIsScoped(false);
+  }
+
+  function toggleVirtualScope() {
     if (screen !== 'match') return;
-    worldRef.current?.setScoped(Boolean(active));
+    const next = !isScoped;
+    worldRef.current?.setScoped(next);
+    setIsScoped(next);
   }
 
   function pulseVirtualInteract() {
@@ -798,15 +807,6 @@ export function useDeadzoneController() {
   function lookWithTouch(dx, dy) {
     if (screen !== 'match') return;
     worldRef.current?.look(dx * 1.15, dy * 1.15);
-  }
-
-  function switchToNextUnlockedWeapon() {
-    const unlockedIds = Object.keys(WEAPONS).filter((id) => weaponUnlocked(WEAPONS[id]));
-    if (unlockedIds.length <= 1) return;
-    const currentIndex = Math.max(0, unlockedIds.indexOf(weaponId));
-    const nextWeaponId = unlockedIds[(currentIndex + 1) % unlockedIds.length];
-    equipWeaponDuringMatch(nextWeaponId);
-    setEvents((items) => [`Switched to ${WEAPONS[nextWeaponId].name}`, ...items].slice(0, 5));
   }
 
   function autoTeamForRoom(room) {
@@ -1374,11 +1374,10 @@ export function useDeadzoneController() {
       onMobileInteract: pulseVirtualInteract,
       onMobileLook: lookWithTouch,
       onMobileMove: setVirtualMovement,
-      onMobileScopeEnd: () => setVirtualScope(false),
-      onMobileScopeStart: () => setVirtualScope(true),
+      onMobileReset: clearVirtualControls,
+      onMobileScopeToggle: toggleVirtualScope,
       onMobileShootEnd: () => setVirtualShoot(false),
       onMobileShootStart: () => setVirtualShoot(true),
-      onMobileSwitchWeapon: switchToNextUnlockedWeapon,
       showScoreboard,
       worldRef,
     },

@@ -4,6 +4,7 @@ import { useDeadzoneController } from './app/useDeadzoneController';
 import { Lobby } from './components/Lobby';
 import { LoadingScreen } from './components/LoadingScreen';
 import { MatchHud } from './components/MatchHud';
+import { MobileOrientationGate } from './components/MobileOrientationGate';
 import { apiBase } from './api/config';
 
 const INITIAL_ASSETS = [
@@ -29,9 +30,14 @@ function App() {
     );
   }
 
-  return screen === 'match'
-    ? <MatchHud {...matchProps} />
-    : <Lobby screen={screen} {...lobbyProps} />;
+  return (
+    <>
+      <MobileOrientationGate />
+      {screen === 'match'
+        ? <MatchHud {...matchProps} />
+        : <Lobby screen={screen} {...lobbyProps} />}
+    </>
+  );
 }
 
 export default App;

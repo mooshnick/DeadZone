@@ -6,6 +6,21 @@
     url('/src/assets/hero.png') center / cover;
 }
 
+html:fullscreen,
+html:fullscreen body,
+html:fullscreen #root {
+  width: 100vw;
+  height: 100svh;
+  overflow: hidden;
+  background: #03070c;
+}
+
+html:fullscreen .menu-shell,
+html:fullscreen .game-3d-shell {
+  width: 100vw;
+  height: 100svh;
+}
+
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -2499,10 +2514,15 @@ button {
 .compact-combat-widget strong {
   color: #ffe3a3;
   font-size: 24px;
+  line-height: 1;
 }
 
 .compact-combat-widget small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: #6dff9f;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -2866,6 +2886,12 @@ button {
   box-shadow: 0 0 24px rgba(83, 216, 255, 0.28), 0 12px 28px rgba(0, 0, 0, 0.36);
 }
 
+.mobile-action--aim.active {
+  outline: 3px solid rgba(255, 255, 255, 0.55);
+  background: linear-gradient(180deg, #7cffbf, #48df81);
+  box-shadow: 0 0 28px rgba(76, 255, 145, 0.42), 0 12px 28px rgba(0, 0, 0, 0.36);
+}
+
 .mobile-action--shoot {
   grid-column: 2;
   grid-row: 1 / span 3;
@@ -3177,8 +3203,20 @@ button {
   }
 
   .compact-combat-widget {
-    left: max(12px, env(safe-area-inset-left));
-    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(154px, calc(env(safe-area-inset-left) + 150px));
+    bottom: max(28px, env(safe-area-inset-bottom));
+    min-width: 92px;
+    padding: 9px 10px;
+    text-align: center;
+  }
+
+  .compact-combat-widget strong {
+    font-size: 21px;
+  }
+
+  .compact-combat-widget small {
+    justify-content: center;
+    font-size: 15px;
   }
 
   .mobile-joystick {
