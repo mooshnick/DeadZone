@@ -2598,6 +2598,102 @@ button {
   transform: translateX(-50%);
 }
 
+.mobile-settings-match,
+.mobile-only-command {
+  display: none;
+}
+
+.mobile-settings-match {
+  position: fixed;
+  z-index: 18;
+  right: max(70px, calc(env(safe-area-inset-right) + 64px));
+  top: max(10px, env(safe-area-inset-top));
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: #101318;
+  font-size: 22px;
+  background: linear-gradient(180deg, #53d8ff, #4fb3ff);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+}
+
+.mobile-controls-dialog {
+  position: fixed;
+  z-index: 95;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: #f7fbff;
+  background: rgba(2, 6, 12, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.mobile-controls-dialog > div {
+  display: grid;
+  gap: 14px;
+  width: min(430px, calc(100vw - 28px));
+  max-height: calc(100svh - 28px);
+  padding: 18px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top right, rgba(83, 216, 255, 0.16), transparent 36%),
+    rgba(12, 20, 31, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.mobile-controls-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-controls-dialog header strong {
+  font-size: 24px;
+}
+
+.mobile-controls-dialog header button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  color: #101318;
+  font-weight: 950;
+  background: #ffc247;
+}
+
+.mobile-controls-dialog label {
+  display: grid;
+  gap: 7px;
+  color: #9fb0c7;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.mobile-controls-dialog select,
+.mobile-controls-dialog input[type='range'] {
+  width: 100%;
+}
+
+.mobile-controls-dialog select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: #f7fbff;
+  background: rgba(7, 14, 24, 0.86);
+}
+
+.mobile-controls-dialog label span {
+  color: #ffc247;
+  font-size: 15px;
+}
+
 .health-widget span {
   color: #95ffc0;
   font-size: 10px;
@@ -2853,8 +2949,8 @@ button {
   right: max(18px, env(safe-area-inset-right));
   bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
   display: grid;
-  grid-template-columns: 72px 92px;
-  grid-template-rows: repeat(3, 58px);
+  grid-template-columns: calc(72px * var(--mobile-control-scale, 1)) calc(92px * var(--mobile-control-scale, 1));
+  grid-template-rows: repeat(4, calc(54px * var(--mobile-control-scale, 1)));
   gap: 10px;
   pointer-events: auto;
 }
@@ -2862,8 +2958,8 @@ button {
 .mobile-action {
   display: grid;
   min-width: 0;
-  width: 74px;
-  height: 62px;
+  width: calc(72px * var(--mobile-control-scale, 1));
+  height: calc(54px * var(--mobile-control-scale, 1));
   padding: 0 8px;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -2894,13 +2990,31 @@ button {
 
 .mobile-action--shoot {
   grid-column: 2;
-  grid-row: 1 / span 3;
-  width: 92px;
-  height: 194px;
+  grid-row: 1 / span 4;
+  width: calc(92px * var(--mobile-control-scale, 1));
+  height: calc(246px * var(--mobile-control-scale, 1));
   color: #101318;
   font-size: 13px;
   background: linear-gradient(180deg, #ffc247, #ff8b2e);
   box-shadow: 0 0 24px rgba(255, 194, 71, 0.32), 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-action--grenade {
+  color: #101318;
+  background: linear-gradient(180deg, #ff8a5b, #e24d3e);
+}
+
+.mobile-layout-low .mobile-joystick,
+.mobile-layout-low .mobile-action-pad {
+  bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+.mobile-layout-spread .mobile-joystick {
+  left: max(34px, calc(env(safe-area-inset-left) + 24px));
+}
+
+.mobile-layout-spread .mobile-action-pad {
+  right: max(34px, calc(env(safe-area-inset-right) + 24px));
 }
 
 .mobile-orientation-gate {
@@ -3085,19 +3199,19 @@ button {
 
   .mobile-action-pad {
     bottom: max(126px, calc(env(safe-area-inset-bottom) + 106px));
-    grid-template-columns: 62px 80px;
-    grid-template-rows: repeat(3, 50px);
+    grid-template-columns: calc(62px * var(--mobile-control-scale, 1)) calc(80px * var(--mobile-control-scale, 1));
+    grid-template-rows: repeat(4, calc(48px * var(--mobile-control-scale, 1)));
   }
 
   .mobile-action {
-    width: 62px;
-    height: 50px;
+    width: calc(62px * var(--mobile-control-scale, 1));
+    height: calc(48px * var(--mobile-control-scale, 1));
     font-size: 10px;
   }
 
   .mobile-action--shoot {
-    width: 80px;
-    height: 170px;
+    width: calc(80px * var(--mobile-control-scale, 1));
+    height: calc(222px * var(--mobile-control-scale, 1));
   }
 }
 
@@ -3182,6 +3296,41 @@ button {
   .scoreboard-team article {
     padding: 8px;
   }
+
+  .mobile-settings-match,
+  .mobile-only-command {
+    display: inline-grid;
+  }
+
+  .death-screen,
+  .pause-screen {
+    place-items: stretch;
+    place-content: stretch;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .death-screen > :not(.death-customizer) {
+    justify-self: center;
+  }
+
+  .death-customizer,
+  .pause-customizer {
+    width: min(100%, 760px);
+    max-height: none;
+    min-height: 0;
+    justify-self: center;
+    overflow-y: auto;
+  }
+
+  .death-customizer-preview .character-preview-canvas {
+    min-height: 190px;
+  }
+
+  .death-customizer-scroll {
+    max-height: 44svh;
+  }
 }
 
 @media (pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
@@ -3234,6 +3383,19 @@ button {
   .mobile-action-pad {
     right: max(16px, env(safe-area-inset-right));
     bottom: max(24px, env(safe-area-inset-bottom));
+    grid-template-columns: calc(58px * var(--mobile-control-scale, 1)) calc(82px * var(--mobile-control-scale, 1));
+    grid-template-rows: repeat(4, calc(44px * var(--mobile-control-scale, 1)));
+  }
+
+  .mobile-action {
+    width: calc(58px * var(--mobile-control-scale, 1));
+    height: calc(44px * var(--mobile-control-scale, 1));
+    font-size: 9px;
+  }
+
+  .mobile-action--shoot {
+    width: calc(82px * var(--mobile-control-scale, 1));
+    height: calc(206px * var(--mobile-control-scale, 1));
   }
 
   .grenade-charge-reticle {

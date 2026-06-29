@@ -10,6 +10,7 @@ export function MatchPauseMenu({
                                    grenadeSkinId,
                                    onContinue,
                                    onExit,
+                                   onMobileControls,
                                    onSetTab,
                                    onToggleAccessory,
                                    outfitId,
@@ -116,6 +117,7 @@ export function MatchPauseMenu({
                     </div>
                     <div className="customizer-footer death-customizer-footer pause-menu-actions">
                         <button className="primary-command" onClick={onContinue}>Continue</button>
+                        <button className="secondary-command mobile-only-command" onClick={onMobileControls}>Mobile Controls</button>
                         <button className="danger-command" onClick={onExit}>Exit Match</button>
                     </div>
                 </div>

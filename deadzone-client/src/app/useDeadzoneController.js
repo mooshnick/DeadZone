@@ -784,6 +784,11 @@ export function useDeadzoneController() {
 
   function clearVirtualControls() {
     setVirtualMovement({ x: 0, y: 0 });
+    [
+      keybinds.grenade || 'KeyQ',
+      keybinds.jump || 'Space',
+      keybinds.reload || 'KeyR',
+    ].forEach((code) => keys.current.delete(code));
     mouse.current.down = false;
     worldRef.current?.setScoped(false);
     setIsScoped(false);
@@ -796,12 +801,23 @@ export function useDeadzoneController() {
     setIsScoped(next);
   }
 
-  function pulseVirtualInteract() {
+  function pulseVirtualKey(code, duration = 130) {
     if (screen !== 'match') return;
-    const code = keybinds.interact || 'KeyE';
     keys.current.add(code);
-    window.setTimeout(() => keys.current.delete(code), 120);
-    worldRef.current?.interactLocal?.();
+    window.setTimeout(() => keys.current.delete(code), duration);
+  }
+
+  function setVirtualGrenade(active) {
+    const code = keybinds.grenade || 'KeyQ';
+    if (screen !== 'match') {
+      keys.current.delete(code);
+      return;
+    }
+    if (active) {
+      keys.current.add(code);
+    } else {
+      keys.current.delete(code);
+    }
   }
 
   function lookWithTouch(dx, dy) {
@@ -1371,9 +1387,12 @@ export function useDeadzoneController() {
       level,
       levelProgress,
       matchResult,
-      onMobileInteract: pulseVirtualInteract,
+      onMobileGrenadeEnd: () => setVirtualGrenade(false),
+      onMobileGrenadeStart: () => setVirtualGrenade(true),
+      onMobileJump: () => pulseVirtualKey(keybinds.jump || 'Space'),
       onMobileLook: lookWithTouch,
       onMobileMove: setVirtualMovement,
+      onMobileReload: () => pulseVirtualKey(keybinds.reload || 'KeyR'),
       onMobileReset: clearVirtualControls,
       onMobileScopeToggle: toggleVirtualScope,
       onMobileShootEnd: () => setVirtualShoot(false),

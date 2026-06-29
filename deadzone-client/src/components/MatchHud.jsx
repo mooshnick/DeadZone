@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MatchPauseMenu } from './MatchPauseMenu';
@@ -34,9 +34,12 @@ export function MatchHud({
   level,
   levelProgress,
   matchResult,
-  onMobileInteract,
+  onMobileGrenadeEnd,
+  onMobileGrenadeStart,
+  onMobileJump,
   onMobileLook,
   onMobileMove,
+  onMobileReload,
   onMobileReset,
   onMobileScopeToggle,
   onMobileShootEnd,
@@ -51,6 +54,9 @@ export function MatchHud({
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [compactHud, setCompactHud] = useState(false);
+  const [showMobileSettings, setShowMobileSettings] = useState(false);
+  const [mobileLayout, setMobileLayout] = useState(() => localStorage.getItem('deadzone-mobile-layout') || 'default');
+  const [mobileScale, setMobileScale] = useState(() => Number(localStorage.getItem('deadzone-mobile-scale') || 1));
   const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
   const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
   const previewAccessories = equippedAccessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
@@ -106,6 +112,21 @@ export function MatchHud({
     isScoped ? 'scoped' : '',
     sniperScoped ? 'sniper-scoped' : '',
   ].filter(Boolean).join(' ');
+  const updateMobileLayout = (value) => {
+    setMobileLayout(value);
+    localStorage.setItem('deadzone-mobile-layout', value);
+  };
+  const updateMobileScale = (value) => {
+    const next = Math.max(0.82, Math.min(1.25, Number(value) || 1));
+    setMobileScale(next);
+    localStorage.setItem('deadzone-mobile-scale', String(next));
+  };
+
+  useEffect(() => {
+    if (deathInfo.isDead || showPauseMenu || matchResult) {
+      onMobileReset?.();
+    }
+  }, [deathInfo.isDead, matchResult, onMobileReset, showPauseMenu]);
 
   return (
     <main className={shellClassName} dir="ltr">
@@ -121,12 +142,17 @@ export function MatchHud({
         disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
         grenadeCharge={grenadeCharge}
         grenadeCount={grenadeCount}
-        onInteract={onMobileInteract}
+        layout={mobileLayout}
+        onGrenadeEnd={onMobileGrenadeEnd}
+        onGrenadeStart={onMobileGrenadeStart}
+        onJump={onMobileJump}
         onLook={onMobileLook}
         onMove={onMobileMove}
+        onReload={onMobileReload}
         onScopeToggle={onMobileScopeToggle}
         onShootEnd={onMobileShootEnd}
         onShootStart={onMobileShootStart}
+        scale={mobileScale}
         scoped={isScoped}
       />
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
@@ -155,14 +181,14 @@ export function MatchHud({
               {deathInfo.killerName && (
                 <em className="killer-focus-label">
                   Killed by {deathInfo.killerName}
-                  {deathInfo.focusSeconds > 0 ? ` · focus ${deathInfo.focusSeconds}s` : ''}
+                  {deathInfo.focusSeconds > 0 ? ` ֲ· focus ${deathInfo.focusSeconds}s` : ''}
                 </em>
               )}
               <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
               <div className="death-player-stats">
                 <div>
                   <span>Cash</span>
-                  <strong>🪙 {wallet}</strong>
+                  <strong>נ×™ {wallet}</strong>
                 </div>
                 <div>
                   <span>Level {level}</span>
@@ -172,6 +198,7 @@ export function MatchHud({
               </div>
               <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>Return to Match</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
+              <button className="ghost-button mobile-only-command" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>Mobile Controls</button>
               <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>Exit to Lobby</button>
             </>
           ) : (
@@ -280,7 +307,7 @@ export function MatchHud({
           <span>{matchResult.localWon ? 'Victory' : matchResult.winner ? 'Match Complete' : 'Draw'}</span>
           <strong>{matchResult.winnerName}</strong>
           <small>{matchResult.reason}</small>
-          {matchResult.localWon && <em>Victory bonus: 🪙 20 +100 XP</em>}
+          {matchResult.localWon && <em>Victory bonus: נ×™ 20 +100 XP</em>}
           <button className="primary-command" onClick={leaveMatch}>Return to Lobby</button>
         </section>
       )}
@@ -295,6 +322,7 @@ export function MatchHud({
             grenadeSkinId={grenadeSkinId}
             onContinue={() => setPaused(false)}
             onExit={() => setShowExitConfirm(true)}
+            onMobileControls={() => setShowMobileSettings(true)}
             onSetTab={setPauseCustomizerTab}
             onToggleAccessory={onToggleAccessoryDuringMatch}
             outfitId={outfitId}
@@ -361,6 +389,49 @@ export function MatchHud({
         <span />
       </button>
 
+      <button
+        aria-label="Mobile control settings"
+        className="mobile-settings-match"
+        onClick={() => setShowMobileSettings(true)}
+        type="button"
+      >
+        {'\u2699'}
+      </button>
+
+      {showMobileSettings && (
+        <section className="mobile-controls-dialog" role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
+          <div>
+            <header>
+              <strong id="mobile-controls-title">Mobile Controls</strong>
+              <button type="button" onClick={() => setShowMobileSettings(false)}>Close</button>
+            </header>
+            <label>
+              Layout
+              <select value={mobileLayout} onChange={(event) => updateMobileLayout(event.target.value)}>
+                <option value="default">Default</option>
+                <option value="low">Low buttons</option>
+                <option value="spread">Wide spacing</option>
+              </select>
+            </label>
+            <label>
+              Button size
+              <input
+                max="1.25"
+                min="0.82"
+                onChange={(event) => updateMobileScale(event.target.value)}
+                step="0.01"
+                type="range"
+                value={mobileScale}
+              />
+              <span>{Math.round(mobileScale * 100)}%</span>
+            </label>
+            <button className="secondary-command" type="button" onClick={() => { updateMobileLayout('default'); updateMobileScale(1); }}>
+              Reset Layout
+            </button>
+          </div>
+        </section>
+      )}
+
       {compactHud && (
         <aside className="health-widget compact-health-bar" aria-label="Health">
           <i><b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} /></i>
@@ -388,7 +459,7 @@ export function MatchHud({
 
       <aside className={compactHud ? 'compact-combat-widget minimized' : 'compact-combat-widget'}>
           <strong>{ammo.reloading ? `${reloadPercent}%` : `${ammo.ammo}/${ammo.magazineSize}`}</strong>
-          <small><span aria-hidden="true">💣</span>{grenadeCount}</small>
+          <small><span aria-hidden="true">{'\u{1F4A3}'}</span>{grenadeCount}</small>
       </aside>
 
       <footer className={compactHud ? 'match-panel overlay compact' : 'match-panel overlay'}>
@@ -397,7 +468,7 @@ export function MatchHud({
           title={compactHud ? 'Open combat HUD' : 'Minimize combat HUD'}
           onClick={() => setCompactHud((value) => !value)}
         >
-          {compactHud ? '⌃' : '⌄'}
+          {compactHud ? 'גƒ' : 'ג„'}
         </button>
         <div className="combat-readout">
           <div className="readout-card weapon-card">
@@ -426,7 +497,7 @@ export function MatchHud({
           </div>
           <div className="readout-card wallet-card">
             <span>Cash</span>
-            <strong>🪙 {wallet}</strong>
+            <strong>נ×™ {wallet}</strong>
             <small>kills pay</small>
           </div>
         </div>

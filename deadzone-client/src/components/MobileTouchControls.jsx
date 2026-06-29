@@ -17,10 +17,15 @@ export function MobileTouchControls({
   disabled = false,
   grenadeCharge = 0,
   grenadeCount = 0,
-  onInteract,
+  layout = 'default',
+  scale = 1,
   scoped = false,
+  onGrenadeEnd,
+  onGrenadeStart,
+  onJump,
   onLook,
   onMove,
+  onReload,
   onScopeToggle,
   onShootEnd,
   onShootStart,
@@ -31,13 +36,18 @@ export function MobileTouchControls({
   const joystickOrigin = useRef(null);
   const activeStickPointer = useRef(null);
   const activeLookPointer = useRef(null);
+  const activeShootPointer = useRef(null);
   const lastLookPoint = useRef(null);
+  const lastShootPoint = useRef(null);
 
   useEffect(() => {
     callbacks.current = {
-      onInteract,
+      onGrenadeEnd,
+      onGrenadeStart,
+      onJump,
       onLook,
       onMove,
+      onReload,
       onScopeToggle,
       onShootEnd,
       onShootStart,
@@ -61,8 +71,11 @@ export function MobileTouchControls({
   const resetAllTouches = useCallback(() => {
     resetJoystick();
     activeLookPointer.current = null;
+    activeShootPointer.current = null;
     lastLookPoint.current = null;
+    lastShootPoint.current = null;
     callbacks.current.onShootEnd?.();
+    callbacks.current.onGrenadeEnd?.();
   }, [resetJoystick]);
 
   useEffect(() => {
@@ -153,8 +166,39 @@ export function MobileTouchControls({
     lastLookPoint.current = null;
   };
 
+  const handleShootDown = (event) => {
+    if (disabled || activeShootPointer.current != null) return;
+    event.preventDefault();
+    requestMobileFullscreen();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    activeShootPointer.current = event.pointerId;
+    lastShootPoint.current = { x: event.clientX, y: event.clientY };
+    callbacks.current.onShootStart?.();
+  };
+
+  const handleShootMove = (event) => {
+    if (event.pointerId !== activeShootPointer.current || !lastShootPoint.current) return;
+    event.preventDefault();
+    const dx = event.clientX - lastShootPoint.current.x;
+    const dy = event.clientY - lastShootPoint.current.y;
+    lastShootPoint.current = { x: event.clientX, y: event.clientY };
+    callbacks.current.onLook?.(dx, dy);
+  };
+
+  const handleShootEnd = (event) => {
+    if (event.pointerId !== activeShootPointer.current) return;
+    event.preventDefault();
+    activeShootPointer.current = null;
+    lastShootPoint.current = null;
+    callbacks.current.onShootEnd?.();
+  };
+
   return (
-    <div className="mobile-touch-layer" aria-hidden={disabled ? 'true' : 'false'}>
+    <div
+      className={`mobile-touch-layer mobile-layout-${layout}`}
+      aria-hidden={disabled ? 'true' : 'false'}
+      style={{ '--mobile-control-scale': scale }}
+    >
       <div
         className="mobile-look-pad"
         onPointerCancel={handleLookEnd}
@@ -193,19 +237,31 @@ export function MobileTouchControls({
         <button
           className="mobile-action mobile-action--shoot"
           disabled={disabled}
-          onPointerCancel={() => callbacks.current.onShootEnd?.()}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            requestMobileFullscreen();
-            callbacks.current.onShootStart?.();
-          }}
-          onPointerLeave={() => callbacks.current.onShootEnd?.()}
-          onPointerUp={() => callbacks.current.onShootEnd?.()}
+          onPointerCancel={handleShootEnd}
+          onPointerDown={handleShootDown}
+          onPointerMove={handleShootMove}
+          onPointerUp={handleShootEnd}
           type="button"
         >
           Shoot
         </button>
-        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onInteract?.()} type="button">Interact</button>
+        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onJump?.()} type="button">Jump</button>
+        <button className="mobile-action" disabled={disabled} onClick={() => callbacks.current.onReload?.()} type="button">Reload</button>
+        <button
+          className="mobile-action mobile-action--grenade"
+          disabled={disabled || grenadeCount <= 0}
+          onPointerCancel={() => callbacks.current.onGrenadeEnd?.()}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            requestMobileFullscreen();
+            callbacks.current.onGrenadeStart?.();
+          }}
+          onPointerLeave={() => callbacks.current.onGrenadeEnd?.()}
+          onPointerUp={() => callbacks.current.onGrenadeEnd?.()}
+          type="button"
+        >
+          Grenade
+        </button>
       </section>
 
       {grenadeCount > 0 && grenadeCharge > 0 && (
