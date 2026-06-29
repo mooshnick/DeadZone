@@ -1,7 +1,7 @@
-import { apiBase } from './config';
+import { sameOriginApiBase } from './config';
 import { sessionTokenKey } from './users';
 
-const API_BASE = apiBase('/api/social');
+const API_BASE = sameOriginApiBase('/api/social');
 
 async function request(path = '', options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {

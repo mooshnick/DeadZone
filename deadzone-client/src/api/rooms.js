@@ -1,7 +1,7 @@
 import { sessionTokenKey } from './users';
-import { apiBase } from './config';
+import { sameOriginApiBase } from './config';
 
-const API_BASE = apiBase('/api/rooms');
+const API_BASE = sameOriginApiBase('/api/rooms');
 
 async function request(path = '', options = {}) {
   const token = localStorage.getItem(sessionTokenKey);
