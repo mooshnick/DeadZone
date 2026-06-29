@@ -18,6 +18,10 @@ const MIN_LOOK_PITCH = -1.15;
 const MAX_LOOK_PITCH = 1.18;
 const TEAM_MODES = new Set(['team-deathmatch', 'capture-flag', 'attack-defend', 'circle-control']);
 const WIN_BONUS = { score: 75, xp: 100, money: 20 };
+const REMOTE_INTERPOLATION_SPEED = 13;
+const REMOTE_EXTRAPOLATION_MS = 260;
+const REMOTE_SNAP_DISTANCE = 18;
+const REMOTE_STOP_SPEED = 0.25;
 const OBJECTIVE_REWARDS = {
   flagCapture: { score: 300, xp: 180, money: 30, label: 'flag capture' },
   flagReturn: { score: 120, xp: 75, money: 12, label: 'flag return' },
@@ -414,6 +418,18 @@ export class GameWorld {
 
   applyRemotePlayerState(player, remote) {
     const previousWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
+    const time = nowMs();
+    const previousNetworkPosition = player.networkTargetPosition?.clone() || player.position.clone();
+    const targetPosition = new THREE.Vector3(
+      remote.x ?? player.position.x,
+      remote.y ?? player.position.y,
+      remote.z ?? player.position.z,
+    );
+    const elapsedSeconds = player.networkUpdatedAt ? Math.max(0.05, (time - player.networkUpdatedAt) / 1000) : 0;
+    const networkVelocity = elapsedSeconds > 0
+      ? targetPosition.clone().sub(previousNetworkPosition).divideScalar(elapsedSeconds)
+      : new THREE.Vector3();
+
     player.name = remote.name || player.name;
     player.team = remote.team || player.team;
     player.weaponId = remote.weaponId || player.weaponId;
@@ -426,10 +442,18 @@ export class GameWorld {
     player.deaths = remote.deaths || 0;
     player.score = remote.score || 0;
     player.isDead = Boolean(remote.dead) || player.health <= 0;
-    player.position.set(remote.x ?? player.position.x, remote.y ?? player.position.y, remote.z ?? player.position.z);
-    player.velocity.set(0, 0, 0);
-    player.yaw = remote.yaw ?? player.yaw;
-    player.pitch = remote.pitch ?? player.pitch;
+    player.networkTargetPosition = targetPosition;
+    player.networkVelocity = networkVelocity.length() > 42 ? networkVelocity.setLength(42) : networkVelocity;
+    player.networkUpdatedAt = time;
+    player.networkTargetYaw = remote.yaw ?? player.yaw;
+    player.networkTargetPitch = remote.pitch ?? player.pitch;
+
+    if (player.position.distanceTo(targetPosition) > REMOTE_SNAP_DISTANCE || player.isDead) {
+      player.position.copy(targetPosition);
+      player.velocity.set(0, 0, 0);
+      player.yaw = player.networkTargetYaw;
+      player.pitch = player.networkTargetPitch;
+    }
 
     const nextWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
     if (previousWeaponKey !== nextWeaponKey) {
@@ -441,6 +465,41 @@ export class GameWorld {
         this.scene.remove(previousMesh);
       }
       this.scene.add(nextMesh);
+    }
+  }
+
+  updateRemotePlayers(dt, time) {
+    for (const player of this.players.values()) {
+      if (player.id === this.localId || player.isBot || !player.networkTargetPosition) {
+        continue;
+      }
+      if (player.isDead) {
+        player.position.copy(player.networkTargetPosition);
+        continue;
+      }
+
+      const sinceUpdate = Math.max(0, time - (player.networkUpdatedAt || time));
+      const extrapolateSeconds = Math.min(REMOTE_EXTRAPOLATION_MS, sinceUpdate) / 1000;
+      const target = player.networkTargetPosition.clone();
+      if (player.networkVelocity && player.networkVelocity.length() > REMOTE_STOP_SPEED) {
+        target.add(player.networkVelocity.clone().multiplyScalar(extrapolateSeconds));
+      }
+
+      const distance = player.position.distanceTo(target);
+      if (distance > REMOTE_SNAP_DISTANCE) {
+        player.position.copy(target);
+      } else {
+        const blend = 1 - Math.exp(-REMOTE_INTERPOLATION_SPEED * dt);
+        player.position.lerp(target, blend);
+      }
+
+      if (typeof player.networkTargetYaw === 'number') {
+        const yawDelta = THREE.MathUtils.euclideanModulo(player.networkTargetYaw - player.yaw + Math.PI, Math.PI * 2) - Math.PI;
+        player.yaw += yawDelta * (1 - Math.exp(-16 * dt));
+      }
+      if (typeof player.networkTargetPitch === 'number') {
+        player.pitch = THREE.MathUtils.lerp(player.pitch, player.networkTargetPitch, 1 - Math.exp(-14 * dt));
+      }
     }
   }
 
@@ -1119,6 +1178,7 @@ export class GameWorld {
       this.updateObjectives(time, dt);
       this.checkMatchEnd(time);
     }
+    this.updateRemotePlayers(dt, time);
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());
