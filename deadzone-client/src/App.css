@@ -353,7 +353,12 @@
   display: grid;
   justify-content: center;
   margin-top: 4px;
+  width: 100%;
   min-height: 44px;
+}
+
+.google-login > div {
+  max-width: 100%;
 }
 
 .google-login.compact {
@@ -429,6 +434,18 @@
 .auth-form header strong {
   color: #ffffff;
   letter-spacing: 0;
+}
+
+@media (max-width: 380px) {
+  .auth-choice,
+  .main-actions {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(280px, 100%);
+  }
+
+  .auth-form {
+    padding: 16px;
+  }
 }
 
 .icon-command {

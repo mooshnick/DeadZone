@@ -1,9 +1,27 @@
 const DEFAULT_SERVER_PORT = '8080';
 
+function localNetworkOrigin(configured) {
+  try {
+    const configuredUrl = new URL(configured);
+    const appHostname = window.location.hostname;
+    const appIsLocal = appHostname === 'localhost' || appHostname === '127.0.0.1' || appHostname === '';
+    const configuredIsLoopback = configuredUrl.hostname === 'localhost' || configuredUrl.hostname === '127.0.0.1';
+
+    if (configuredIsLoopback && !appIsLocal) {
+      configuredUrl.hostname = appHostname;
+      return configuredUrl.toString().replace(/\/$/, '');
+    }
+  } catch {
+    return configured.replace(/\/$/, '');
+  }
+
+  return configured.replace(/\/$/, '');
+}
+
 function serverOrigin() {
   const configured = import.meta.env.VITE_API_ORIGIN;
   if (configured) {
-    return configured.replace(/\/$/, '');
+    return localNetworkOrigin(configured);
   }
 
   const { hostname, protocol } = window.location;

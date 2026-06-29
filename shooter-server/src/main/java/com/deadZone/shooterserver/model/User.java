@@ -48,6 +48,9 @@ public class User {
     @Column(nullable = false, length = 120)
     private String email;
 
+    @Column(name = "google_subject", unique = true, length = 64)
+    private String googleSubject;
+
     @Column(nullable = false)
     private String password;
 
@@ -164,6 +167,11 @@ public class User {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getGoogleSubject() { return googleSubject; }
+    public void setGoogleSubject(String googleSubject) {
+        this.googleSubject = googleSubject == null || googleSubject.isBlank() ? null : googleSubject.trim();
+    }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }

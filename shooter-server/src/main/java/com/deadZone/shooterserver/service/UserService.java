@@ -105,9 +105,10 @@ public class UserService {
     @Transactional
     public AuthResponse googleLogin(GoogleLoginRequest request) {
         GoogleProfile profile = verifyGoogleToken(request);
-        User user = userRepository.findAllByEmailIgnoreCaseOrderByIdAsc(profile.email()).stream()
-                .findFirst()
+        User user = userRepository.findByGoogleSubject(profile.subject())
+                .or(() -> userRepository.findAllByEmailIgnoreCaseOrderByIdAsc(profile.email()).stream().findFirst())
                 .orElseGet(() -> new User(uniqueGoogleUsername(profile), profile.email(), passwordService.hash(UUID.randomUUID().toString())));
+        user.setGoogleSubject(profile.subject());
         user.setEmail(profile.email());
         user.setEmailVerified(true);
         if (user.getEmailVerifiedAt() == null) {
@@ -349,12 +350,13 @@ public class UserService {
             }
             JsonNode root = objectMapper.readTree(response.body());
             String audience = root.path("aud").asText("");
+            String subject = root.path("sub").asText("").trim();
             String email = root.path("email").asText("").trim().toLowerCase();
             boolean emailVerified = root.path("email_verified").asBoolean("true".equalsIgnoreCase(root.path("email_verified").asText("")));
-            if (!googleClientId.equals(audience) || email.isBlank() || !emailVerified) {
+            if (!googleClientId.equals(audience) || subject.isBlank() || email.isBlank() || !emailVerified) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google account could not be verified.");
             }
-            return new GoogleProfile(email, root.path("name").asText(""), root.path("given_name").asText(""));
+            return new GoogleProfile(subject, email, root.path("name").asText(""), root.path("given_name").asText(""));
         } catch (ResponseStatusException error) {
             throw error;
         } catch (Exception error) {
@@ -533,5 +535,5 @@ public class UserService {
         return values;
     }
 
-    private record GoogleProfile(String email, String name, String givenName) {}
+    private record GoogleProfile(String subject, String email, String name, String givenName) {}
 }

@@ -154,7 +154,7 @@ function GoogleSignInButton({ compact = false, onLogin }) {
         size: compact ? 'medium' : 'large',
         shape: 'pill',
         text: 'continue_with',
-        width: compact ? 260 : 320,
+        width: Math.min(compact ? 260 : 320, Math.max(220, window.innerWidth - 48)),
       });
       renderedRef.current = true;
     };
