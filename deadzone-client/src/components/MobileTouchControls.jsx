@@ -108,6 +108,8 @@ export function MobileTouchControls({
   useEffect(() => {
     if (disabled) {
       window.setTimeout(resetAllTouches, 0);
+    } else {
+      window.setTimeout(resetAllTouches, 0);
     }
   }, [disabled, resetAllTouches]);
 

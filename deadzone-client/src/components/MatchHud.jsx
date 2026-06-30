@@ -120,6 +120,8 @@ export function MatchHud({
   const setPaused = (value) => {
     if (!value) {
       onMobileReset?.();
+      window.setTimeout(() => onMobileReset?.(), 0);
+      window.setTimeout(() => onMobileReset?.(), 120);
     }
     setShowPauseMenu(value);
     worldRef.current?.setPaused(value);
@@ -129,6 +131,7 @@ export function MatchHud({
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
       window.setTimeout(() => onMobileReset?.(), 0);
+      window.setTimeout(() => onMobileReset?.(), 120);
       setShowDeathCustomizer(false);
     }
   };
