@@ -127,6 +127,7 @@ export function MobileTouchControls({
       left: `${control.x}%`,
       top: `${control.y}%`,
       '--control-size': control.size || 1,
+      '--control-opacity': control.opacity ?? 0.82,
     };
   };
 

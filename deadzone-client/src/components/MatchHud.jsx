@@ -6,12 +6,12 @@ import { MobileTouchControls } from './MobileTouchControls';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 
 const MOBILE_CONTROL_DEFAULTS = {
-  aim: { x: 76, y: 25, size: 1 },
-  grenade: { x: 76, y: 72, size: 1 },
-  joystick: { x: 14, y: 72, size: 1 },
-  jump: { x: 76, y: 41, size: 1 },
-  reload: { x: 76, y: 56, size: 1 },
-  shoot: { x: 89, y: 49, size: 1 },
+  aim: { x: 76, y: 25, size: 1, opacity: 0.82 },
+  grenade: { x: 76, y: 72, size: 1, opacity: 0.82 },
+  joystick: { x: 14, y: 72, size: 1, opacity: 0.76 },
+  jump: { x: 76, y: 41, size: 1, opacity: 0.82 },
+  reload: { x: 76, y: 56, size: 1, opacity: 0.82 },
+  shoot: { x: 89, y: 49, size: 1, opacity: 0.82 },
 };
 
 const MOBILE_CONTROL_NAMES = {
@@ -25,9 +25,13 @@ const MOBILE_CONTROL_NAMES = {
 
 function loadMobileControls() {
   try {
+    const savedControls = JSON.parse(localStorage.getItem('deadzone-mobile-controls')) || {};
     return {
       ...MOBILE_CONTROL_DEFAULTS,
-      ...(JSON.parse(localStorage.getItem('deadzone-mobile-controls')) || {}),
+      ...Object.fromEntries(Object.entries(MOBILE_CONTROL_DEFAULTS).map(([id, defaults]) => [
+        id,
+        { ...defaults, ...(savedControls[id] || {}) },
+      ])),
     };
   } catch {
     return MOBILE_CONTROL_DEFAULTS;
@@ -483,7 +487,19 @@ export function MatchHud({
               />
               <span>{Math.round((mobileControls[selectedMobileControl]?.size || 1) * 100)}%</span>
             </label>
-            <small className="mobile-controls-hint">Open this panel, press "Drag buttons", then drag each control to your favorite spot.</small>
+            <label>
+              {MOBILE_CONTROL_NAMES[selectedMobileControl]} opacity
+              <input
+                max="1"
+                min="0.25"
+                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: Math.max(0.25, Math.min(1, Number(event.target.value) || 0.82)) })}
+                step="0.01"
+                type="range"
+                value={mobileControls[selectedMobileControl]?.opacity ?? 0.82}
+              />
+              <span>{Math.round((mobileControls[selectedMobileControl]?.opacity ?? 0.82) * 100)}%</span>
+            </label>
+            <small className="mobile-controls-hint">Press "Drag buttons", move each control, then tune size and opacity like a mobile shooter layout.</small>
             <button className="secondary-command" type="button" onClick={resetMobileControls}>
               Reset Layout
             </button>

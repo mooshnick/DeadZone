@@ -3093,6 +3093,7 @@ button {
   position: absolute !important;
   right: auto !important;
   bottom: auto !important;
+  opacity: var(--control-opacity, 0.82);
   transform: translate(-50%, -50%) scale(var(--control-size, 1));
   transform-origin: center;
 }
@@ -3120,6 +3121,7 @@ button {
 }
 
 .mobile-control-free.selected {
+  opacity: max(var(--control-opacity, 0.82), 0.58);
   outline: 3px solid rgba(255, 194, 71, 0.9);
   outline-offset: 5px;
 }
