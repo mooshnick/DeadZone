@@ -96,10 +96,10 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
     const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.58, 0.12), accentMaterial);
     chestPlate.position.set(0, 0.08, 1.33);
     chestPlate.scale.set(0.92, 1, 1);
-    const weaponParts = createWeaponPreviewMeshes(weaponId, weaponMaterial, darkMaterial);
+    const weaponParts = createWeaponPreviewMeshes(weaponId, weaponMaterial, darkMaterial).filter(Boolean);
     const grenade = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 14), grenadeMaterial);
     grenade.position.set(-1.28, -0.45, 0.82);
-    const accessoryMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory));
+    const accessoryMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(Boolean);
     model.add(body, visor, belt, chestPlate, ...weaponParts, grenade, ...accessoryMeshes);
 
     const bounds = new THREE.Box3().setFromObject(model);
@@ -190,7 +190,7 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       state.model.remove(mesh);
       mesh.geometry.dispose();
     });
-    const weaponParts = createWeaponPreviewMeshes(weaponId, state.weaponMaterial, state.darkMaterial);
+    const weaponParts = createWeaponPreviewMeshes(weaponId, state.weaponMaterial, state.darkMaterial).filter(Boolean);
     state.weaponParts = weaponParts;
     state.model.add(...weaponParts);
   }, [weaponId]);
@@ -217,7 +217,7 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       mesh.geometry.dispose();
       mesh.material?.dispose?.();
     });
-    const nextMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory));
+    const nextMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(Boolean);
     state.accessoryMeshes = nextMeshes;
     state.model.add(...nextMeshes);
     // Accessory objects are rebuilt only when their ids change, which prevents preview stutter.
