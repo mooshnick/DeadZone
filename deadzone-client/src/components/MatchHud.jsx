@@ -87,6 +87,7 @@ export function MatchHud({
   const [mobileEditMode, setMobileEditMode] = useState(false);
   const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
+  const [mobileResetSignal, setMobileResetSignal] = useState(0);
   const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
   const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
   const previewAccessories = equippedAccessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
@@ -117,21 +118,26 @@ export function MatchHud({
   );
 
   const sniperScoped = isScoped && weaponId === 'sniper';
+  const resetMobileInput = () => {
+    onMobileReset?.();
+    setMobileResetSignal((value) => value + 1);
+  };
   const setPaused = (value) => {
     if (!value) {
-      onMobileReset?.();
-      window.setTimeout(() => onMobileReset?.(), 0);
-      window.setTimeout(() => onMobileReset?.(), 120);
+      resetMobileInput();
+      window.setTimeout(resetMobileInput, 0);
+      window.setTimeout(resetMobileInput, 120);
     }
     setShowPauseMenu(value);
     worldRef.current?.setPaused(value);
   };
   const returnToMatch = () => {
-    onMobileReset?.();
+    resetMobileInput();
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
-      window.setTimeout(() => onMobileReset?.(), 0);
-      window.setTimeout(() => onMobileReset?.(), 120);
+      window.setTimeout(resetMobileInput, 0);
+      window.setTimeout(resetMobileInput, 120);
+      window.setTimeout(resetMobileInput, 260);
       setShowDeathCustomizer(false);
     }
   };
@@ -164,9 +170,9 @@ export function MatchHud({
 
   useEffect(() => {
     if (deathInfo.isDead || showPauseMenu || matchResult) {
-      onMobileReset?.();
+      resetMobileInput();
     }
-  }, [deathInfo.isDead, matchResult, onMobileReset, showPauseMenu]);
+  }, [deathInfo.isDead, matchResult, showPauseMenu]);
 
   return (
     <main className={shellClassName} dir="ltr">
@@ -184,6 +190,7 @@ export function MatchHud({
         editMode={showMobileSettings && mobileEditMode}
         grenadeCharge={grenadeCharge}
         grenadeCount={grenadeCount}
+        key={mobileResetSignal}
         onControlChange={updateMobileControl}
         onGrenadeEnd={onMobileGrenadeEnd}
         onGrenadeStart={onMobileGrenadeStart}
@@ -195,6 +202,7 @@ export function MatchHud({
         onSelectControl={setSelectedMobileControl}
         onShootEnd={onMobileShootEnd}
         onShootStart={onMobileShootStart}
+        resetSignal={mobileResetSignal}
         selectedControl={selectedMobileControl}
         scoped={isScoped}
       />

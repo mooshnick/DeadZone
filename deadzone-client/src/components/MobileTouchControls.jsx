@@ -40,6 +40,7 @@ export function MobileTouchControls({
   onScopeToggle,
   onShootEnd,
   onShootStart,
+  resetSignal = 0,
 }) {
   const [enabled, setEnabled] = useState(false);
   const [stick, setStick] = useState({ active: false, x: 0, y: 0 });
@@ -113,6 +114,10 @@ export function MobileTouchControls({
     }
   }, [disabled, resetAllTouches]);
 
+  useEffect(() => {
+    window.setTimeout(resetAllTouches, 0);
+  }, [resetAllTouches, resetSignal]);
+
   if (!enabled || (disabled && !editMode)) return null;
 
   const controlStyle = (id) => {
@@ -178,7 +183,7 @@ export function MobileTouchControls({
 
   const handleJoystickDown = (event) => {
     if (beginEditDrag('joystick', event)) return;
-    if (disabled || activeStickPointer.current != null) return;
+    if (disabled) return;
     event.preventDefault();
     requestMobileFullscreen();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -228,7 +233,7 @@ export function MobileTouchControls({
 
   const handleShootDown = (event) => {
     if (beginEditDrag('shoot', event)) return;
-    if (disabled || activeShootPointer.current != null) return;
+    if (disabled) return;
     event.preventDefault();
     requestMobileFullscreen();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -278,6 +283,7 @@ export function MobileTouchControls({
         ].filter(Boolean).join(' ')}
         onPointerCancel={handleJoystickEnd}
         onPointerDown={handleJoystickDown}
+        onLostPointerCapture={handleJoystickEnd}
         onPointerMove={handleJoystickMove}
         onPointerUp={handleJoystickEnd}
         style={controlStyle('joystick')}
@@ -321,6 +327,7 @@ export function MobileTouchControls({
         disabled={disabled && !editMode}
         onPointerCancel={handleShootEnd}
         onPointerDown={handleShootDown}
+        onLostPointerCapture={handleShootEnd}
         onPointerMove={handleShootMove}
         onPointerUp={handleShootEnd}
         style={controlStyle('shoot')}

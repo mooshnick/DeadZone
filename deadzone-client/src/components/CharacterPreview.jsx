@@ -96,28 +96,28 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
     const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.58, 0.12), accentMaterial);
     chestPlate.position.set(0, 0.08, 1.33);
     chestPlate.scale.set(0.92, 1, 1);
-    const weaponParts = createWeaponPreviewMeshes(weaponId, weaponMaterial, darkMaterial).filter(Boolean);
+    const weaponParts = createWeaponPreviewMeshes(weaponId, weaponMaterial, darkMaterial).filter(isObject3D);
     const grenade = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 14), grenadeMaterial);
     grenade.position.set(-1.28, -0.45, 0.82);
-    const accessoryMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(Boolean);
-    model.add(body, visor, belt, chestPlate, ...weaponParts, grenade, ...accessoryMeshes);
+    const accessoryMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(isObject3D);
+    safeAdd(model, body, visor, belt, chestPlate, ...weaponParts, grenade, ...accessoryMeshes);
 
     const bounds = new THREE.Box3().setFromObject(model);
     const center = bounds.getCenter(new THREE.Vector3());
     model.position.x = -center.x;
     model.position.y = -center.y + 0.05;
-    character.add(model);
-    scene.add(character);
+    safeAdd(character, model);
+    safeAdd(scene, character);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 3.3));
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xdbeafe, 2.6));
+    safeAdd(scene, new THREE.AmbientLight(0xffffff, 3.3));
+    safeAdd(scene, new THREE.HemisphereLight(0xffffff, 0xdbeafe, 2.6));
     const key = new THREE.DirectionalLight(0xffffff, 3.2);
     key.position.set(4, 5, 6);
     const fill = new THREE.DirectionalLight(0xffffff, 1.55);
     fill.position.set(-5, 3, 4);
     const rim = new THREE.DirectionalLight(0xffffff, 1.1);
     rim.position.set(0, 4, -5);
-    scene.add(key, fill, rim);
+    safeAdd(scene, key, fill, rim);
     stateRef.current = {
       accessoryMeshes,
       accentMaterial,
@@ -160,7 +160,7 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       const currentState = stateRef.current;
       const currentWeaponParts = currentState?.weaponParts || weaponParts;
       const currentAccessoryMeshes = currentState?.accessoryMeshes || accessoryMeshes;
-      [body, visor, belt, chestPlate, ...currentWeaponParts, grenade, ...currentAccessoryMeshes].forEach((mesh) => mesh.geometry.dispose());
+      [body, visor, belt, chestPlate, ...currentWeaponParts, grenade, ...currentAccessoryMeshes].forEach((mesh) => mesh.geometry?.dispose?.());
       [shellMaterial, trimMaterial, accentMaterial, darkMaterial, weaponMaterial, grenadeMaterial].forEach((material) => material.dispose());
       currentAccessoryMeshes.forEach((mesh) => mesh.material?.dispose?.());
       stateRef.current = null;
@@ -190,9 +190,9 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       state.model.remove(mesh);
       mesh.geometry.dispose();
     });
-    const weaponParts = createWeaponPreviewMeshes(weaponId, state.weaponMaterial, state.darkMaterial).filter(Boolean);
+    const weaponParts = createWeaponPreviewMeshes(weaponId, state.weaponMaterial, state.darkMaterial).filter(isObject3D);
     state.weaponParts = weaponParts;
-    state.model.add(...weaponParts);
+    safeAdd(state.model, ...weaponParts);
   }, [weaponId]);
 
   useEffect(() => {
@@ -217,9 +217,9 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       mesh.geometry.dispose();
       mesh.material?.dispose?.();
     });
-    const nextMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(Boolean);
+    const nextMeshes = accessories.flatMap((accessory) => createAccessoryMeshes(accessory)).filter(isObject3D);
     state.accessoryMeshes = nextMeshes;
-    state.model.add(...nextMeshes);
+    safeAdd(state.model, ...nextMeshes);
     // Accessory objects are rebuilt only when their ids change, which prevents preview stutter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessoryKey]);
@@ -233,6 +233,14 @@ export function CharacterPreview({ accessories = [], outfit, weaponColor = '#cbd
       aria-label="3D player character preview"
     />
   );
+}
+
+function isObject3D(value) {
+  return value instanceof THREE.Object3D;
+}
+
+function safeAdd(parent, ...children) {
+  parent.add(...children.filter(isObject3D));
 }
 
 function createAccessoryMeshes(accessory) {

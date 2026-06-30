@@ -32,11 +32,11 @@ export class PlayerMeshFactory {
     const healthBar = this.createHealthBar(player);
     const accessories = this.createAccessories(player.accessoryIds || []);
 
-    group.add(body, band, visor, weapon, healthBar, ...accessories);
+    this.safeAdd(group, body, band, visor, weapon, healthBar, ...accessories);
     if (player.id !== this.localId) {
       player.nameSprite = NameSpriteFactory.create(player.name);
       player.nameSprite.position.set(0, 3.35, 0);
-      group.add(player.nameSprite);
+      this.safeAdd(group, player.nameSprite);
     }
     player.mesh = group;
     return group;
@@ -59,7 +59,7 @@ export class PlayerMeshFactory {
     fill.position.x = -1.06;
 
     bar.position.set(0, 3.05, 0);
-    bar.add(frame, fill);
+    this.safeAdd(bar, frame, fill);
     player.healthBar = bar;
     player.healthFill = fill;
     return bar;
@@ -85,7 +85,7 @@ export class PlayerMeshFactory {
       scope.position.set(0, 0.32, -0.25);
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 0.68), dark);
       stock.position.z = 0.92;
-      group.add(receiver, barrel, muzzle, scope, stock);
+      this.safeAdd(group, receiver, barrel, muzzle, scope, stock);
       return this.attachMuzzle(group, [0, 0, -3.15]);
     }
 
@@ -103,7 +103,7 @@ export class PlayerMeshFactory {
       const grip = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.55, 0.24), dark);
       grip.rotation.x = -0.35;
       grip.position.set(0, -0.35, 0.32);
-      group.add(body, leftBarrel, rightBarrel, pump, grip);
+      this.safeAdd(group, body, leftBarrel, rightBarrel, pump, grip);
       return this.attachMuzzle(group, [0, 0.08, -1.58]);
     }
 
@@ -118,7 +118,7 @@ export class PlayerMeshFactory {
       mag.position.set(0, -0.5, 0.12);
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.45), dark);
       stock.position.z = 0.58;
-      group.add(body, shortBarrel, mag, stock);
+      this.safeAdd(group, body, shortBarrel, mag, stock);
       return this.attachMuzzle(group, [0, 0, -1.12]);
     }
 
@@ -132,7 +132,7 @@ export class PlayerMeshFactory {
       ringA.position.z = -0.45;
       const ringB = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.03, 10, 24), dark);
       ringB.position.z = -1.18;
-      group.add(core, barrel, ringA, ringB);
+      this.safeAdd(group, core, barrel, ringA, ringB);
       return this.attachMuzzle(group, [0, 0, -1.42]);
     }
 
@@ -149,7 +149,7 @@ export class PlayerMeshFactory {
       handle.position.set(0, -0.48, 0.2);
       const sight = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.46), dark);
       sight.position.set(0, 0.42, -0.2);
-      group.add(tube, rear, cone, handle, sight);
+      this.safeAdd(group, tube, rear, cone, handle, sight);
       return this.attachMuzzle(group, [0, 0, -1.94]);
     }
 
@@ -165,7 +165,7 @@ export class PlayerMeshFactory {
     stock.position.z = 0.78;
     const sight = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.36), dark);
     sight.position.set(0, 0.28, -0.36);
-    group.add(body, barrel, magazine, stock, sight);
+    this.safeAdd(group, body, barrel, magazine, stock, sight);
     return this.attachMuzzle(group, [0, 0, -1.62]);
   }
 
@@ -173,9 +173,13 @@ export class PlayerMeshFactory {
     const muzzle = new THREE.Object3D();
     muzzle.name = 'weapon-muzzle';
     muzzle.position.set(x, y, z);
-    group.add(muzzle);
+    this.safeAdd(group, muzzle);
     group.userData.muzzle = muzzle;
     return group;
+  }
+
+  safeAdd(parent, ...children) {
+    parent.add(...children.filter((child) => child instanceof THREE.Object3D));
   }
 
   createAccessories(accessoryIds) {

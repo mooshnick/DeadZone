@@ -3944,6 +3944,10 @@ button {
     touch-action: pan-y;
   }
 
+  .pause-screen {
+    background: rgba(2, 6, 12, 0.94);
+  }
+
   .death-screen > :not(.death-customizer),
   .pause-screen > * {
     justify-self: center;
@@ -3975,6 +3979,15 @@ button {
     padding: 10px;
   }
 
+  .pause-customizer .death-customizer-layout {
+    display: grid;
+    grid-template-columns: minmax(104px, 20vw) minmax(0, 1fr);
+    gap: 8px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .pause-customizer header {
     min-height: 34px;
     align-items: center;
@@ -3986,6 +3999,20 @@ button {
 
   .pause-customizer header span {
     font-size: 11px;
+  }
+
+  .pause-customizer .death-customizer-preview {
+    min-width: 0;
+    padding: 6px;
+  }
+
+  .pause-customizer .death-customizer-preview strong,
+  .pause-customizer .death-customizer-preview span {
+    max-width: 100%;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .death-customizer-preview {
@@ -4003,9 +4030,9 @@ button {
   }
 
   .pause-customizer .death-customizer-preview .character-preview-canvas {
-    width: min(130px, 18vw);
-    height: min(140px, 44svh);
-    min-height: 96px;
+    width: min(112px, 18vw);
+    height: min(112px, 34svh);
+    min-height: 76px;
   }
 
   .death-customizer-preview strong {
@@ -4018,6 +4045,7 @@ button {
 
   .death-customizer-options {
     min-height: 0;
+    height: 100%;
     overflow: hidden;
   }
 
@@ -4058,8 +4086,8 @@ button {
 
   .pause-menu-actions,
   .death-customizer-footer {
-    position: relative;
-    bottom: auto;
+    position: sticky;
+    bottom: 0;
     z-index: 3;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
