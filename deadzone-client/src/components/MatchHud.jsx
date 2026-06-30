@@ -439,7 +439,7 @@ export function MatchHud({
       </button>
 
       {showMobileSettings && (
-        <section className="mobile-controls-dialog" role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
+        <section className={mobileEditMode ? 'mobile-controls-dialog editing' : 'mobile-controls-dialog'} role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
           <div>
             <header>
               <strong id="mobile-controls-title">Mobile Controls</strong>

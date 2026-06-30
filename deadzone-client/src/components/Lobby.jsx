@@ -385,7 +385,10 @@ function PlayerScreen({
   xp,
 }) {
   const [pendingPurchase, setPendingPurchase] = useState(null);
-  const [customizerTab, setCustomizerTab] = useState('outfits');
+  const [storeCategory, setStoreCategory] = useState('clothes');
+  const [weaponStoreTab, setWeaponStoreTab] = useState('type');
+  const [clothesStoreTab, setClothesStoreTab] = useState('egg');
+  const [selectedStoreItem, setSelectedStoreItem] = useState(null);
   const outfit = previewOutfit || previewedOutfit || OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
   const weaponSkin = previewWeaponSkin || previewedWeaponSkin || selectedWeaponSkin;
   const grenadeSkin = previewGrenadeSkin || previewedGrenadeSkin || selectedGrenadeSkin;
@@ -397,6 +400,9 @@ function PlayerScreen({
       return;
     }
     setPendingPurchase({ item, action });
+  };
+  const selectStoreItem = (item, details) => {
+    setSelectedStoreItem({ item, ...details });
   };
   const accessoriesBySlot = (slots) => ACCESSORIES.filter((item) => slots.includes(item.slot));
   const activeAccessoryIdForSlot = (slot) => previewAccessory?.slot === slot
@@ -413,7 +419,17 @@ function PlayerScreen({
       owned={ownedAccessories.includes(item.id)}
       price={item.price}
       subtitle={item.slot}
-      onPreview={() => setPreviewAccessory(item)}
+      onPreview={() => {
+        setPreviewAccessory(item);
+        selectStoreItem(item, {
+          action: () => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item)),
+          color: item.color,
+          equipped: accessoryIds.includes(item.id),
+          kind: item.slot,
+          owned: ownedAccessories.includes(item.id),
+          subtitle: item.slot,
+        });
+      }}
       onAction={() => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item))}
     />
   );
@@ -437,94 +453,177 @@ function PlayerScreen({
         </aside>
         <div className="store-panel">
           <div className="customizer-tabs" role="tablist" aria-label="Customizer sections">
-            <button className={customizerTab === 'outfits' ? 'active' : ''} onClick={() => setCustomizerTab('outfits')}>Outfits</button>
-            <button className={customizerTab === 'weapons' ? 'active' : ''} onClick={() => setCustomizerTab('weapons')}>Weapons</button>
+            <button className={storeCategory === 'clothes' ? 'active' : ''} onClick={() => setStoreCategory('clothes')}>Clothes</button>
+            <button className={storeCategory === 'weapons' ? 'active' : ''} onClick={() => setStoreCategory('weapons')}>Weapons</button>
           </div>
-          <div className="store-scroll-area">
-            {customizerTab === 'outfits' ? (
+          <div className="store-subtabs" role="tablist" aria-label="Store sub sections">
+            {storeCategory === 'weapons' ? (
               <>
-                <StoreSection title="Player Colors">
-                  {OUTFITS.map((item) => (
-                    <StoreItem
-                      key={item.id}
-                      active={(previewOutfit?.id || outfitId) === item.id}
-                      color={item.displayColor || item.shell}
-                      equipped={outfitId === item.id}
-                      kind="outfit"
-                      name={item.name}
-                      owned={ownedOutfits.includes(item.id)}
-                      price={item.price}
-                      onPreview={() => setPreviewOutfit(item)}
-                      onAction={() => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item))}
-                    />
-                  ))}
-                </StoreSection>
-                <StoreSection title="Hats, Hair & Face">
-                  {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryStoreItem)}
-                </StoreSection>
-                <StoreSection title="Middle Wear">
-                  {accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).map(renderAccessoryStoreItem)}
-                </StoreSection>
-                <StoreSection title="Shoes & Rides">
-                  {accessoriesBySlot(['shoes']).map(renderAccessoryStoreItem)}
-                </StoreSection>
+                <button className={weaponStoreTab === 'type' ? 'active' : ''} onClick={() => setWeaponStoreTab('type')}>Type</button>
+                <button className={weaponStoreTab === 'skin' ? 'active' : ''} onClick={() => setWeaponStoreTab('skin')}>Weapon Skin</button>
+                <button className={weaponStoreTab === 'grenade' ? 'active' : ''} onClick={() => setWeaponStoreTab('grenade')}>Grenade</button>
               </>
             ) : (
               <>
-                <StoreSection title="Weapons">
-                  {Object.entries(WEAPONS).map(([id, weapon]) => (
-                    <button
-                      className={weaponId === id ? 'loadout-row active' : 'loadout-row'}
-                      disabled={!weaponUnlocked(weapon)}
-                      key={id}
-                      onClick={() => weaponUnlocked(weapon) && selectWeapon(id)}
-                    >
-                      <StoreVisual color={weapon.color} kind="weapon" weaponId={id} />
-                      <span><strong>{weapon.name}</strong><small>{weapon.tag}</small></span>
-                      <span>MK {weaponUpgrades[id] || 0}</span>
-                      {weaponUnlocked(weapon) && (
-                        <em onClick={(event) => { event.stopPropagation(); upgradeWeapon(id); }}>
-                          Upgrade
-                        </em>
-                      )}
-                    </button>
-                  ))}
-                </StoreSection>
-                <StoreSection title="Weapon Skins">
-                  {WEAPON_SKINS.map((item) => (
-                    <StoreItem
-                      key={item.id}
-                      active={(previewWeaponSkin?.id || weaponSkinId) === item.id}
-                      color={item.color}
-                      equipped={weaponSkinId === item.id}
-                      kind="weapon-skin"
-                      name={item.name}
-                      owned={ownedWeaponSkins.includes(item.id)}
-                      price={item.price}
-                      onPreview={() => setPreviewWeaponSkin(item)}
-                      onAction={() => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item))}
-                    />
-                  ))}
-                </StoreSection>
-                <StoreSection title="Grenade Skins">
-                  {GRENADE_SKINS.map((item) => (
-                    <StoreItem
-                      key={item.id}
-                      active={(previewGrenadeSkin?.id || grenadeSkinId) === item.id}
-                      color={item.color}
-                      equipped={grenadeSkinId === item.id}
-                      kind="grenade"
-                      name={item.name}
-                      owned={ownedGrenadeSkins.includes(item.id)}
-                      price={item.price}
-                      onPreview={() => setPreviewGrenadeSkin(item)}
-                      onAction={() => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item))}
-                    />
-                  ))}
-                </StoreSection>
+                <button className={clothesStoreTab === 'egg' ? 'active' : ''} onClick={() => setClothesStoreTab('egg')}>Egg</button>
+                <button className={clothesStoreTab === 'head' ? 'active' : ''} onClick={() => setClothesStoreTab('head')}>Head</button>
+                <button className={clothesStoreTab === 'shirt' ? 'active' : ''} onClick={() => setClothesStoreTab('shirt')}>Shirt</button>
+                <button className={clothesStoreTab === 'gear' ? 'active' : ''} onClick={() => setClothesStoreTab('gear')}>Gear</button>
+                <button className={clothesStoreTab === 'legs' ? 'active' : ''} onClick={() => setClothesStoreTab('legs')}>Legs</button>
               </>
             )}
           </div>
+          <div className="store-scroll-area">
+            {storeCategory === 'clothes' ? (
+              <>
+                {clothesStoreTab === 'egg' && (
+                  <StoreSection title="Egg Colors">
+                    {OUTFITS.map((item) => (
+                      <StoreItem
+                        key={item.id}
+                        active={(previewOutfit?.id || outfitId) === item.id}
+                        color={item.displayColor || item.shell}
+                        equipped={outfitId === item.id}
+                        kind="outfit"
+                        name={item.name}
+                        owned={ownedOutfits.includes(item.id)}
+                        price={item.price}
+                        onPreview={() => {
+                          setPreviewOutfit(item);
+                          selectStoreItem(item, {
+                            action: () => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item)),
+                            color: item.displayColor || item.shell,
+                            equipped: outfitId === item.id,
+                            kind: 'outfit',
+                            owned: ownedOutfits.includes(item.id),
+                          });
+                        }}
+                        onAction={() => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item))}
+                      />
+                    ))}
+                  </StoreSection>
+                )}
+                {clothesStoreTab === 'head' && (
+                  <StoreSection title="Head Gear">
+                    {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryStoreItem)}
+                  </StoreSection>
+                )}
+                {clothesStoreTab === 'shirt' && (
+                  <StoreSection title="Shirts">
+                    {accessoriesBySlot(['shirt']).map(renderAccessoryStoreItem)}
+                  </StoreSection>
+                )}
+                {clothesStoreTab === 'gear' && (
+                  <StoreSection title="Body Gear">
+                    {accessoriesBySlot(['belt', 'backpack', 'watch', 'tail']).map(renderAccessoryStoreItem)}
+                  </StoreSection>
+                )}
+                {clothesStoreTab === 'legs' && (
+                  <StoreSection title="Leg Gear">
+                    {accessoriesBySlot(['shoes']).map(renderAccessoryStoreItem)}
+                  </StoreSection>
+                )}
+              </>
+            ) : (
+              <>
+                {weaponStoreTab === 'type' && (
+                  <StoreSection title="Weapon Type">
+                    {Object.entries(WEAPONS).map(([id, weapon]) => (
+                      <button
+                        className={weaponId === id ? 'loadout-row active' : 'loadout-row'}
+                        disabled={!weaponUnlocked(weapon)}
+                        key={id}
+                        onClick={() => weaponUnlocked(weapon) && selectWeapon(id)}
+                      >
+                        <StoreVisual color={weapon.color} kind="weapon" weaponId={id} />
+                        <span><strong>{weapon.name}</strong><small>{weapon.tag}</small></span>
+                        <span>MK {weaponUpgrades[id] || 0}</span>
+                        {weaponUnlocked(weapon) && (
+                          <em onClick={(event) => { event.stopPropagation(); upgradeWeapon(id); }}>
+                            Upgrade
+                          </em>
+                        )}
+                      </button>
+                    ))}
+                  </StoreSection>
+                )}
+                {weaponStoreTab === 'skin' && (
+                  <StoreSection title="Weapon Skins">
+                    {WEAPON_SKINS.map((item) => (
+                      <StoreItem
+                        key={item.id}
+                        active={(previewWeaponSkin?.id || weaponSkinId) === item.id}
+                        color={item.color}
+                        equipped={weaponSkinId === item.id}
+                        kind="weapon-skin"
+                        name={item.name}
+                        owned={ownedWeaponSkins.includes(item.id)}
+                        price={item.price}
+                        onPreview={() => {
+                          setPreviewWeaponSkin(item);
+                          selectStoreItem(item, {
+                            action: () => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item)),
+                            color: item.color,
+                            equipped: weaponSkinId === item.id,
+                            kind: 'weapon-skin',
+                            owned: ownedWeaponSkins.includes(item.id),
+                          });
+                        }}
+                        onAction={() => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item))}
+                      />
+                    ))}
+                  </StoreSection>
+                )}
+                {weaponStoreTab === 'grenade' && (
+                  <StoreSection title="Grenade Skins">
+                    {GRENADE_SKINS.map((item) => (
+                      <StoreItem
+                        key={item.id}
+                        active={(previewGrenadeSkin?.id || grenadeSkinId) === item.id}
+                        color={item.color}
+                        equipped={grenadeSkinId === item.id}
+                        kind="grenade"
+                        name={item.name}
+                        owned={ownedGrenadeSkins.includes(item.id)}
+                        price={item.price}
+                        onPreview={() => {
+                          setPreviewGrenadeSkin(item);
+                          selectStoreItem(item, {
+                            action: () => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item)),
+                            color: item.color,
+                            equipped: grenadeSkinId === item.id,
+                            kind: 'grenade',
+                            owned: ownedGrenadeSkins.includes(item.id),
+                          });
+                        }}
+                        onAction={() => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item))}
+                      />
+                    ))}
+                  </StoreSection>
+                )}
+              </>
+            )}
+          </div>
+          <aside className="mobile-store-inspector" aria-live="polite">
+            {selectedStoreItem ? (
+              <>
+                <StoreVisual color={selectedStoreItem.color} kind={selectedStoreItem.kind} />
+                <span>{selectedStoreItem.subtitle || selectedStoreItem.kind}</span>
+                <strong>{selectedStoreItem.item.name}</strong>
+                <small>{selectedStoreItem.owned ? (selectedStoreItem.equipped ? 'Equipped' : 'Owned') : 'Available'}</small>
+                <b>{selectedStoreItem.owned ? 'Ready' : <><span aria-hidden="true">🪙</span> {selectedStoreItem.item.price}</>}</b>
+                <button className="primary-command" onClick={selectedStoreItem.action}>
+                  {selectedStoreItem.owned ? (selectedStoreItem.equipped ? 'Equipped' : 'Equip') : 'Buy'}
+                </button>
+              </>
+            ) : (
+              <>
+                <span>Selection</span>
+                <strong>Tap an item</strong>
+                <small>Price and action will appear here</small>
+              </>
+            )}
+          </aside>
           <div className="customizer-footer">
             <button className="primary-command" onClick={() => setPanel('main')}>Continue</button>
           </div>

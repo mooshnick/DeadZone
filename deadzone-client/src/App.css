@@ -704,12 +704,17 @@ html:fullscreen .game-3d-shell {
 }
 
 .store-panel {
+  position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0;
   max-height: calc(100svh - 76px);
-  padding: 28px;
+  padding: 22px 28px 28px;
   overflow: hidden;
+}
+
+.mobile-store-inspector {
+  display: none;
 }
 
 .customizer-tabs {
@@ -737,12 +742,108 @@ html:fullscreen .game-3d-shell {
   background: #ffc247;
 }
 
+.store-panel > .customizer-tabs {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+}
+
+.store-panel > .customizer-tabs button {
+  position: relative;
+  min-height: 58px;
+  min-width: 138px;
+  padding: 0 22px;
+  border: 2px solid rgba(80, 157, 255, 0.72);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  color: #c6ddff;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: 0;
+  background:
+    linear-gradient(180deg, rgba(49, 101, 177, 0.86), rgba(18, 54, 116, 0.96)),
+    #163c7d;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 -5px 18px rgba(28, 118, 255, 0.18);
+  transform: translateY(8px);
+  transition: transform 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.store-panel > .customizer-tabs button.active {
+  z-index: 2;
+  color: #ffffff;
+  border-color: #75c8ff;
+  background:
+    linear-gradient(180deg, rgba(92, 183, 255, 0.98), rgba(35, 127, 214, 0.98)),
+    #2682d8;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.34),
+    0 -5px 24px rgba(68, 185, 255, 0.35);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+  transform: translateY(0);
+}
+
+.store-subtabs {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(112px, 1fr);
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 18px 14px;
+  border: 2px solid rgba(117, 200, 255, 0.66);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(180deg, rgba(33, 132, 218, 0.94), rgba(22, 92, 174, 0.92)),
+    #1762b1;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.14);
+}
+
+.store-subtabs button {
+  min-height: 40px;
+  flex: 1 1 110px;
+  border: 2px solid rgba(185, 229, 255, 0.42);
+  border-radius: 10px;
+  color: #d9edff;
+  font-size: 13px;
+  font-weight: 950;
+  background: rgba(8, 43, 96, 0.52);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
+}
+
+.store-subtabs button.active {
+  color: #082444;
+  border-color: #d4f1ff;
+  background: linear-gradient(180deg, #ffffff, #a9ddff);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    0 8px 18px rgba(7, 33, 82, 0.2);
+}
+
 .store-scroll-area {
   display: grid;
   align-content: start;
-  gap: 26px;
+  gap: 20px;
   min-height: 0;
-  padding-right: 8px;
+  padding: 18px 18px 18px 18px;
+  border: 2px solid rgba(117, 200, 255, 0.66);
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
+  background:
+    linear-gradient(180deg, rgba(18, 91, 174, 0.92), rgba(11, 55, 125, 0.96)),
+    #123f82;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 34px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
   scrollbar-color: #ffc247 rgba(255, 255, 255, 0.1);
   scrollbar-width: thin;
@@ -770,8 +871,8 @@ html:fullscreen .game-3d-shell {
   gap: 10px;
   align-items: center;
   justify-content: flex-end;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 14px;
+  border-top: 0;
 }
 
 .customizer-footer .primary-command,
@@ -780,26 +881,37 @@ html:fullscreen .game-3d-shell {
 }
 
 .store-section h2 {
-  margin: 0 0 12px;
-  font-size: 17px;
+  margin: 0 0 14px;
+  color: #ffffff;
+  font-size: 22px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.22);
 }
 
 .store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 12px;
 }
 
 .store-item {
   display: grid;
   overflow: hidden;
-  border: 1px solid #384352;
-  border-radius: 7px;
-  background: #1a212a;
+  border: 3px solid rgba(148, 211, 255, 0.58);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(45, 143, 226, 0.92), rgba(14, 63, 137, 0.98)),
+    #1458a8;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.16),
+    0 10px 22px rgba(3, 17, 43, 0.18);
 }
 
 .store-item.active {
   border-color: #ffc247;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 3px rgba(255, 194, 71, 0.28),
+    0 12px 24px rgba(3, 17, 43, 0.24);
 }
 
 .store-preview,
@@ -809,16 +921,23 @@ html:fullscreen .game-3d-shell {
 
 .store-preview {
   display: grid;
-  gap: 9px;
-  justify-items: start;
-  min-height: 128px;
-  padding: 14px;
-  text-align: left;
+  gap: 8px;
+  justify-items: center;
+  min-height: 132px;
+  padding: 12px 10px;
+  color: #ffffff;
+  text-align: center;
   background: transparent;
 }
 
+.store-preview strong {
+  font-size: 14px;
+  line-height: 1.05;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.24);
+}
+
 .store-preview small {
-  color: #97a8bc;
+  color: #cdeaff;
   font-size: 11px;
   font-weight: 850;
   text-transform: uppercase;
@@ -830,12 +949,15 @@ html:fullscreen .game-3d-shell {
   display: block;
   width: 96px;
   height: 58px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 6px;
+  border: 2px solid rgba(211, 241, 255, 0.56);
+  border-radius: 12px;
   background:
     radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--item-color) 24%, transparent), transparent 46%),
-    #101722;
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.28);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(18, 73, 153, 0.2)),
+    #0b3470;
+  box-shadow:
+    inset 0 0 18px rgba(0, 0, 0, 0.22),
+    0 6px 14px rgba(2, 17, 45, 0.22);
 }
 
 .store-visual i,
@@ -1113,11 +1235,15 @@ html:fullscreen .game-3d-shell {
 }
 
 .store-buy {
-  min-height: 34px;
-  color: #11161d !important;
+  min-height: 36px;
+  margin: 0 10px 10px;
+  border: 2px solid rgba(255, 240, 181, 0.64);
+  border-radius: 10px;
+  color: #112035 !important;
   font-size: 12px !important;
   font-weight: 950;
-  background: #ffc247;
+  background: linear-gradient(180deg, #ffdf66, #ffaf25);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.36);
 }
 
 .purchase-modal {
@@ -1159,19 +1285,29 @@ html:fullscreen .game-3d-shell {
 
 .loadout-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  min-height: 62px;
-  padding: 10px 12px;
-  border: 1px solid #384352;
-  border-radius: 6px;
+  min-height: 78px;
+  padding: 12px;
+  border: 3px solid rgba(148, 211, 255, 0.58);
+  border-radius: 14px;
+  color: #ffffff;
   text-align: left;
-  background: #1a212a;
+  background:
+    linear-gradient(180deg, rgba(45, 143, 226, 0.92), rgba(14, 63, 137, 0.98)),
+    #1458a8;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.16),
+    0 10px 22px rgba(3, 17, 43, 0.18);
 }
 
 .loadout-row.active {
   border-color: #ffc247;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 3px rgba(255, 194, 71, 0.28),
+    0 12px 24px rgba(3, 17, 43, 0.24);
 }
 
 .loadout-row span:first-child {
@@ -1179,17 +1315,30 @@ html:fullscreen .game-3d-shell {
 }
 
 .loadout-row small {
-  color: #9aa8b8;
+  color: #cdeaff;
+  font-weight: 850;
 }
 
 .loadout-row em {
-  padding: 7px 9px;
-  border-radius: 4px;
-  color: #101318;
+  padding: 8px 10px;
+  border: 2px solid rgba(255, 240, 181, 0.64);
+  border-radius: 9px;
+  color: #112035;
   font-size: 11px;
   font-style: normal;
-  font-weight: 900;
-  background: #ffc247;
+  font-weight: 950;
+  background: linear-gradient(180deg, #ffdf66, #ffaf25);
+}
+
+.loadout-row > span:last-of-type {
+  color: #ffdf66;
+  font-weight: 950;
+}
+
+.loadout-row:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.75);
+  opacity: 0.56;
 }
 
 .play-lobby {
@@ -2620,7 +2769,7 @@ button {
 
 .mobile-controls-dialog {
   position: fixed;
-  z-index: 95;
+  z-index: 140;
   inset: 0;
   display: grid;
   place-items: center;
@@ -2643,6 +2792,15 @@ button {
     radial-gradient(circle at top right, rgba(83, 216, 255, 0.16), transparent 36%),
     rgba(12, 20, 31, 0.96);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.mobile-controls-dialog.editing {
+  background: rgba(2, 6, 12, 0.38);
+  pointer-events: none;
+}
+
+.mobile-controls-dialog.editing > div {
+  pointer-events: auto;
 }
 
 .mobile-controls-dialog header {
@@ -2901,7 +3059,7 @@ button {
 }
 
 .mobile-touch-editing {
-  z-index: 96;
+  z-index: 130;
   background: rgba(3, 7, 12, 0.18);
   pointer-events: auto;
 }
@@ -3256,6 +3414,25 @@ button {
 }
 
 @media (pointer: coarse) and (max-width: 700px) and (orientation: portrait) {
+  .store-panel {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .store-panel > .customizer-tabs,
+  .store-panel > .store-subtabs,
+  .store-scroll-area,
+  .mobile-store-inspector,
+  .customizer-footer {
+    grid-column: 1;
+  }
+
+  .mobile-store-inspector {
+    position: static;
+    grid-row: auto;
+    min-height: 0;
+  }
+
   .mobile-joystick {
     bottom: max(132px, calc(env(safe-area-inset-bottom) + 112px));
     width: 118px;
@@ -3357,53 +3534,182 @@ button {
   }
 
   .store-panel {
-    gap: 10px;
-    max-height: none;
-    padding: 12px;
+    grid-template-columns: minmax(118px, 158px) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 10px;
+    row-gap: 0;
+    max-height: calc(100svh - 96px);
+    min-height: 0;
+    padding: 10px;
     overflow: visible;
   }
 
+  .store-panel > .customizer-tabs,
+  .store-panel > .store-subtabs,
   .store-scroll-area {
-    gap: 14px;
-    max-height: 52svh;
-    padding-right: 4px;
+    grid-column: 2;
+  }
+
+  .store-panel > .customizer-tabs,
+  .store-panel > .store-subtabs {
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .store-panel > .customizer-tabs button,
+  .store-panel > .store-subtabs button {
+    min-height: 36px;
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .store-panel > .customizer-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .store-panel > .customizer-tabs button {
+    padding: 0 10px;
+    transform: translateY(5px);
+  }
+
+  .store-panel > .customizer-tabs button.active {
+    transform: translateY(0);
+  }
+
+  .store-panel > .store-subtabs {
+    grid-auto-flow: row;
+    grid-auto-columns: initial;
+    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+    padding: 10px 8px 8px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .store-scroll-area {
+    gap: 10px;
+    max-height: none;
+    padding: 10px 8px 58px;
+    border-radius: 0 0 12px 12px;
   }
 
   .store-section h2 {
-    margin-bottom: 8px;
-    font-size: 14px;
+    margin-bottom: 7px;
+    font-size: 13px;
   }
 
   .store-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+    gap: 6px;
+  }
+
+  .loadout-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 76px;
+    padding: 9px;
+  }
+
+  .loadout-row em,
+  .loadout-row > span:last-of-type {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .store-preview {
-    min-height: 82px;
-    padding: 9px;
-    gap: 5px;
+    min-height: 68px;
+    padding: 6px;
+    gap: 3px;
   }
 
   .store-preview strong {
-    font-size: 13px;
+    font-size: 10px;
     line-height: 1.05;
   }
 
   .store-preview small {
-    font-size: 9px;
+    display: none;
   }
 
   .store-visual {
-    width: 72px;
-    height: 42px;
-    transform: scale(0.82);
+    width: 58px;
+    height: 34px;
+    transform: scale(0.78);
     transform-origin: left top;
   }
 
   .store-buy {
-    min-height: 30px;
-    font-size: 10px !important;
+    display: none;
+  }
+
+  .mobile-store-inspector {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    grid-column: 1;
+    grid-row: 2 / 5;
+    align-self: start;
+    display: grid;
+    gap: 7px;
+    min-height: 236px;
+    padding: 10px;
+    border: 2px solid rgba(255, 194, 71, 0.72);
+    border-radius: 12px;
+    color: #ffffff;
+    background:
+      linear-gradient(180deg, rgba(38, 35, 23, 0.96), rgba(12, 18, 27, 0.98)),
+      #121821;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.14),
+      0 14px 34px rgba(0, 0, 0, 0.28);
+  }
+
+  .mobile-store-inspector .store-visual {
+    width: 100%;
+    height: 62px;
+    transform: none;
+  }
+
+  .mobile-store-inspector span {
+    color: #ffc247;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+  }
+
+  .mobile-store-inspector strong {
+    font-size: 15px;
+    line-height: 1.05;
+  }
+
+  .mobile-store-inspector small {
+    color: #aeb9c8;
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .mobile-store-inspector b {
+    color: #ffdf66;
+    font-size: 16px;
+  }
+
+  .mobile-store-inspector .primary-command {
+    align-self: end;
+    min-height: 38px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .store-panel > .customizer-footer {
+    position: sticky;
+    z-index: 5;
+    bottom: max(0px, env(safe-area-inset-bottom));
+    grid-column: 1 / -1;
+    justify-content: stretch;
+    padding: 8px 0 0;
+    background: linear-gradient(180deg, rgba(2, 6, 12, 0), rgba(2, 6, 12, 0.92) 32%);
+  }
+
+  .store-panel > .customizer-footer .primary-command {
+    width: 100%;
+    min-height: 44px;
   }
 
   .scoreboard-overlay {
@@ -3433,6 +3739,8 @@ button {
 
   .death-screen,
   .pause-screen {
+    z-index: 110;
+    display: block;
     place-items: stretch;
     place-content: stretch;
     padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
@@ -3450,22 +3758,106 @@ button {
   .death-customizer,
   .pause-customizer {
     width: min(100%, 760px);
-    max-height: calc(100svh - 24px);
-    min-height: 0;
+    max-height: none;
+    min-height: calc(100svh - 24px);
     justify-self: center;
-    overflow-y: auto;
+    overflow: visible;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
   }
 
+  .death-customizer-layout,
+  .pause-menu-layout {
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .death-customizer-preview {
+    position: static;
+    padding: 10px;
+  }
+
   .death-customizer-preview .character-preview-canvas {
-    min-height: 190px;
+    width: min(260px, 70vw);
+    height: min(220px, 30svh);
+    min-height: 150px;
+  }
+
+  .death-customizer-options {
+    min-height: 0;
+    overflow: visible;
   }
 
   .death-customizer-scroll {
-    max-height: 44svh;
+    max-height: none;
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .death-customizer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .death-customizer-item {
+    min-height: 96px;
+    padding: 9px;
+  }
+
+  .death-customizer-item .store-visual {
+    width: 72px;
+    height: 42px;
+    transform: scale(0.82);
+    transform-origin: left top;
+  }
+
+  .pause-menu-actions,
+  .death-customizer-footer {
+    position: sticky;
+    bottom: max(0px, env(safe-area-inset-bottom));
+    z-index: 3;
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 10px 0 0;
+    background: linear-gradient(180deg, rgba(12, 20, 31, 0), rgba(12, 20, 31, 0.98) 22%);
+  }
+
+  .pause-menu-actions button,
+  .death-customizer-footer button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .mobile-controls-dialog {
+    z-index: 150;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .mobile-controls-dialog > div {
+    width: min(460px, calc(100vw - 20px));
+    max-height: calc(100svh - 20px);
+  }
+}
+
+@media (pointer: coarse) and (max-width: 700px) and (orientation: portrait) {
+  .store-panel {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .store-panel > .customizer-tabs,
+  .store-panel > .store-subtabs,
+  .store-scroll-area,
+  .mobile-store-inspector,
+  .customizer-footer {
+    grid-column: 1;
+  }
+
+  .mobile-store-inspector {
+    position: static;
+    grid-row: auto;
+    min-height: 0;
   }
 }
 
