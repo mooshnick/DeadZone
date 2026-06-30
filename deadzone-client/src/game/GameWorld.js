@@ -23,6 +23,7 @@ const REMOTE_EXTRAPOLATION_MS = 900;
 const REMOTE_SNAP_DISTANCE = 18;
 const REMOTE_STOP_SPEED = 0.25;
 const REMOTE_MAX_SPEED = 36;
+const LOCAL_RESPAWN_RECONCILE_GUARD_MS = 3000;
 const OBJECTIVE_REWARDS = {
   flagCapture: { score: 300, xp: 180, money: 30, label: 'flag capture' },
   flagReturn: { score: 120, xp: 75, money: 12, label: 'flag return' },
@@ -93,6 +94,8 @@ export class GameWorld {
     this.deathInputReleased = false;
     this.localDeathFocus = null;
     this.realtimeClient = null;
+    this.localStateVersion = 1;
+    this.localRespawnedAt = 0;
   }
 
   start() {
@@ -349,6 +352,7 @@ export class GameWorld {
       assists: player.assists,
       deaths: player.deaths,
       score: player.score,
+      stateVersion: this.localStateVersion,
     };
   }
 
@@ -391,6 +395,7 @@ export class GameWorld {
     } else {
       this.localDeathFocus = null;
     }
+    this.bumpLocalStateVersion();
     target.kill(time);
     this.onHealthChange?.(0);
     this.onDeathChange?.({
@@ -449,11 +454,24 @@ export class GameWorld {
     if (!player) {
       return;
     }
+    const time = nowMs();
+    const remoteVersion = Number(remote.stateVersion) || 0;
+    const isLowerRemoteHealth = typeof remote.health === 'number' && remote.health < player.health;
+    const isRemoteDeathState = Boolean(remote.dead) || (typeof remote.health === 'number' && remote.health <= 0);
+    if (!player.isDead && (isLowerRemoteHealth || isRemoteDeathState)) {
+      const isOlderThanLocal = remoteVersion > 0 && remoteVersion < this.localStateVersion;
+      const isUntaggedAfterRespawn = remoteVersion === 0 && this.localRespawnedAt > 0;
+      const isInsideRespawnGuard = this.localRespawnedAt > 0 && time - this.localRespawnedAt < LOCAL_RESPAWN_RECONCILE_GUARD_MS;
+      if (isOlderThanLocal || isUntaggedAfterRespawn || isInsideRespawnGuard) {
+        return;
+      }
+    }
     if (typeof remote.health === 'number' && remote.health < player.health) {
       player.health = Math.max(0, remote.health);
       this.onHealthChange?.(player.health);
       if (player.health <= 0 && !player.isDead) {
-        player.kill(nowMs());
+        this.bumpLocalStateVersion();
+        player.kill(time);
       }
     }
   }
@@ -629,6 +647,10 @@ export class GameWorld {
     });
   }
 
+  bumpLocalStateVersion() {
+    this.localStateVersion += 1;
+  }
+
   applyRecoil(player, weapon) {
     if (player.id !== this.localId) {
       return;
@@ -683,7 +705,9 @@ export class GameWorld {
     if (!player || !player.isDead || nowMs() < player.respawnReadyAt) {
       return false;
     }
+    this.bumpLocalStateVersion();
     player.respawn();
+    this.localRespawnedAt = nowMs();
     this.deathInputReleased = false;
     this.jumpWasDown = false;
     this.qWasDown = false;
@@ -695,6 +719,7 @@ export class GameWorld {
     this.onHealthChange?.(player.health);
     this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
+    this.realtimeClient?.sendMoveNow?.(this.networkPayloadFor(player), this.localRespawnedAt);
     if (capturePointer) {
       this.capturePointer();
     }
@@ -815,6 +840,7 @@ export class GameWorld {
     const speed = player.buffs.speed ? 21 : 15;
     player.isGrounded = this.collisionSystem.move(player.position, player.velocity, wish.multiplyScalar(speed * dt), dt);
     if (this.selectedMap.hazard === 'lava' && player.position.y <= 1.35 && !this.collisionSystem.isOnRaisedBlock(player.position)) {
+      this.bumpLocalStateVersion();
       player.kill(time);
       this.localDeathFocus = null;
       this.onHealthChange?.(0);
@@ -1248,6 +1274,7 @@ export class GameWorld {
 
   handleElimination(shooter, target, time) {
     if (target.id === this.localId) {
+      this.bumpLocalStateVersion();
       document.exitPointerLock?.();
       this.mouse.current.down = false;
       this.setScoped(false);

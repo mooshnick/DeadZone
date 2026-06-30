@@ -123,6 +123,11 @@ export class RealtimeClient {
     this.send({ ...this.payloadWithVelocity(payload, time), type: 'MOVE' });
   }
 
+  sendMoveNow(payload, time = performance.now()) {
+    this.lastMoveSentAt = time;
+    this.send({ ...this.payloadWithVelocity(payload, time), type: 'MOVE' }, true);
+  }
+
   sendHit(payload) {
     this.send({ ...payload, type: 'HIT' }, true);
   }

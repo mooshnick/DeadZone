@@ -65,6 +65,7 @@ public class RoomService {
         player.setAssists(Math.max(0, message.getAssists()));
         player.setDeaths(Math.max(0, message.getDeaths()));
         player.setScore(Math.max(0, message.getScore()));
+        player.setStateVersion(Math.max(player.getStateVersion(), message.getStateVersion()));
     }
 
     public Player playerForSession(String sessionId) {

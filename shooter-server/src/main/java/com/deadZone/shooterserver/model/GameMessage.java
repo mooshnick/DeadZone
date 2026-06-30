@@ -28,6 +28,7 @@ public class GameMessage {
     private int assists;
     private int deaths;
     private int score;
+    private int stateVersion;
 
     public GameMessage() {}
 
@@ -111,4 +112,7 @@ public class GameMessage {
 
     public int getScore() { return score; }
     public void setScore(int score) { this.score = score; }
+
+    public int getStateVersion() { return stateVersion; }
+    public void setStateVersion(int stateVersion) { this.stateVersion = stateVersion; }
 }

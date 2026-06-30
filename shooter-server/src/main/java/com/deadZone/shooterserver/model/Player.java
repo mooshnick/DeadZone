@@ -19,6 +19,7 @@ public class Player {
     private int assists;
     private int deaths;
     private int score;
+    private int stateVersion;
     private boolean dead;
 
     public Player() {}
@@ -42,6 +43,7 @@ public class Player {
         this.assists = 0;
         this.deaths = 0;
         this.score = 0;
+        this.stateVersion = 1;
         this.dead = false;
     }
 
@@ -98,6 +100,9 @@ public class Player {
 
     public int getScore() { return score; }
     public void setScore(int score) { this.score = score; }
+
+    public int getStateVersion() { return stateVersion; }
+    public void setStateVersion(int stateVersion) { this.stateVersion = stateVersion; }
 
     public boolean isDead() { return dead; }
     public void setDead(boolean dead) { this.dead = dead; }
