@@ -22,6 +22,7 @@ import {
   loadKeybindsForUser,
   starterRooms,
 } from './appConstants';
+import { createTranslator, LANGUAGE_STORAGE_KEY, normalizeLanguage } from '../i18n';
 
 const ROUTES = {
   auth: '/auth',
@@ -188,6 +189,7 @@ function updateRoute(path, replace = false) {
 export function useDeadzoneController() {
   const [screen, setScreen] = useState('loading');
   const [panel, setPanel] = useState('main');
+  const [language, setLanguage] = useState(() => normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY)));
   const [authMode, setAuthMode] = useState(() => routeStateFromPath().authMode || null);
   const [rooms, setRooms] = useState(starterRooms);
   const [selectedRoomId, setSelectedRoomId] = useState(starterRooms[0].id);
@@ -255,6 +257,15 @@ export function useDeadzoneController() {
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
+  const t = useMemo(() => createTranslator(language), [language]);
+
+  function toggleLanguage() {
+    setLanguage((current) => {
+      const next = current === 'he' ? 'en' : 'he';
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+      return next;
+    });
+  }
   const keys = useRef(new Set());
   const mouse = useRef({ down: false });
   const localId = useMemo(() => 'player-' + makeId(), []);
@@ -1301,6 +1312,7 @@ export function useDeadzoneController() {
       findPlayers,
       inviteFriend,
       keybinds,
+      language,
       level,
       levelProgress,
       lobbyStatus,
@@ -1355,6 +1367,8 @@ export function useDeadzoneController() {
       weaponSkinId,
       weaponUnlocked,
       weaponUpgrades,
+      t,
+      toggleLanguage,
       xp,
     },
       matchProps: {
@@ -1368,6 +1382,7 @@ export function useDeadzoneController() {
       equipWeaponDuringMatch,
       events,
       grenadeCharge,
+      language,
       isScoped,
       health,
       leaveMatch,
@@ -1398,6 +1413,7 @@ export function useDeadzoneController() {
       onMobileShootEnd: () => setVirtualShoot(false),
       onMobileShootStart: () => setVirtualShoot(true),
       showScoreboard,
+      t,
       worldRef,
     },
   };

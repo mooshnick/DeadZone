@@ -27,6 +27,7 @@ export function MobileTouchControls({
   editMode = false,
   grenadeCharge = 0,
   grenadeCount = 0,
+  labels = CONTROL_LABELS,
   onControlChange,
   onSelectControl,
   selectedControl,
@@ -289,7 +290,7 @@ export function MobileTouchControls({
         onPointerUp={handleJoystickEnd}
         style={controlStyle('joystick')}
       >
-        {editMode && <em>{CONTROL_LABELS.joystick}</em>}
+        {editMode && <em>{labels.joystick || CONTROL_LABELS.joystick}</em>}
         <span className="mobile-joystick-ring" />
         <span
           className={stick.active ? 'mobile-joystick-thumb active' : 'mobile-joystick-thumb'}
@@ -316,7 +317,7 @@ export function MobileTouchControls({
         style={controlStyle('aim')}
         type="button"
       >
-        Aim
+        {labels.aim || CONTROL_LABELS.aim}
       </button>
       <button
         className={[
@@ -334,7 +335,7 @@ export function MobileTouchControls({
         style={controlStyle('shoot')}
         type="button"
       >
-        Shoot
+        {labels.shoot || CONTROL_LABELS.shoot}
       </button>
       <button
         className={[
@@ -351,7 +352,7 @@ export function MobileTouchControls({
         style={controlStyle('jump')}
         type="button"
       >
-        Jump
+        {labels.jump || CONTROL_LABELS.jump}
       </button>
       <button
         className={[
@@ -368,7 +369,7 @@ export function MobileTouchControls({
         style={controlStyle('reload')}
         type="button"
       >
-        Reload
+        {labels.reload || CONTROL_LABELS.reload}
       </button>
       <button
         className={[
@@ -394,12 +395,12 @@ export function MobileTouchControls({
         style={controlStyle('grenade')}
         type="button"
       >
-        Grenade
+        {labels.grenade || CONTROL_LABELS.grenade}
       </button>
 
       {grenadeCount > 0 && grenadeCharge > 0 && (
         <div className="mobile-grenade-power">
-          <span>Throw</span>
+          <span>{labels.throw || 'Throw'}</span>
           <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
         </div>
       )}

@@ -4,12 +4,27 @@ import { StoreVisual } from './StoreVisual';
 import { googleClientId } from '../api/users';
 import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
+import {
+  createTranslator,
+  displayAccessory,
+  displayGameMode,
+  displayGrenadeSkin,
+  displayKeybindLabel,
+  displayMap,
+  displayMission,
+  displayOutfit,
+  displayWeapon,
+  displayWeaponSkin,
+  LANGUAGES,
+} from '../i18n';
 
 export function Lobby(props) {
+  const t = props.t || createTranslator(props.language);
+  const dir = LANGUAGES[props.language || 'en']?.dir || 'ltr';
   if (props.screen === 'loading') {
     return (
-      <main className="menu-shell">
-        <div className="session-loader">Restoring session...</div>
+      <main className="menu-shell" dir={dir}>
+        <div className="session-loader">{t('loading.session')}</div>
       </main>
     );
   }
@@ -33,24 +48,25 @@ export function Lobby(props) {
   return <MainMenu {...props} />;
 }
 
-function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, handleGoogleLogin, setAuthMode, setCredentials }) {
+function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, handleGoogleLogin, language = 'en', setAuthMode, setCredentials, t }) {
   const mode = authMode || null;
   const outfit = OUTFITS[0];
+  const dir = LANGUAGES[language]?.dir || 'ltr';
 
   return (
-    <main className="menu-shell auth-screen">
+    <main className="menu-shell auth-screen" dir={dir}>
       <section className={mode ? 'auth-stage form-mode' : 'auth-stage'}>
         <div className="auth-landing-art">
           <h1 className="auth-title">DEAD ZONE</h1>
-          <span className="auth-subtitle">Enter the arena</span>
+          <span className="auth-subtitle">{t('auth.subtitle')}</span>
         </div>
         <CharacterPreview outfit={outfit} variant="hero" />
 
         {!mode && (
           <div className="auth-choice">
-            <button className="primary-command" onClick={() => setAuthMode('login')}>Login</button>
-            <button className="secondary-command" onClick={() => setAuthMode('register')}>Register</button>
-            <GoogleSignInButton onLogin={handleGoogleLogin} />
+            <button className="primary-command" onClick={() => setAuthMode('login')}>{t('auth.login')}</button>
+            <button className="secondary-command" onClick={() => setAuthMode('register')}>{t('auth.register')}</button>
+            <GoogleSignInButton onLogin={handleGoogleLogin} t={t} />
           </div>
         )}
 
@@ -63,12 +79,12 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             }}
           >
             <header>
-              <strong>{mode === 'login' ? 'Welcome back' : mode === 'verify' ? 'Verify email' : 'Create account'}</strong>
+              <strong>{mode === 'login' ? t('auth.welcomeBack') : mode === 'verify' ? t('auth.verifyEmail') : t('auth.createAccount')}</strong>
               <button type="button" className="icon-command" title="Close" onClick={() => setAuthMode(null)}>×</button>
             </header>
             {mode !== 'verify' && (
               <label>
-                Username
+                {t('auth.username')}
                 <input
                   autoFocus
                   autoComplete="username"
@@ -79,7 +95,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             )}
             {(mode === 'register' || mode === 'verify') && (
               <label>
-                Email
+                {t('auth.email')}
                 <input
                   autoFocus={mode === 'verify'}
                   type="email"
@@ -91,7 +107,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             )}
             {mode !== 'verify' && (
               <label>
-                Password
+                {t('auth.password')}
                 <input
                   type="password"
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -102,7 +118,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             )}
             {mode === 'register' && (
               <label>
-                Confirm password
+                {t('auth.confirmPassword')}
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -113,7 +129,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             )}
             {mode === 'verify' && (
               <label>
-                6-digit code
+                {t('auth.code')}
                 <input
                   autoComplete="one-time-code"
                   inputMode="numeric"
@@ -125,9 +141,9 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             )}
             {accountStatus && <div className="form-message">{accountStatus}</div>}
             <button className="primary-command" type="submit">
-              {mode === 'login' ? 'Login' : mode === 'verify' ? 'Verify Code' : 'Create Account'}
+              {mode === 'login' ? t('auth.login') : mode === 'verify' ? t('auth.verifyCode') : t('auth.createAccount')}
             </button>
-            {mode !== 'verify' && <GoogleSignInButton onLogin={handleGoogleLogin} compact />}
+            {mode !== 'verify' && <GoogleSignInButton onLogin={handleGoogleLogin} compact t={t} />}
           </form>
         )}
       </section>
@@ -135,7 +151,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
   );
 }
 
-function GoogleSignInButton({ compact = false, onLogin }) {
+function GoogleSignInButton({ compact = false, onLogin, t = createTranslator('en') }) {
   const buttonRef = useRef(null);
   const renderedRef = useRef(false);
 
@@ -191,7 +207,7 @@ function GoogleSignInButton({ compact = false, onLogin }) {
   if (!googleClientId) {
     return (
       <small className="google-login-hint">
-        Google login needs VITE_GOOGLE_CLIENT_ID.
+        {t('auth.googleHint')}
       </small>
     );
   }
@@ -208,6 +224,7 @@ function MainMenu({
   account,
   claimMissionReward,
   grenadeSkinId,
+  language = 'en',
   level,
   levelProgress,
   missionCards,
@@ -217,24 +234,26 @@ function MainMenu({
   rerollMission,
   setPanel,
   signOut,
+  t,
   wallet,
   weaponSkinId,
   xp,
 }) {
-  const outfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
-  const accessories = (accessoryIds || []).map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
+  const dir = LANGUAGES[language]?.dir || 'ltr';
+  const outfit = displayOutfit(OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
+  const accessories = (accessoryIds || []).map((id) => displayAccessory(ACCESSORIES.find((item) => item.id === id), language)).filter(Boolean);
 
   return (
-    <main className="menu-shell">
+    <main className="menu-shell" dir={dir}>
       <header className="menu-topbar">
         <div className="menu-brand compact">
           <span>DEADZONE</span>
           <small>{account?.username} / 🪙 {wallet}</small>
         </div>
-        <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
+        <ProgressBadge level={level} levelProgress={levelProgress} t={t} xp={xp} />
         <div className="topbar-actions">
-          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
-          <button className="logout-command" onClick={signOut}>Logout</button>
+          <button className="settings-command" title={t('menu.settings')} aria-label={t('menu.settings')} onClick={() => setPanel('settings')}>⚙</button>
+          <button className="logout-command" onClick={signOut}>{t('menu.logout')}</button>
         </div>
       </header>
       <section className="main-menu">
@@ -247,55 +266,58 @@ function MainMenu({
           variant="hero"
         />
         <div className="main-actions">
-          <button className="secondary-command" onClick={() => setPanel('player')}>My Player</button>
-          <button className="primary-command" onClick={() => setPanel('play')}>Start Playing</button>
+          <button className="secondary-command" onClick={() => setPanel('player')}>{t('menu.myPlayer')}</button>
+          <button className="primary-command" onClick={() => setPanel('play')}>{t('menu.startPlaying')}</button>
         </div>
-        <MissionBoard missions={missionCards} onClaim={claimMissionReward} onReroll={rerollMission} />
+        <MissionBoard language={language} missions={missionCards} onClaim={claimMissionReward} onReroll={rerollMission} t={t} />
       </section>
     </main>
   );
 }
 
-function MissionBoard({ missions = [], onClaim, onReroll }) {
+function MissionBoard({ language = 'en', missions = [], onClaim, onReroll, t }) {
   return (
     <aside className="mission-board">
       <header>
-        <span>Daily Missions</span>
-        <strong>Earn rewards</strong>
+        <span>{t('missions.daily')}</span>
+        <strong>{t('missions.earn')}</strong>
       </header>
       <div className="mission-list">
-        {missions.map((mission) => (
-          <article className={mission.claimed ? 'mission-card claimed' : mission.ready ? 'mission-card ready' : 'mission-card'} key={mission.id}>
-            <div>
-              <strong>{mission.title}</strong>
-              <small>{mission.description}</small>
-            </div>
-            <span>{Math.min(mission.progress, mission.target)}/{mission.target}</span>
-            <i><b style={{ width: `${mission.percent}%` }} /></i>
-            <em>
-              {mission.claimed
-                ? `New mission in ${mission.resetCountdown}`
-                : `🪙 ${mission.rewardMoney} / ${mission.rewardXp} XP`}
-            </em>
-            {mission.ready && !mission.claimed && (
-              <button className="mission-action claim" onClick={() => onClaim?.(mission.id)}>Claim Reward</button>
-            )}
-            {!mission.ready && !mission.claimed && (
-              <button className="mission-action" onClick={() => onReroll?.(mission.id)}>
-                {mission.rerollCost === 0 ? 'Change Free' : `Change 🪙 ${mission.rerollCost}`}
-              </button>
-            )}
-          </article>
-        ))}
+        {missions.map((mission) => {
+          const translatedMission = displayMission(mission, language);
+          return (
+            <article className={mission.claimed ? 'mission-card claimed' : mission.ready ? 'mission-card ready' : 'mission-card'} key={mission.id}>
+              <div>
+                <strong>{translatedMission.title}</strong>
+                <small>{translatedMission.description}</small>
+              </div>
+              <span>{Math.min(mission.progress, mission.target)}/{mission.target}</span>
+              <i><b style={{ width: `${mission.percent}%` }} /></i>
+              <em>
+                {mission.claimed
+                  ? t('missions.newIn', { time: mission.resetCountdown })
+                  : `🪙 ${mission.rewardMoney} / ${mission.rewardXp} XP`}
+              </em>
+              {mission.ready && !mission.claimed && (
+                <button className="mission-action claim" onClick={() => onClaim?.(mission.id)}>{t('missions.claim')}</button>
+              )}
+              {!mission.ready && !mission.claimed && (
+                <button className="mission-action" onClick={() => onReroll?.(mission.id)}>
+                  {mission.rerollCost === 0 ? t('missions.changeFree') : t('missions.changeCost', { cost: mission.rerollCost })}
+                </button>
+              )}
+            </article>
+          );
+        })}
       </div>
     </aside>
   );
 }
-function ProgressBadge({ level, levelProgress, xp }) {
+function ProgressBadge({ level, levelProgress, t = createTranslator('en'), xp }) {
   return (
     <div className="menu-progress-badge">
-      <span>Level {level}</span>
-      <strong>{xp} XP</strong>
+      <span>{t('progress.level', { level })}</span>
+      <strong>{t('progress.xp', { xp })}</strong>
       <i><b style={{ width: `${levelProgress}%` }} /></i>
     </div>
   );
@@ -304,25 +326,40 @@ function ProgressBadge({ level, levelProgress, xp }) {
 function SettingsScreen({
   editingKeybind,
   keybinds,
+  language = 'en',
   level,
   levelProgress,
   resetKeybinds,
   setEditingKeybind,
   setPanel,
+  t,
+  toggleLanguage,
   xp,
 }) {
+  const dir = LANGUAGES[language]?.dir || 'ltr';
+
   return (
-    <main className="menu-shell">
+    <main className="menu-shell" dir={dir}>
       <header className="menu-topbar">
-        <button className="back-command" onClick={() => setPanel('main')}>Back to Main Menu</button>
-        <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
-        <strong>Settings</strong>
+        <button className="back-command" onClick={() => setPanel('main')}>{t('menu.back')}</button>
+        <ProgressBadge level={level} levelProgress={levelProgress} t={t} xp={xp} />
+        <strong>{t('menu.settings')}</strong>
       </header>
       <section className="settings-screen">
         <div className="settings-card">
           <header>
-            <span>Controls</span>
-            <strong>Keyboard Settings</strong>
+            <span>{t('settings.language')}</span>
+            <strong>{t('settings.gameLanguage')}</strong>
+          </header>
+          <button className="language-toggle" onClick={toggleLanguage} type="button">
+            <span>{language === 'he' ? '🇮🇱' : '🇺🇸'}</span>
+            <strong>{LANGUAGES[language]?.label || LANGUAGES.en.label}</strong>
+          </button>
+        </div>
+        <div className="settings-card">
+          <header>
+            <span>{t('settings.controls')}</span>
+            <strong>{t('settings.keyboard')}</strong>
           </header>
           <div className="keybind-list">
             {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
@@ -331,14 +368,14 @@ function SettingsScreen({
                 key={action}
                 onClick={() => setEditingKeybind(action)}
               >
-                <span>{label}</span>
-                <strong>{editingKeybind === action ? 'Press key...' : keybinds[action]}</strong>
+                <span>{displayKeybindLabel(action, label, language)}</span>
+                <strong>{editingKeybind === action ? t('settings.pressKey') : keybinds[action]}</strong>
               </button>
             ))}
           </div>
           <div className="settings-actions">
-            <button className="secondary-command" onClick={resetKeybinds}>Reset Controls</button>
-            <button className="primary-command" onClick={() => setPanel('main')}>Done</button>
+            <button className="secondary-command" onClick={resetKeybinds}>{t('settings.reset')}</button>
+            <button className="primary-command" onClick={() => setPanel('main')}>{t('settings.done')}</button>
           </div>
         </div>
       </section>
@@ -353,6 +390,7 @@ function PlayerScreen({
   buyOrEquipOutfit,
   buyOrEquipWeaponSkin,
   grenadeSkinId,
+  language = 'en',
   ownedGrenadeSkins,
   ownedAccessories,
   ownedOutfits,
@@ -376,6 +414,7 @@ function PlayerScreen({
   setPreviewOutfit,
   setPreviewWeaponSkin,
   selectWeapon,
+  t,
   upgradeWeapon,
   wallet,
   weaponId,
@@ -389,10 +428,11 @@ function PlayerScreen({
   const [weaponStoreTab, setWeaponStoreTab] = useState('type');
   const [clothesStoreTab, setClothesStoreTab] = useState('egg');
   const [selectedStoreItem, setSelectedStoreItem] = useState(null);
-  const outfit = previewOutfit || previewedOutfit || OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
-  const weaponSkin = previewWeaponSkin || previewedWeaponSkin || selectedWeaponSkin;
-  const grenadeSkin = previewGrenadeSkin || previewedGrenadeSkin || selectedGrenadeSkin;
-  const accessories = previewedAccessories || [];
+  const dir = LANGUAGES[language]?.dir || 'ltr';
+  const outfit = displayOutfit(previewOutfit || previewedOutfit || OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
+  const weaponSkin = displayWeaponSkin(previewWeaponSkin || previewedWeaponSkin || selectedWeaponSkin, language);
+  const grenadeSkin = displayGrenadeSkin(previewGrenadeSkin || previewedGrenadeSkin || selectedGrenadeSkin, language);
+  const accessories = (previewedAccessories || []).map((item) => displayAccessory(item, language));
 
   const requestPurchase = (item, owned, action) => {
     if (owned || item.price === 0) {
@@ -401,46 +441,48 @@ function PlayerScreen({
     }
     setPendingPurchase({ item, action });
   };
-  const selectStoreItem = (item, details) => {
-    setSelectedStoreItem({ item, ...details });
-  };
+  const selectStoreItem = (item, details) => setSelectedStoreItem({ item, ...details });
   const accessoriesBySlot = (slots) => ACCESSORIES.filter((item) => slots.includes(item.slot));
   const activeAccessoryIdForSlot = (slot) => previewAccessory?.slot === slot
     ? previewAccessory.id
     : accessoryIds.find((id) => ACCESSORIES.find((accessory) => accessory.id === id)?.slot === slot);
-  const renderAccessoryStoreItem = (item) => (
-    <StoreItem
-      key={item.id}
-      active={activeAccessoryIdForSlot(item.slot) === item.id}
-      color={item.color}
-      equipped={accessoryIds.includes(item.id)}
-      kind={item.slot}
-      name={item.name}
-      owned={ownedAccessories.includes(item.id)}
-      price={item.price}
-      subtitle={item.slot}
-      onPreview={() => {
-        setPreviewAccessory(item);
-        selectStoreItem(item, {
-          action: () => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item)),
-          color: item.color,
-          equipped: accessoryIds.includes(item.id),
-          kind: item.slot,
-          owned: ownedAccessories.includes(item.id),
-          subtitle: item.slot,
-        });
-      }}
-      onAction={() => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item))}
-    />
-  );
+  const renderAccessoryStoreItem = (item) => {
+    const displayItem = displayAccessory(item, language);
+    return (
+      <StoreItem
+        key={item.id}
+        active={activeAccessoryIdForSlot(item.slot) === item.id}
+        color={item.color}
+        equipped={accessoryIds.includes(item.id)}
+        kind={item.slot}
+        name={displayItem.name}
+        owned={ownedAccessories.includes(item.id)}
+        price={item.price}
+        subtitle={displayItem.slotLabel}
+        t={t}
+        onPreview={() => {
+          setPreviewAccessory(item);
+          selectStoreItem({ ...item, name: displayItem.name }, {
+            action: () => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item)),
+            color: item.color,
+            equipped: accessoryIds.includes(item.id),
+            kind: item.slot,
+            owned: ownedAccessories.includes(item.id),
+            subtitle: displayItem.slotLabel,
+          });
+        }}
+        onAction={() => requestPurchase(item, ownedAccessories.includes(item.id), () => buyOrEquipAccessory(item))}
+      />
+    );
+  };
 
   return (
-    <main className="menu-shell">
+    <main className="menu-shell" dir={dir}>
       <header className="menu-topbar">
-        <button className="back-command" onClick={() => setPanel('main')}>← Back to Main Menu</button>
+        <button className="back-command" onClick={() => setPanel('main')}>{t('menu.back')}</button>
         <div className="topbar-actions">
-          <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
-          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
+          <ProgressBadge level={level} levelProgress={levelProgress} t={t} xp={xp} />
+          <button className="settings-command" title={t('menu.settings')} aria-label={t('menu.settings')} onClick={() => setPanel('settings')}>⚙</button>
           <strong>🪙 {wallet}</strong>
         </div>
       </header>
@@ -448,28 +490,28 @@ function PlayerScreen({
         <aside className="customizer-preview">
           <CharacterPreview accessories={accessories} outfit={outfit} weaponColor={weaponSkin.color} grenadeColor={grenadeSkin.color} variant="side" weaponId={weaponId} />
           <strong>{outfit.name}</strong>
-          <span>{WEAPONS[weaponId].name} / {weaponSkin.name} / {grenadeSkin.name}</span>
+          <span>{displayWeapon(weaponId, WEAPONS[weaponId], language).name} / {weaponSkin.name} / {grenadeSkin.name}</span>
           {!!accessories.length && <small>{accessories.map((item) => item.name).join(' / ')}</small>}
         </aside>
         <div className="store-panel">
           <div className="customizer-tabs" role="tablist" aria-label="Customizer sections">
-            <button className={storeCategory === 'clothes' ? 'active' : ''} onClick={() => setStoreCategory('clothes')}>Clothes</button>
-            <button className={storeCategory === 'weapons' ? 'active' : ''} onClick={() => setStoreCategory('weapons')}>Weapons</button>
+            <button className={storeCategory === 'clothes' ? 'active' : ''} onClick={() => setStoreCategory('clothes')}>{t('store.clothes')}</button>
+            <button className={storeCategory === 'weapons' ? 'active' : ''} onClick={() => setStoreCategory('weapons')}>{t('store.weapons')}</button>
           </div>
           <div className="store-subtabs" role="tablist" aria-label="Store sub sections">
             {storeCategory === 'weapons' ? (
               <>
-                <button className={weaponStoreTab === 'type' ? 'active' : ''} onClick={() => setWeaponStoreTab('type')}>Type</button>
-                <button className={weaponStoreTab === 'skin' ? 'active' : ''} onClick={() => setWeaponStoreTab('skin')}>Weapon Skin</button>
-                <button className={weaponStoreTab === 'grenade' ? 'active' : ''} onClick={() => setWeaponStoreTab('grenade')}>Grenade</button>
+                <button className={weaponStoreTab === 'type' ? 'active' : ''} onClick={() => setWeaponStoreTab('type')}>{t('store.type')}</button>
+                <button className={weaponStoreTab === 'skin' ? 'active' : ''} onClick={() => setWeaponStoreTab('skin')}>{t('store.weaponSkin')}</button>
+                <button className={weaponStoreTab === 'grenade' ? 'active' : ''} onClick={() => setWeaponStoreTab('grenade')}>{t('store.grenade')}</button>
               </>
             ) : (
               <>
-                <button className={clothesStoreTab === 'egg' ? 'active' : ''} onClick={() => setClothesStoreTab('egg')}>Egg</button>
-                <button className={clothesStoreTab === 'head' ? 'active' : ''} onClick={() => setClothesStoreTab('head')}>Head</button>
-                <button className={clothesStoreTab === 'shirt' ? 'active' : ''} onClick={() => setClothesStoreTab('shirt')}>Shirt</button>
-                <button className={clothesStoreTab === 'gear' ? 'active' : ''} onClick={() => setClothesStoreTab('gear')}>Gear</button>
-                <button className={clothesStoreTab === 'legs' ? 'active' : ''} onClick={() => setClothesStoreTab('legs')}>Legs</button>
+                <button className={clothesStoreTab === 'egg' ? 'active' : ''} onClick={() => setClothesStoreTab('egg')}>{t('store.egg')}</button>
+                <button className={clothesStoreTab === 'head' ? 'active' : ''} onClick={() => setClothesStoreTab('head')}>{t('store.head')}</button>
+                <button className={clothesStoreTab === 'shirt' ? 'active' : ''} onClick={() => setClothesStoreTab('shirt')}>{t('store.shirt')}</button>
+                <button className={clothesStoreTab === 'gear' ? 'active' : ''} onClick={() => setClothesStoreTab('gear')}>{t('store.gear')}</button>
+                <button className={clothesStoreTab === 'legs' ? 'active' : ''} onClick={() => setClothesStoreTab('legs')}>{t('store.legs')}</button>
               </>
             )}
           </div>
@@ -477,128 +519,88 @@ function PlayerScreen({
             {storeCategory === 'clothes' ? (
               <>
                 {clothesStoreTab === 'egg' && (
-                  <StoreSection title="Egg Colors">
-                    {OUTFITS.map((item) => (
-                      <StoreItem
-                        key={item.id}
-                        active={(previewOutfit?.id || outfitId) === item.id}
-                        color={item.displayColor || item.shell}
-                        equipped={outfitId === item.id}
-                        kind="outfit"
-                        name={item.name}
-                        owned={ownedOutfits.includes(item.id)}
-                        price={item.price}
-                        onPreview={() => {
-                          setPreviewOutfit(item);
-                          selectStoreItem(item, {
-                            action: () => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item)),
-                            color: item.displayColor || item.shell,
-                            equipped: outfitId === item.id,
-                            kind: 'outfit',
-                            owned: ownedOutfits.includes(item.id),
-                          });
-                        }}
-                        onAction={() => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item))}
-                      />
-                    ))}
+                  <StoreSection title={t('store.eggColors')}>
+                    {OUTFITS.map((item) => {
+                      const displayItem = displayOutfit(item, language);
+                      return (
+                        <StoreItem
+                          key={item.id}
+                          active={(previewOutfit?.id || outfitId) === item.id}
+                          color={item.displayColor || item.shell}
+                          equipped={outfitId === item.id}
+                          kind="outfit"
+                          name={displayItem.name}
+                          owned={ownedOutfits.includes(item.id)}
+                          price={item.price}
+                          t={t}
+                          onPreview={() => {
+                            setPreviewOutfit(item);
+                            selectStoreItem({ ...item, name: displayItem.name }, {
+                              action: () => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item)),
+                              color: item.displayColor || item.shell,
+                              equipped: outfitId === item.id,
+                              kind: 'outfit',
+                              owned: ownedOutfits.includes(item.id),
+                            });
+                          }}
+                          onAction={() => requestPurchase(item, ownedOutfits.includes(item.id), () => buyOrEquipOutfit(item))}
+                        />
+                      );
+                    })}
                   </StoreSection>
                 )}
-                {clothesStoreTab === 'head' && (
-                  <StoreSection title="Head Gear">
-                    {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryStoreItem)}
-                  </StoreSection>
-                )}
-                {clothesStoreTab === 'shirt' && (
-                  <StoreSection title="Shirts">
-                    {accessoriesBySlot(['shirt']).map(renderAccessoryStoreItem)}
-                  </StoreSection>
-                )}
-                {clothesStoreTab === 'gear' && (
-                  <StoreSection title="Body Gear">
-                    {accessoriesBySlot(['belt', 'backpack', 'watch', 'tail']).map(renderAccessoryStoreItem)}
-                  </StoreSection>
-                )}
-                {clothesStoreTab === 'legs' && (
-                  <StoreSection title="Leg Gear">
-                    {accessoriesBySlot(['shoes']).map(renderAccessoryStoreItem)}
-                  </StoreSection>
-                )}
+                {clothesStoreTab === 'head' && <StoreSection title={t('store.headGear')}>{accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryStoreItem)}</StoreSection>}
+                {clothesStoreTab === 'shirt' && <StoreSection title={t('store.shirts')}>{accessoriesBySlot(['shirt']).map(renderAccessoryStoreItem)}</StoreSection>}
+                {clothesStoreTab === 'gear' && <StoreSection title={t('store.bodyGear')}>{accessoriesBySlot(['belt', 'backpack', 'watch', 'tail']).map(renderAccessoryStoreItem)}</StoreSection>}
+                {clothesStoreTab === 'legs' && <StoreSection title={t('store.legGear')}>{accessoriesBySlot(['shoes']).map(renderAccessoryStoreItem)}</StoreSection>}
               </>
             ) : (
               <>
                 {weaponStoreTab === 'type' && (
-                  <StoreSection title="Weapon Type">
-                    {Object.entries(WEAPONS).map(([id, weapon]) => (
-                      <button
-                        className={weaponId === id ? 'loadout-row active' : 'loadout-row'}
-                        disabled={!weaponUnlocked(weapon)}
-                        key={id}
-                        onClick={() => weaponUnlocked(weapon) && selectWeapon(id)}
-                      >
-                        <StoreVisual color={weapon.color} kind="weapon" weaponId={id} />
-                        <span><strong>{weapon.name}</strong><small>{weapon.tag}</small></span>
-                        <span>MK {weaponUpgrades[id] || 0}</span>
-                        {weaponUnlocked(weapon) && (
-                          <em onClick={(event) => { event.stopPropagation(); upgradeWeapon(id); }}>
-                            Upgrade
-                          </em>
-                        )}
-                      </button>
-                    ))}
+                  <StoreSection title={t('store.weaponType')}>
+                    {Object.entries(WEAPONS).map(([id, item]) => {
+                      const weapon = displayWeapon(id, item, language);
+                      return (
+                        <button className={weaponId === id ? 'loadout-row active' : 'loadout-row'} disabled={!weaponUnlocked(item)} key={id} onClick={() => weaponUnlocked(item) && selectWeapon(id)}>
+                          <StoreVisual color={item.color} kind="weapon" weaponId={id} />
+                          <span><strong>{weapon.name}</strong><small>{weapon.tag}</small></span>
+                          <span>MK {weaponUpgrades[id] || 0}</span>
+                          {weaponUnlocked(item) && <em onClick={(event) => { event.stopPropagation(); upgradeWeapon(id); }}>{t('store.upgrade')}</em>}
+                        </button>
+                      );
+                    })}
                   </StoreSection>
                 )}
                 {weaponStoreTab === 'skin' && (
-                  <StoreSection title="Weapon Skins">
-                    {WEAPON_SKINS.map((item) => (
-                      <StoreItem
-                        key={item.id}
-                        active={(previewWeaponSkin?.id || weaponSkinId) === item.id}
-                        color={item.color}
-                        equipped={weaponSkinId === item.id}
-                        kind="weapon-skin"
-                        name={item.name}
-                        owned={ownedWeaponSkins.includes(item.id)}
-                        price={item.price}
-                        onPreview={() => {
-                          setPreviewWeaponSkin(item);
-                          selectStoreItem(item, {
-                            action: () => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item)),
-                            color: item.color,
-                            equipped: weaponSkinId === item.id,
-                            kind: 'weapon-skin',
-                            owned: ownedWeaponSkins.includes(item.id),
-                          });
-                        }}
-                        onAction={() => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item))}
-                      />
-                    ))}
+                  <StoreSection title={t('store.weaponSkins')}>
+                    {WEAPON_SKINS.map((item) => {
+                      const displayItem = displayWeaponSkin(item, language);
+                      return (
+                        <StoreItem key={item.id} active={(previewWeaponSkin?.id || weaponSkinId) === item.id} color={item.color} equipped={weaponSkinId === item.id} kind="weapon-skin" name={displayItem.name} owned={ownedWeaponSkins.includes(item.id)} price={item.price} t={t}
+                          onPreview={() => {
+                            setPreviewWeaponSkin(item);
+                            selectStoreItem({ ...item, name: displayItem.name }, { action: () => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item)), color: item.color, equipped: weaponSkinId === item.id, kind: 'weapon-skin', owned: ownedWeaponSkins.includes(item.id) });
+                          }}
+                          onAction={() => requestPurchase(item, ownedWeaponSkins.includes(item.id), () => buyOrEquipWeaponSkin(item))}
+                        />
+                      );
+                    })}
                   </StoreSection>
                 )}
                 {weaponStoreTab === 'grenade' && (
-                  <StoreSection title="Grenade Skins">
-                    {GRENADE_SKINS.map((item) => (
-                      <StoreItem
-                        key={item.id}
-                        active={(previewGrenadeSkin?.id || grenadeSkinId) === item.id}
-                        color={item.color}
-                        equipped={grenadeSkinId === item.id}
-                        kind="grenade"
-                        name={item.name}
-                        owned={ownedGrenadeSkins.includes(item.id)}
-                        price={item.price}
-                        onPreview={() => {
-                          setPreviewGrenadeSkin(item);
-                          selectStoreItem(item, {
-                            action: () => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item)),
-                            color: item.color,
-                            equipped: grenadeSkinId === item.id,
-                            kind: 'grenade',
-                            owned: ownedGrenadeSkins.includes(item.id),
-                          });
-                        }}
-                        onAction={() => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item))}
-                      />
-                    ))}
+                  <StoreSection title={t('store.grenadeSkins')}>
+                    {GRENADE_SKINS.map((item) => {
+                      const displayItem = displayGrenadeSkin(item, language);
+                      return (
+                        <StoreItem key={item.id} active={(previewGrenadeSkin?.id || grenadeSkinId) === item.id} color={item.color} equipped={grenadeSkinId === item.id} kind="grenade" name={displayItem.name} owned={ownedGrenadeSkins.includes(item.id)} price={item.price} t={t}
+                          onPreview={() => {
+                            setPreviewGrenadeSkin(item);
+                            selectStoreItem({ ...item, name: displayItem.name }, { action: () => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item)), color: item.color, equipped: grenadeSkinId === item.id, kind: 'grenade', owned: ownedGrenadeSkins.includes(item.id) });
+                          }}
+                          onAction={() => requestPurchase(item, ownedGrenadeSkins.includes(item.id), () => buyOrEquipGrenadeSkin(item))}
+                        />
+                      );
+                    })}
                   </StoreSection>
                 )}
               </>
@@ -610,41 +612,33 @@ function PlayerScreen({
                 <StoreVisual color={selectedStoreItem.color} kind={selectedStoreItem.kind} />
                 <span>{selectedStoreItem.subtitle || selectedStoreItem.kind}</span>
                 <strong>{selectedStoreItem.item.name}</strong>
-                <small>{selectedStoreItem.owned ? (selectedStoreItem.equipped ? 'Equipped' : 'Owned') : 'Available'}</small>
-                <b>{selectedStoreItem.owned ? 'Ready' : <><span aria-hidden="true">🪙</span> {selectedStoreItem.item.price}</>}</b>
+                <small>{selectedStoreItem.owned ? (selectedStoreItem.equipped ? t('store.equipped') : t('store.owned')) : t('store.available')}</small>
+                <b>{selectedStoreItem.owned ? t('store.ready') : <>🪙 {selectedStoreItem.item.price}</>}</b>
                 <button className="primary-command" onClick={selectedStoreItem.action}>
-                  {selectedStoreItem.owned ? (selectedStoreItem.equipped ? 'Equipped' : 'Equip') : 'Buy'}
+                  {selectedStoreItem.owned ? (selectedStoreItem.equipped ? t('store.equipped') : t('store.equip')) : t('store.buy')}
                 </button>
               </>
             ) : (
               <>
-                <span>Selection</span>
-                <strong>Tap an item</strong>
-                <small>Price and action will appear here</small>
+                <span>{t('store.selection')}</span>
+                <strong>{t('store.tapItem')}</strong>
+                <small>{t('store.priceHint')}</small>
               </>
             )}
           </aside>
           <div className="customizer-footer">
-            <button className="primary-command" onClick={() => setPanel('main')}>Continue</button>
+            <button className="primary-command" onClick={() => setPanel('main')}>{t('store.continue')}</button>
           </div>
         </div>
       </section>
       {pendingPurchase && (
         <div className="purchase-modal" role="dialog" aria-modal="true">
           <div>
-            <strong>Confirm purchase</strong>
-            <span>{pendingPurchase.item.name} costs 🪙 {pendingPurchase.item.price}.</span>
+            <strong>{t('store.confirmPurchase')}</strong>
+            <span>{t('store.costs', { name: pendingPurchase.item.name, price: pendingPurchase.item.price })}</span>
             <div className="purchase-actions">
-              <button className="secondary-command" onClick={() => setPendingPurchase(null)}>Cancel</button>
-              <button
-                className="primary-command"
-                onClick={() => {
-                  pendingPurchase.action();
-                  setPendingPurchase(null);
-                }}
-              >
-                Buy
-              </button>
+              <button className="secondary-command" onClick={() => setPendingPurchase(null)}>{t('store.cancel')}</button>
+              <button className="primary-command" onClick={() => { pendingPurchase.action(); setPendingPurchase(null); }}>{t('store.buy')}</button>
             </div>
           </div>
         </div>
@@ -662,7 +656,7 @@ function StoreSection({ children, title }) {
   );
 }
 
-function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, owned, price, subtitle }) {
+function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, owned, price, subtitle, t = createTranslator('en') }) {
   return (
     <article className={active ? 'store-item active' : 'store-item'}>
       <button className="store-preview" onClick={onPreview || onAction}>
@@ -671,7 +665,7 @@ function StoreItem({ active, color, equipped, kind, name, onAction, onPreview, o
         {subtitle && <small>{subtitle}</small>}
       </button>
       <button className="store-buy" onClick={onAction}>
-        {owned ? (equipped ? 'Equipped' : 'Equip') : `🪙 ${price}`}
+        {owned ? (equipped ? t('store.equipped') : t('store.equip')) : `🪙 ${price}`}
       </button>
     </article>
   );
@@ -685,6 +679,7 @@ function PlayScreen({
   inviteFriend,
   joinMatch,
   joinRoomByCode,
+  language = 'en',
   level,
   levelProgress,
   lobbyStatus,
@@ -700,82 +695,67 @@ function PlayScreen({
   setPanel,
   setRoomDraft,
   setSelectedRoomId,
+  t,
   xp,
 }) {
   const [gameCode, setGameCode] = useState('');
+  const dir = LANGUAGES[language]?.dir || 'ltr';
 
   return (
-    <main className="menu-shell">
+    <main className="menu-shell" dir={dir}>
       <header className="menu-topbar">
-        <button className="back-command" onClick={() => setPanel('main')}>← Back to Main Menu</button>
+        <button className="back-command" onClick={() => setPanel('main')}>{t('menu.back')}</button>
         <div className="topbar-actions">
-          <ProgressBadge level={level} levelProgress={levelProgress} xp={xp} />
-          <button className="settings-command" title="Settings" aria-label="Settings" onClick={() => setPanel('settings')}>⚙</button>
-          <strong>Multiplayer Lobby</strong>
+          <ProgressBadge level={level} levelProgress={levelProgress} t={t} xp={xp} />
+          <button className="settings-command" title={t('menu.settings')} aria-label={t('menu.settings')} onClick={() => setPanel('settings')}>⚙</button>
+          <strong>{t('lobby.title')}</strong>
         </div>
       </header>
       <section className="play-lobby">
         <div className="multiplayer-hub">
           <div className="room-browser">
-          <header>
-            <div>
-              <span>OPEN ROOMS</span>
-              <strong>Choose a battle</strong>
-            </div>
-            <button className="add-room-command" title="Create a new room" onClick={() => setPanel('create')}>+</button>
-          </header>
-
-          {panel === 'create' ? (
-            <CreateRoomForm
-              createRoom={createRoom}
-              mapUnlocked={mapUnlocked}
-              roomDraft={roomDraft}
-              setPanel={setPanel}
-              setRoomDraft={setRoomDraft}
-            />
-          ) : (
-            <>
-              <div className="room-list-clean">
-                {rooms.map((room) => {
-                  const map = MAPS.find((item) => item.id === room.mapId) || MAPS[0];
-                  const mode = GAME_MODES.find((item) => item.id === room.gameMode) || GAME_MODES[0];
-                  return (
-                    <button
-                      className={room.id === selectedRoomId ? 'room-card active' : 'room-card'}
-                      key={room.id}
-                      onClick={() => setSelectedRoomId(room.id)}
-                    >
-                      <span className="room-color" style={{ background: map.accent }} />
-                      <span><strong>{room.name}</strong><small>{mode.short} / {map.name} / First to {room.scoreLimit} / {room.timeLimitMinutes} min / Code {room.id}</small></span>
-                      <span>{room.players}/{room.maxPlayers}</span>
-                    </button>
-                  );
-                })}
-                {!rooms.length && <div className="empty-rooms">No rooms are currently open.</div>}
+            <header>
+              <div>
+                <span>{t('lobby.openRooms')}</span>
+                <strong>{t('lobby.chooseBattle')}</strong>
               </div>
-              <button className="primary-command join-room-command" disabled={!selectedRoomId} onClick={joinMatch}>
-                Join Selected Room
-              </button>
-              <form
-                className="game-code-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  joinRoomByCode(gameCode);
-                }}
-              >
-                <label>
-                  Game Code
-                  <input
-                    placeholder="Enter invite code"
-                    value={gameCode}
-                    onChange={(event) => setGameCode(event.target.value.toUpperCase())}
-                  />
-                </label>
-                <button type="submit">Find Room</button>
-              </form>
-            </>
-          )}
-          {panel !== 'create' && lobbyStatus && <div className="lobby-message">{lobbyStatus}</div>}
+              <button className="add-room-command" title={t('lobby.createRoom')} onClick={() => setPanel('create')}>+</button>
+            </header>
+
+            {panel === 'create' ? (
+              <CreateRoomForm createRoom={createRoom} language={language} mapUnlocked={mapUnlocked} roomDraft={roomDraft} setPanel={setPanel} setRoomDraft={setRoomDraft} t={t} />
+            ) : (
+              <>
+                <div className="room-list-clean">
+                  {rooms.map((room) => {
+                    const map = displayMap(MAPS.find((item) => item.id === room.mapId) || MAPS[0], language);
+                    const mode = displayGameMode(GAME_MODES.find((item) => item.id === room.gameMode) || GAME_MODES[0], language);
+                    return (
+                      <button className={room.id === selectedRoomId ? 'room-card active' : 'room-card'} key={room.id} onClick={() => setSelectedRoomId(room.id)}>
+                        <span className="room-color" style={{ background: map.accent }} />
+                        <span>
+                          <strong>{room.name}</strong>
+                          <small>{mode.short} / {map.name} / {t('lobby.firstTo', { score: room.scoreLimit })} / {t('lobby.minutesShort', { minutes: room.timeLimitMinutes })} / {t('lobby.code', { code: room.id })}</small>
+                        </span>
+                        <span>{room.players}/{room.maxPlayers}</span>
+                      </button>
+                    );
+                  })}
+                  {!rooms.length && <div className="empty-rooms">{t('lobby.empty')}</div>}
+                </div>
+                <button className="primary-command join-room-command" disabled={!selectedRoomId} onClick={joinMatch}>
+                  {t('lobby.joinSelected')}
+                </button>
+                <form className="game-code-form" onSubmit={(event) => { event.preventDefault(); joinRoomByCode(gameCode); }}>
+                  <label>
+                    {t('lobby.gameCode')}
+                    <input placeholder={t('lobby.invitePlaceholder')} value={gameCode} onChange={(event) => setGameCode(event.target.value.toUpperCase())} />
+                  </label>
+                  <button type="submit">{t('lobby.findRoom')}</button>
+                </form>
+              </>
+            )}
+            {panel !== 'create' && lobbyStatus && <div className="lobby-message">{lobbyStatus}</div>}
           </div>
           <SocialPanel
             answerFriendRequest={answerFriendRequest}
@@ -786,6 +766,7 @@ function PlayScreen({
             requestFriendship={requestFriendship}
             selectedRoom={selectedRoom}
             social={social}
+            t={t}
           />
         </div>
       </section>
@@ -802,6 +783,7 @@ function SocialPanel({
   requestFriendship,
   selectedRoom,
   social = {},
+  t,
 }) {
   const [tab, setTab] = useState('friends');
   const [query, setQuery] = useState('');
@@ -811,55 +793,45 @@ function SocialPanel({
     <aside className="social-panel">
       <header>
         <div>
-          <span>SQUAD</span>
-          <strong>Friends & Invites</strong>
+          <span>{t('social.squad')}</span>
+          <strong>{t('social.friendsInvites')}</strong>
         </div>
         {!!requestCount && <b>{requestCount}</b>}
       </header>
       <div className="social-tabs">
-        <button className={tab === 'friends' ? 'active' : ''} onClick={() => setTab('friends')}>Friends</button>
-        <button className={tab === 'requests' ? 'active' : ''} onClick={() => setTab('requests')}>Requests</button>
-        <button className={tab === 'invites' ? 'active' : ''} onClick={() => setTab('invites')}>Invites</button>
+        <button className={tab === 'friends' ? 'active' : ''} onClick={() => setTab('friends')}>{t('social.friends')}</button>
+        <button className={tab === 'requests' ? 'active' : ''} onClick={() => setTab('requests')}>{t('social.requests')}</button>
+        <button className={tab === 'invites' ? 'active' : ''} onClick={() => setTab('invites')}>{t('social.invites')}</button>
       </div>
       <div className="social-scroll">
         {tab === 'friends' && (
           <>
-            <form
-              className="friend-search"
-              onSubmit={(event) => {
-                event.preventDefault();
-                findPlayers(query);
-              }}
-            >
-              <input
-                placeholder="Search username"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <button type="submit" title="Search players">Search</button>
+            <form className="friend-search" onSubmit={(event) => { event.preventDefault(); findPlayers(query); }}>
+              <input placeholder={t('social.searchPlaceholder')} value={query} onChange={(event) => setQuery(event.target.value)} />
+              <button type="submit" title={t('social.search')}>{t('social.search')}</button>
             </form>
             {!!playerSearchResults.length && (
               <div className="social-list search-results">
                 {playerSearchResults.map((player) => (
                   <div className="social-row" key={player.id}>
-                    <span><strong>{player.username}</strong><small>Level {player.level}</small></span>
-                    <button onClick={() => requestFriendship(player.username)}>Add</button>
+                    <span><strong>{player.username}</strong><small>{t('progress.level', { level: player.level })}</small></span>
+                    <button onClick={() => requestFriendship(player.username)}>{t('social.add')}</button>
                   </div>
                 ))}
               </div>
             )}
             <div className="social-section-title">
-              <span>Your friends</span>
-              <small>{selectedRoom ? `Invite to ${selectedRoom.id}` : 'Select a room first'}</small>
+              <span>{t('social.yourFriends')}</span>
+              <small>{selectedRoom ? t('social.inviteTo', { room: selectedRoom.id }) : t('social.selectRoom')}</small>
             </div>
             <div className="social-list">
               {(social.friends || []).map((friend) => (
                 <div className="social-row" key={friend.id}>
-                  <span><strong>{friend.username}</strong><small>Level {friend.level}</small></span>
-                  <button disabled={!selectedRoom} onClick={() => inviteFriend(friend.id)}>Invite</button>
+                  <span><strong>{friend.username}</strong><small>{t('progress.level', { level: friend.level })}</small></span>
+                  <button disabled={!selectedRoom} onClick={() => inviteFriend(friend.id)}>{t('social.invite')}</button>
                 </div>
               ))}
-              {!social.friends?.length && <p className="social-empty">Search for a username and send your first friend request.</p>}
+              {!social.friends?.length && <p className="social-empty">{t('social.emptyFriends')}</p>}
             </div>
           </>
         )}
@@ -867,21 +839,19 @@ function SocialPanel({
           <div className="social-list">
             {(social.incomingRequests || []).map((request) => (
               <div className="social-row stacked" key={request.id}>
-                <span><strong>{request.user.username}</strong><small>wants to be your friend</small></span>
+                <span><strong>{request.user.username}</strong><small>{t('social.wantsFriend')}</small></span>
                 <div>
-                  <button onClick={() => answerFriendRequest(request.id, true)}>Accept</button>
-                  <button className="muted" onClick={() => answerFriendRequest(request.id, false)}>Decline</button>
+                  <button onClick={() => answerFriendRequest(request.id, true)}>{t('social.accept')}</button>
+                  <button className="muted" onClick={() => answerFriendRequest(request.id, false)}>{t('social.decline')}</button>
                 </div>
               </div>
             ))}
             {(social.outgoingRequests || []).map((request) => (
               <div className="social-row pending" key={request.id}>
-                <span><strong>{request.user.username}</strong><small>Request pending</small></span>
+                <span><strong>{request.user.username}</strong><small>{t('social.pending')}</small></span>
               </div>
             ))}
-            {!social.incomingRequests?.length && !social.outgoingRequests?.length && (
-              <p className="social-empty">No pending friend requests.</p>
-            )}
+            {!social.incomingRequests?.length && !social.outgoingRequests?.length && <p className="social-empty">{t('social.noRequests')}</p>}
           </div>
         )}
         {tab === 'invites' && (
@@ -890,15 +860,15 @@ function SocialPanel({
               <div className="social-row stacked" key={invite.id}>
                 <span>
                   <strong>{invite.sender.username}</strong>
-                  <small>{invite.room.name} / Code {invite.room.id}</small>
+                  <small>{t('social.roomInvite', { room: invite.room.name, code: invite.room.id })}</small>
                 </span>
                 <div>
-                  <button onClick={() => answerRoomInvite(invite.id, true)}>Accept</button>
-                  <button className="muted" onClick={() => answerRoomInvite(invite.id, false)}>Decline</button>
+                  <button onClick={() => answerRoomInvite(invite.id, true)}>{t('social.accept')}</button>
+                  <button className="muted" onClick={() => answerRoomInvite(invite.id, false)}>{t('social.decline')}</button>
                 </div>
               </div>
             ))}
-            {!social.roomInvites?.length && <p className="social-empty">No room invitations right now.</p>}
+            {!social.roomInvites?.length && <p className="social-empty">{t('social.noInvites')}</p>}
           </div>
         )}
       </div>
@@ -906,100 +876,63 @@ function SocialPanel({
   );
 }
 
-function CreateRoomForm({ createRoom, mapUnlocked, roomDraft, setPanel, setRoomDraft }) {
+function CreateRoomForm({ createRoom, language = 'en', mapUnlocked, roomDraft, setPanel, setRoomDraft, t }) {
   const modeRules = GAME_MODE_RULES[roomDraft.gameMode] || GAME_MODE_RULES['team-deathmatch'];
   return (
     <div className="create-room-form">
       <label>
-        Room name
-        <input
-          value={roomDraft.name}
-          onChange={(event) => setRoomDraft((draft) => ({ ...draft, name: event.target.value }))}
-        />
+        {t('room.name')}
+        <input value={roomDraft.name} onChange={(event) => setRoomDraft((draft) => ({ ...draft, name: event.target.value }))} />
       </label>
       <div className="map-choice-grid">
-        {MAPS.map((map) => (
-          <button
-            className={roomDraft.mapId === map.id ? 'map-choice active' : 'map-choice'}
-            disabled={!mapUnlocked(map)}
-            key={map.id}
-            onClick={() => setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}
-          >
-            <i style={{ background: map.accent }} />
-            <span>{map.name}</span>
-          </button>
-        ))}
+        {MAPS.map((map) => {
+          const display = displayMap(map, language);
+          return (
+            <button className={roomDraft.mapId === map.id ? 'map-choice active' : 'map-choice'} disabled={!mapUnlocked(map)} key={map.id} onClick={() => setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}>
+              <i style={{ background: map.accent }} />
+              <span>{display.name}</span>
+            </button>
+          );
+        })}
       </div>
       <div className="mode-choice-grid">
-        {GAME_MODES.map((mode) => (
-          <button
-            className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'}
-            key={mode.id}
-            onClick={() => setRoomDraft((draft) => ({
-              ...draft,
-              gameMode: mode.id,
-              scoreLimit: GAME_MODE_RULES[mode.id].defaultScore,
-            }))}
-          >
-            <strong>{mode.short}</strong>
-            <span>{mode.name}</span>
-            <small>{mode.description}</small>
-          </button>
-        ))}
+        {GAME_MODES.map((mode) => {
+          const display = displayGameMode(mode, language);
+          return (
+            <button className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'} key={mode.id} onClick={() => setRoomDraft((draft) => ({ ...draft, gameMode: mode.id, scoreLimit: GAME_MODE_RULES[mode.id].defaultScore }))}>
+              <strong>{display.short}</strong>
+              <span>{display.name}</span>
+              <small>{display.description}</small>
+            </button>
+          );
+        })}
       </div>
       <div className="room-rule-grid">
         <label>
-          Score target
-          <input
-            type="number"
-            min={modeRules.minScore}
-            max={modeRules.maxScore}
-            step={modeRules.scoreStep}
-            value={roomDraft.scoreLimit}
-            onChange={(event) => setRoomDraft((draft) => ({
-              ...draft,
-              scoreLimit: Math.max(modeRules.minScore, Math.min(modeRules.maxScore, Number(event.target.value) || modeRules.defaultScore)),
-            }))}
-          />
-          <small>Allowed: {modeRules.minScore}–{modeRules.maxScore}</small>
+          {t('room.scoreTarget')}
+          <input type="number" min={modeRules.minScore} max={modeRules.maxScore} step={modeRules.scoreStep} value={roomDraft.scoreLimit} onChange={(event) => setRoomDraft((draft) => ({ ...draft, scoreLimit: Math.max(modeRules.minScore, Math.min(modeRules.maxScore, Number(event.target.value) || modeRules.defaultScore)) }))} />
+          <small>{t('room.allowed', { min: modeRules.minScore, max: modeRules.maxScore })}</small>
         </label>
         <label>
-          Match time
-          <select
-            value={roomDraft.timeLimitMinutes}
-            onChange={(event) => setRoomDraft((draft) => ({ ...draft, timeLimitMinutes: Number(event.target.value) }))}
-          >
-            {MATCH_TIME_OPTIONS.map((minutes) => <option value={minutes} key={minutes}>{minutes} minutes</option>)}
+          {t('room.matchTime')}
+          <select value={roomDraft.timeLimitMinutes} onChange={(event) => setRoomDraft((draft) => ({ ...draft, timeLimitMinutes: Number(event.target.value) }))}>
+            {MATCH_TIME_OPTIONS.map((minutes) => <option value={minutes} key={minutes}>{t('room.minutes', { minutes })}</option>)}
           </select>
-          <small>Maximum 20 minutes</small>
+          <small>{t('room.maxTime')}</small>
         </label>
       </div>
       <label>
-        Max players
-        <input
-          type="number"
-          min="2"
-          max="10"
-          value={roomDraft.maxPlayers}
-          onChange={(event) => setRoomDraft((draft) => ({
-            ...draft,
-            maxPlayers: Math.max(2, Math.min(10, Number(event.target.value) || 2)),
-          }))}
-        />
+        {t('room.maxPlayers')}
+        <input type="number" min="2" max="10" value={roomDraft.maxPlayers} onChange={(event) => setRoomDraft((draft) => ({ ...draft, maxPlayers: Math.max(2, Math.min(10, Number(event.target.value) || 2)) }))} />
       </label>
       <label className="simple-check">
-        <input
-          type="checkbox"
-          checked={roomDraft.allowBots}
-          onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))}
-        />
-        Fill empty spots with bots
+        <input type="checkbox" checked={roomDraft.allowBots} onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))} />
+        {t('room.bots')}
       </label>
       <div className="create-actions">
-        <button className="secondary-command" onClick={() => setPanel('play')}>Cancel</button>
-        <button className="primary-command" onClick={createRoom}>Create Room</button>
+        <button className="secondary-command" onClick={() => setPanel('play')}>{t('room.cancel')}</button>
+        <button className="primary-command" onClick={createRoom}>{t('room.create')}</button>
       </div>
     </div>
   );
 }
-

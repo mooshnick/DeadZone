@@ -4,6 +4,17 @@ import { StoreVisual } from './StoreVisual';
 import { MatchPauseMenu } from './MatchPauseMenu';
 import { MobileTouchControls } from './MobileTouchControls';
 import { ACCESSORIES, GAME_MODES, GRENADE_SKINS, MAPS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
+import {
+  createTranslator,
+  displayAccessory,
+  displayGameMode,
+  displayGrenadeSkin,
+  displayMap,
+  displayOutfit,
+  displayWeapon,
+  displayWeaponSkin,
+  LANGUAGES,
+} from '../i18n';
 
 const MOBILE_CONTROL_DEFAULTS = {
   aim: { x: 76, y: 25, size: 1, opacity: 0.82 },
@@ -52,6 +63,7 @@ export function MatchHud({
   grenadeSkinId,
   health,
   isScoped,
+  language = 'en',
   leaveMatch,
   localId,
   onToggleAccessoryDuringMatch,
@@ -78,6 +90,7 @@ export function MatchHud({
   onMobileShootEnd,
   onMobileShootStart,
   showScoreboard,
+  t = createTranslator(language),
   worldRef,
   xp,
 }) {
@@ -92,13 +105,14 @@ export function MatchHud({
   const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
   const [mobileResetSignal, setMobileResetSignal] = useState(0);
-  const weapon = WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle;
-  const previewOutfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
-  const previewAccessories = equippedAccessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
-  const previewWeaponSkin = WEAPON_SKINS.find((item) => item.id === weaponSkinId) || WEAPON_SKINS[0];
-  const previewGrenadeSkin = GRENADE_SKINS.find((item) => item.id === grenadeSkinId) || GRENADE_SKINS[0];
-  const mapName = MAPS.find((map) => map.id === currentMatch.mapId)?.name || 'Arena';
-  const mode = GAME_MODES.find((item) => item.id === (score.mode || currentMatch.gameMode)) || GAME_MODES[0];
+  const dir = LANGUAGES[language]?.dir || 'ltr';
+  const weapon = displayWeapon(weaponId, WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle, language);
+  const previewOutfit = displayOutfit(OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
+  const previewAccessories = equippedAccessoryIds.map((id) => displayAccessory(ACCESSORIES.find((item) => item.id === id), language)).filter(Boolean);
+  const previewWeaponSkin = displayWeaponSkin(WEAPON_SKINS.find((item) => item.id === weaponSkinId) || WEAPON_SKINS[0], language);
+  const previewGrenadeSkin = displayGrenadeSkin(GRENADE_SKINS.find((item) => item.id === grenadeSkinId) || GRENADE_SKINS[0], language);
+  const mapName = displayMap(MAPS.find((map) => map.id === currentMatch.mapId), language)?.name || 'Arena';
+  const mode = displayGameMode(GAME_MODES.find((item) => item.id === (score.mode || currentMatch.gameMode)) || GAME_MODES[0], language);
   const reloadPercent = Math.round((ammo.reloadProgress || 0) * 100);
   const grenadeCount = Math.min(3, ammo.grenades ?? 0);
   const freeForAll = mode.id === 'free-for-all';
@@ -179,7 +193,7 @@ export function MatchHud({
   }, [deathInfo.isDead, matchResult, showPauseMenu]);
 
   return (
-    <main className={shellClassName} dir="ltr">
+    <main className={shellClassName} dir={dir}>
       <canvas className="world-canvas" ref={canvasRef} />
       <div className="scope-vignette" />
       <div className="sniper-scope-overlay">
@@ -209,20 +223,29 @@ export function MatchHud({
         resetSignal={mobileResetSignal}
         selectedControl={selectedMobileControl}
         scoped={isScoped}
+        labels={{
+          aim: t('mobile.aim'),
+          grenade: t('mobile.grenade'),
+          joystick: t('mobile.move'),
+          jump: t('mobile.jump'),
+          reload: t('mobile.reload'),
+          shoot: t('mobile.shoot'),
+          throw: t('mobile.throw'),
+        }}
       />
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
-        <span>{grenadeCharge > 0.82 ? 'Perfect throw' : 'Grenade power'}</span>
+        <span>{grenadeCharge > 0.82 ? t('grenade.perfect') : t('grenade.power')}</span>
         <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
       </div>
 
       {deathInfo.isDead && deathInfo.focusSeconds > 0 && !showDeathCustomizer && (
         <div className="kill-cam-overlay">
           <div className="kill-cam-banner">
-            <span>KILL CAM</span>
-            <strong>{deathInfo.killerName ? `${deathInfo.killerName} eliminated you` : 'You were eliminated'}</strong>
+            <span>{t('death.killCam')}</span>
+            <strong>{deathInfo.killerName ? t('death.eliminatedBy', { name: deathInfo.killerName }) : t('death.eliminated')}</strong>
             <div className="kill-cam-countdown" aria-label={`${deathInfo.seconds} seconds until respawn`}>
               <b>{deathInfo.seconds}</b>
-              <small>SECONDS TO RESPAWN</small>
+              <small>{t('death.seconds')}</small>
             </div>
           </div>
         </div>
@@ -232,35 +255,35 @@ export function MatchHud({
         <div className="death-screen">
           {!showDeathCustomizer ? (
             <>
-              <strong>You were eliminated</strong>
+              <strong>{t('death.eliminated')}</strong>
               {deathInfo.killerName && (
                 <em className="killer-focus-label">
-                  Killed by {deathInfo.killerName}
+                  {t('death.killedBy', { name: deathInfo.killerName })}
                   {deathInfo.focusSeconds > 0 ? ` ֲ· focus ${deathInfo.focusSeconds}s` : ''}
                 </em>
               )}
-              <span>{deathInfo.ready ? 'Ready to return' : `Respawn available in ${deathInfo.seconds}`}</span>
+              <span>{deathInfo.ready ? t('death.ready') : t('death.respawnIn', { seconds: deathInfo.seconds })}</span>
               <div className="death-player-stats">
                 <div>
-                  <span>Cash</span>
-                  <strong>נ×™ {wallet}</strong>
+                  <span>{t('hud.cash')}</span>
+                  <strong>🪙 {wallet}</strong>
                 </div>
                 <div>
-                  <span>Level {level}</span>
-                  <strong>{xp} XP</strong>
+                  <span>{t('progress.level', { level })}</span>
+                  <strong>{t('progress.xp', { xp })}</strong>
                   <i><b style={{ width: `${levelProgress}%` }} /></i>
                 </div>
               </div>
-              <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>Return to Match</button>
-              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>Customize Character</button>
-              <button className="ghost-button mobile-only-command" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>Mobile Controls</button>
-              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>Exit to Lobby</button>
+              <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>{t('death.return')}</button>
+              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>{t('death.customize')}</button>
+              <button className="ghost-button mobile-only-command" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>{t('death.mobileControls')}</button>
+              <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>{t('death.exitLobby')}</button>
             </>
           ) : (
             <div className="death-customizer">
               <header>
-                <strong>Customize Character</strong>
-                <button className="ghost-button" onClick={() => setShowDeathCustomizer(false)}>Back</button>
+                <strong>{t('death.customize')}</strong>
+                <button className="ghost-button" onClick={() => setShowDeathCustomizer(false)}>{t('menu.back')}</button>
               </header>
               <div className="death-customizer-layout">
                 <aside className="death-customizer-preview">
@@ -277,14 +300,14 @@ export function MatchHud({
                 </aside>
                 <div className="death-customizer-options">
                   <div className="customizer-tabs" role="tablist" aria-label="Respawn customizer sections">
-                    <button className={deathCustomizerTab === 'outfits' ? 'active' : ''} onClick={() => setDeathCustomizerTab('outfits')}>Outfits</button>
-                    <button className={deathCustomizerTab === 'weapons' ? 'active' : ''} onClick={() => setDeathCustomizerTab('weapons')}>Weapons</button>
+                    <button className={deathCustomizerTab === 'outfits' ? 'active' : ''} onClick={() => setDeathCustomizerTab('outfits')}>{t('store.clothes')}</button>
+                    <button className={deathCustomizerTab === 'weapons' ? 'active' : ''} onClick={() => setDeathCustomizerTab('weapons')}>{t('store.weapons')}</button>
                   </div>
                   <div className="death-customizer-scroll">
                     {deathCustomizerTab === 'outfits' ? (
                       <>
                         <section>
-                          <span>Outfits</span>
+                          <span>{t('store.eggColors')}</span>
                           <div className="death-customizer-grid">
                             {OUTFITS.filter((item) => ownedOutfits.includes(item.id)).map((item) => (
                               <button
@@ -293,36 +316,36 @@ export function MatchHud({
                                 onClick={() => equipOwnedOutfitDuringMatch(item.id)}
                               >
                                 <StoreVisual color={item.displayColor || item.shell} kind="outfit" />
-                                <b>{item.name}</b>
+                                <b>{displayOutfit(item, language).name}</b>
                               </button>
                             ))}
                           </div>
                         </section>
                         <section>
-                          <span>Hats, Hair & Face</span>
+                          <span>{t('store.headGear')}</span>
                           <div className="death-customizer-grid">
                             {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessoryOption)}
-                            {!accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).length && <em>No accessories owned yet</em>}
+                            {!accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).length && <em>{t('common.noAccessories')}</em>}
                           </div>
                         </section>
                         <section>
-                          <span>Middle Wear</span>
+                          <span>{t('store.bodyGear')}</span>
                           <div className="death-customizer-grid">
                             {accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).map(renderAccessoryOption)}
-                            {!accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).length && <em>No accessories owned yet</em>}
+                            {!accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail']).length && <em>{t('common.noAccessories')}</em>}
                           </div>
                         </section>
                         <section>
-                          <span>Shoes & Rides</span>
+                          <span>{t('store.legGear')}</span>
                           <div className="death-customizer-grid">
                             {accessoriesBySlot(['shoes']).map(renderAccessoryOption)}
-                            {!accessoriesBySlot(['shoes']).length && <em>No accessories owned yet</em>}
+                            {!accessoriesBySlot(['shoes']).length && <em>{t('common.noAccessories')}</em>}
                           </div>
                         </section>
                       </>
                     ) : (
                       <section>
-                        <span>Weapons for next spawn</span>
+                        <span>{t('common.chooseWeapon')}</span>
                         <div className="death-customizer-grid">
                           {Object.entries(WEAPONS).map(([id, item]) => (
                             <button
@@ -332,7 +355,7 @@ export function MatchHud({
                               onClick={() => equipWeaponDuringMatch(id)}
                             >
                               <StoreVisual color={item.color} kind="weapon" weaponId={id} />
-                              <b>{item.name}</b>
+                              <b>{displayWeapon(id, item, language).name}</b>
                             </button>
                           ))}
                         </div>
@@ -346,9 +369,9 @@ export function MatchHud({
                       onMouseDown={(event) => event.stopPropagation()}
                       onClick={returnToMatch}
                     >
-                      {deathInfo.ready ? 'Continue' : `Ready in ${deathInfo.seconds}s`}
+                      {deathInfo.ready ? t('store.continue') : t('death.respawnIn', { seconds: deathInfo.seconds })}
                     </button>
-                    <button className="secondary-command" onClick={() => setShowDeathCustomizer(false)}>Back</button>
+                    <button className="secondary-command" onClick={() => setShowDeathCustomizer(false)}>{t('menu.back')}</button>
                   </div>
                 </div>
               </div>
@@ -359,11 +382,11 @@ export function MatchHud({
 
       {matchResult && (
         <section className="match-result-overlay">
-          <span>{matchResult.localWon ? 'Victory' : matchResult.winner ? 'Match Complete' : 'Draw'}</span>
+          <span>{matchResult.localWon ? t('match.victory') : matchResult.winner ? t('match.complete') : t('match.draw')}</span>
           <strong>{matchResult.winnerName}</strong>
           <small>{matchResult.reason}</small>
-          {matchResult.localWon && <em>Victory bonus: נ×™ 20 +100 XP</em>}
-          <button className="primary-command" onClick={leaveMatch}>Return to Lobby</button>
+          {matchResult.localWon && <em>{t('match.bonus')}: 🪙 20 +100 XP</em>}
+          <button className="primary-command" onClick={leaveMatch}>{t('match.returnLobby')}</button>
         </section>
       )}
 
@@ -375,6 +398,7 @@ export function MatchHud({
             equipOutfit={equipOwnedOutfitDuringMatch}
             equipWeapon={equipWeaponDuringMatch}
             grenadeSkinId={grenadeSkinId}
+            language={language}
             onContinue={() => setPaused(false)}
             onExit={() => setShowExitConfirm(true)}
             onMobileControls={() => setShowMobileSettings(true)}
@@ -386,6 +410,7 @@ export function MatchHud({
             weaponId={weaponId}
             weaponSkinId={weaponSkinId}
             weaponUnlocked={weaponUnlocked}
+            t={t}
           />
         </div>
       )}
@@ -393,11 +418,11 @@ export function MatchHud({
       {showExitConfirm && (
         <section className="exit-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="exit-confirm-title">
           <div>
-            <strong id="exit-confirm-title">Exit match?</strong>
-            <span>Are you sure you want to leave the current game?</span>
+            <strong id="exit-confirm-title">{t('confirm.exitTitle')}</strong>
+            <span>{t('confirm.exitText')}</span>
             <div>
-              <button className="secondary-command" onClick={() => setShowExitConfirm(false)}>Stay</button>
-              <button className="danger-command" onClick={exitPausedMatch}>Exit</button>
+              <button className="secondary-command" onClick={() => setShowExitConfirm(false)}>{t('confirm.stay')}</button>
+              <button className="danger-command" onClick={exitPausedMatch}>{t('pause.exit')}</button>
             </div>
           </div>
         </section>
@@ -407,7 +432,7 @@ export function MatchHud({
         <div className="hud-brand-block">
           <img className="hud-game-logo" src="/Shadow_Logo.png" alt="DeadZone" />
           <div>
-            <span className="eyebrow">Room / Map</span>
+            <span className="eyebrow">{t('hud.roomMap')}</span>
             <strong>{selectedRoomId} / {mapName}</strong>
             <small>{mode.name}</small>
           </div>
@@ -415,37 +440,37 @@ export function MatchHud({
         <div className="scoreboard">
           {freeForAll ? (
             <>
-              <span className="blue-score">Leader</span>
+              <span className="blue-score">{t('hud.leader')}</span>
               <b>{leader ? leader.kills : 0}</b>
               <span className="red-score">{leader?.name || 'None'}</span>
             </>
           ) : (
             <>
-              <span className="blue-score">Blue {score.blue}</span>
+              <span className="blue-score">{t('hud.blue')} {score.blue}</span>
               <b>:</b>
-              <span className="red-score">{score.red} Red</span>
+              <span className="red-score">{score.red} {t('hud.red')}</span>
             </>
           )}
         </div>
         <div className="match-rules-status">
           <strong>{remainingMinutes}:{remainingClockSeconds}</strong>
-          <span>Target {score.target || currentMatch.scoreLimit}</span>
+          <span>{t('hud.target')} {score.target || currentMatch.scoreLimit}</span>
         </div>
       </header>
 
       <button
-        aria-label="Pause"
+        aria-label={t('hud.pause')}
         className="pause-match"
         disabled={deathInfo.isDead || Boolean(matchResult)}
         onClick={() => setPaused(true)}
-        title="Pause"
+        title={t('hud.pause')}
       >
         <span />
         <span />
       </button>
 
       <button
-        aria-label="Mobile control settings"
+        aria-label={t('death.mobileControls')}
         className="mobile-settings-match"
         onClick={() => setShowMobileSettings(true)}
         type="button"
@@ -457,14 +482,14 @@ export function MatchHud({
         <section className={mobileEditMode ? 'mobile-controls-dialog editing' : 'mobile-controls-dialog'} role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
           <div>
             <header>
-              <strong id="mobile-controls-title">Mobile Controls</strong>
-              <button type="button" onClick={() => setShowMobileSettings(false)}>Close</button>
+              <strong id="mobile-controls-title">{t('mobile.controls')}</strong>
+              <button type="button" onClick={() => setShowMobileSettings(false)}>{t('mobile.close')}</button>
             </header>
             <label>
-              Control
+              {t('mobile.control')}
               <select value={selectedMobileControl} onChange={(event) => setSelectedMobileControl(event.target.value)}>
                 {Object.entries(MOBILE_CONTROL_NAMES).map(([id, label]) => (
-                  <option value={id} key={id}>{label}</option>
+                  <option value={id} key={id}>{t(`mobile.${id === 'joystick' ? 'movement' : id}`)}</option>
                 ))}
               </select>
             </label>
@@ -473,10 +498,10 @@ export function MatchHud({
               type="button"
               onClick={() => setMobileEditMode((value) => !value)}
             >
-              {mobileEditMode ? 'Dragging enabled' : 'Drag buttons'}
+              {mobileEditMode ? t('mobile.dragging') : t('mobile.dragButtons')}
             </button>
             <label>
-              {MOBILE_CONTROL_NAMES[selectedMobileControl]} size
+              {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.size')}
               <input
                 max="1.45"
                 min="0.72"
@@ -488,7 +513,7 @@ export function MatchHud({
               <span>{Math.round((mobileControls[selectedMobileControl]?.size || 1) * 100)}%</span>
             </label>
             <label>
-              {MOBILE_CONTROL_NAMES[selectedMobileControl]} opacity
+              {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.opacity')}
               <input
                 max="1"
                 min="0.25"
@@ -499,16 +524,16 @@ export function MatchHud({
               />
               <span>{Math.round((mobileControls[selectedMobileControl]?.opacity ?? 0.82) * 100)}%</span>
             </label>
-            <small className="mobile-controls-hint">Press "Drag buttons", move each control, then tune size and opacity like a mobile shooter layout.</small>
+            <small className="mobile-controls-hint">{t('mobile.dragButtons')}</small>
             <button className="secondary-command" type="button" onClick={resetMobileControls}>
-              Reset Layout
+              {t('mobile.resetLayout')}
             </button>
           </div>
         </section>
       )}
 
       {compactHud && (
-        <aside className="health-widget compact-health-bar" aria-label="Health">
+        <aside className="health-widget compact-health-bar" aria-label={t('hud.health')}>
           <i><b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} /></i>
         </aside>
       )}
@@ -518,15 +543,15 @@ export function MatchHud({
       {showScoreboard && (
         <section className="scoreboard-overlay">
           <header>
-            <strong>Scoreboard</strong>
-            <span>K / A / D / Score</span>
+            <strong>{t('hud.scoreboard')}</strong>
+            <span>{t('hud.k')} / {t('hud.a')} / {t('hud.d')} / {t('hud.score')}</span>
           </header>
           {freeForAll ? (
-            <ScoreboardTeam localId={localId} players={score.players} title="All Players" variant="neutral" />
+            <ScoreboardTeam localId={localId} players={score.players} title={t('hud.allPlayers')} variant="neutral" t={t} />
           ) : (
             <div className="scoreboard-teams">
-              <ScoreboardTeam localId={localId} players={bluePlayers} title="Blue Team" />
-              <ScoreboardTeam localId={localId} players={redPlayers} title="Red Team" />
+              <ScoreboardTeam localId={localId} players={bluePlayers} title={t('hud.blueTeam')} team="blue" t={t} />
+              <ScoreboardTeam localId={localId} players={redPlayers} title={t('hud.redTeam')} team="red" t={t} />
             </div>
           )}
         </section>
@@ -547,33 +572,33 @@ export function MatchHud({
         </button>
         <div className="combat-readout">
           <div className="readout-card weapon-card">
-            <span>Weapon</span>
+          <span>{t('hud.weapon')}</span>
             <strong>{weapon.name}</strong>
             <small>{activeBuffs}</small>
           </div>
           <div className={ammo.reloading ? 'readout-card ammo-card reloading' : 'readout-card ammo-card'}>
-            <span>{ammo.reloading ? 'Reload' : 'Ammo'}</span>
+            <span>{ammo.reloading ? t('hud.reload') : t('hud.ammo')}</span>
             <strong>{ammo.reloading ? `${reloadPercent}%` : ammo.ammo}</strong>
-            <small>{ammo.reloading ? 'R in progress' : `/ ${ammo.magazineSize}`}</small>
+            <small>{ammo.reloading ? t('hud.reload') : `/ ${ammo.magazineSize}`}</small>
             <i style={{ '--reload': `${reloadPercent}%` }} />
           </div>
           <div className="readout-card grenade-card">
-            <span>Grenades</span>
+            <span>{t('hud.grenades')}</span>
             <strong>{grenadeCount}<small>/3</small></strong>
             <div className="grenade-pips">
               {[0, 1, 2].map((slot) => <b className={slot < grenadeCount ? 'filled' : ''} key={slot} />)}
             </div>
           </div>
           <div className="readout-card health-card">
-            <span>Health</span>
+            <span>{t('hud.health')}</span>
             <strong>{Math.max(0, Math.min(100, Math.round(health ?? 100)))}</strong>
             <small>HP</small>
             <i style={{ '--health': `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} />
           </div>
           <div className="readout-card wallet-card">
-            <span>Cash</span>
-            <strong>נ×™ {wallet}</strong>
-            <small>kills pay</small>
+            <span>{t('hud.cash')}</span>
+            <strong>🪙 {wallet}</strong>
+            <small>{t('hud.killsPay')}</small>
           </div>
         </div>
 
@@ -585,15 +610,15 @@ export function MatchHud({
   );
 }
 
-function ScoreboardTeam({ localId, players, title, variant }) {
+function ScoreboardTeam({ localId, players, team, title, t, variant }) {
   return (
-    <section className={variant === 'neutral' ? 'scoreboard-team neutral' : title.startsWith('Red') ? 'scoreboard-team red' : 'scoreboard-team blue'}>
+    <section className={variant === 'neutral' ? 'scoreboard-team neutral' : team === 'red' ? 'scoreboard-team red' : 'scoreboard-team blue'}>
       <header>
         <strong>{title}</strong>
-        <span>K</span>
-        <span>A</span>
-        <span>D</span>
-        <span>Score</span>
+        <span>{t('hud.k')}</span>
+        <span>{t('hud.a')}</span>
+        <span>{t('hud.d')}</span>
+        <span>{t('hud.score')}</span>
       </header>
       <div>
         {players.map((player) => (

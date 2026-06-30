@@ -1,6 +1,7 @@
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { ACCESSORIES, GRENADE_SKINS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
+import { createTranslator, displayAccessory, displayGrenadeSkin, displayOutfit, displayWeapon, displayWeaponSkin } from '../i18n';
 
 export function MatchPauseMenu({
                                    activeTab,
@@ -8,6 +9,7 @@ export function MatchPauseMenu({
                                    equipOutfit,
                                    equipWeapon,
                                    grenadeSkinId,
+                                   language = 'en',
                                    onContinue,
                                    onExit,
                                    onMobileControls,
@@ -16,15 +18,16 @@ export function MatchPauseMenu({
                                    outfitId,
                                    ownedAccessories,
                                    ownedOutfits,
+                                   t = createTranslator(language),
                                    weaponId,
                                    weaponSkinId,
                                    weaponUnlocked,
                                }) {
-    const outfit = OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0];
-    const accessories = accessoryIds.map((id) => ACCESSORIES.find((item) => item.id === id)).filter(Boolean);
-    const weapon = WEAPONS[weaponId] || WEAPONS.rifle;
-    const weaponSkin = WEAPON_SKINS.find((item) => item.id === weaponSkinId) || WEAPON_SKINS[0];
-    const grenadeSkin = GRENADE_SKINS.find((item) => item.id === grenadeSkinId) || GRENADE_SKINS[0];
+    const outfit = displayOutfit(OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
+    const accessories = accessoryIds.map((id) => displayAccessory(ACCESSORIES.find((item) => item.id === id), language)).filter(Boolean);
+    const weapon = displayWeapon(weaponId, WEAPONS[weaponId] || WEAPONS.rifle, language);
+    const weaponSkin = displayWeaponSkin(WEAPON_SKINS.find((item) => item.id === weaponSkinId) || WEAPON_SKINS[0], language);
+    const grenadeSkin = displayGrenadeSkin(GRENADE_SKINS.find((item) => item.id === grenadeSkinId) || GRENADE_SKINS[0], language);
     const accessoryForSlot = (slot) => accessoryIds.find((id) => ACCESSORIES.find((item) => item.id === id)?.slot === slot);
     const accessoriesBySlot = (slots) => ACCESSORIES.filter((item) => ownedAccessories.includes(item.id) && slots.includes(item.slot));
     const renderAccessory = (item) => (
@@ -34,16 +37,16 @@ export function MatchPauseMenu({
             onClick={() => onToggleAccessory(item)}
         >
             <StoreVisual color={item.color} kind={item.slot} />
-            <b>{item.name}</b>
-            <small>{item.slot}</small>
+            <b>{displayAccessory(item, language).name}</b>
+            <small>{displayAccessory(item, language).slotLabel}</small>
         </button>
     );
 
     return (
         <div className="death-customizer pause-customizer">
             <header>
-                <strong>Paused</strong>
-                <span>Loadout changes apply immediately</span>
+                <strong>{t('pause.title')}</strong>
+                <span>{t('pause.hint')}</span>
             </header>
             <div className="death-customizer-layout">
                 <aside className="death-customizer-preview">
@@ -60,14 +63,14 @@ export function MatchPauseMenu({
                 </aside>
                 <div className="death-customizer-options">
                     <div className="customizer-tabs" role="tablist" aria-label="Pause menu customization">
-                        <button className={activeTab === 'outfits' ? 'active' : ''} onClick={() => onSetTab('outfits')}>Outfits</button>
-                        <button className={activeTab === 'weapons' ? 'active' : ''} onClick={() => onSetTab('weapons')}>Weapons</button>
+                        <button className={activeTab === 'outfits' ? 'active' : ''} onClick={() => onSetTab('outfits')}>{t('store.clothes')}</button>
+                        <button className={activeTab === 'weapons' ? 'active' : ''} onClick={() => onSetTab('weapons')}>{t('store.weapons')}</button>
                     </div>
                     <div className="death-customizer-scroll">
                         {activeTab === 'outfits' ? (
                             <>
                                 <section>
-                                    <span>Outfits</span>
+                                    <span>{t('store.eggColors')}</span>
                                     <div className="death-customizer-grid">
                                         {OUTFITS.filter((item) => ownedOutfits.includes(item.id)).map((item) => (
                                             <button
@@ -76,29 +79,29 @@ export function MatchPauseMenu({
                                                 onClick={() => equipOutfit(item.id)}
                                             >
                                                 <StoreVisual color={item.displayColor || item.shell} kind="outfit" />
-                                                <b>{item.name}</b>
+                                                <b>{displayOutfit(item, language).name}</b>
                                             </button>
                                         ))}
                                     </div>
                                 </section>
                                 <section>
-                                    <span>Hats, Hair & Face</span>
+                                    <span>{t('store.headGear')}</span>
                                     <div className="death-customizer-grid">
                                         {accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).map(renderAccessory)}
-                                        {!accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).length && <em>No accessories owned yet</em>}
+                                        {!accessoriesBySlot(['hat', 'hair', 'glasses', 'nose']).length && <em>{t('common.noAccessories')}</em>}
                                     </div>
                                 </section>
                                 <section>
-                                    <span>Gear</span>
+                                    <span>{t('store.gear')}</span>
                                     <div className="death-customizer-grid">
                                         {accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail', 'shoes']).map(renderAccessory)}
-                                        {!accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail', 'shoes']).length && <em>No accessories owned yet</em>}
+                                        {!accessoriesBySlot(['shirt', 'belt', 'backpack', 'watch', 'tail', 'shoes']).length && <em>{t('common.noAccessories')}</em>}
                                     </div>
                                 </section>
                             </>
                         ) : (
                             <section>
-                                <span>Choose weapon</span>
+                                <span>{t('common.chooseWeapon')}</span>
                                 <div className="death-customizer-grid">
                                     {Object.entries(WEAPONS).map(([id, item]) => (
                                         <button
@@ -108,7 +111,7 @@ export function MatchPauseMenu({
                                             onClick={() => equipWeapon(id)}
                                         >
                                             <StoreVisual color={item.color} kind="weapon" weaponId={id} />
-                                            <b>{item.name}</b>
+                                            <b>{displayWeapon(id, item, language).name}</b>
                                         </button>
                                     ))}
                                 </div>
@@ -116,9 +119,9 @@ export function MatchPauseMenu({
                         )}
                     </div>
                     <div className="customizer-footer death-customizer-footer pause-menu-actions">
-                        <button className="primary-command" onClick={onContinue}>Continue</button>
-                        <button className="secondary-command mobile-only-command" onClick={onMobileControls}>Mobile Controls</button>
-                        <button className="danger-command" onClick={onExit}>Exit Match</button>
+                        <button className="primary-command" onClick={onContinue}>{t('store.continue')}</button>
+                        <button className="secondary-command mobile-only-command" onClick={onMobileControls}>{t('death.mobileControls')}</button>
+                        <button className="danger-command" onClick={onExit}>{t('pause.exit')}</button>
                     </div>
                 </div>
             </div>

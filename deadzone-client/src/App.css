@@ -1862,6 +1862,32 @@ html:fullscreen .game-3d-shell {
   font-size: 26px;
 }
 
+.language-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 194, 71, 0.45);
+  border-radius: 8px;
+  color: #fff7df;
+  font: inherit;
+  font-weight: 900;
+  text-align: start;
+  background: linear-gradient(135deg, rgba(245, 165, 36, 0.18), rgba(87, 199, 255, 0.1));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.language-toggle span {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.language-toggle strong {
+  font-size: 18px;
+}
+
 .settings-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(140px, 1fr));
