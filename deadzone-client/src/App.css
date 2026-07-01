@@ -4052,6 +4052,46 @@ button {
     max-width: 100%;
   }
 
+  .death-screen > strong {
+    font-size: clamp(24px, 6vw, 34px);
+  }
+
+  .death-screen > span {
+    font-size: 13px;
+  }
+
+  .killer-focus-label {
+    max-width: min(520px, calc(100vw - 20px));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .death-player-stats {
+    width: min(460px, calc(100vw - 16px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .death-player-stats > div {
+    min-height: 52px;
+    padding: 8px 10px;
+  }
+
+  .death-actions {
+    width: min(520px, calc(100vw - 16px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .death-actions button {
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 1.05;
+  }
+
   .death-customizer,
   .pause-customizer {
     width: 100%;
@@ -4062,6 +4102,26 @@ button {
     overflow: hidden;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
+  }
+
+  .death-customizer {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .death-customizer > header {
+    min-height: 36px;
+    align-items: center;
+  }
+
+  .death-customizer > header strong {
+    font-size: clamp(18px, 4.4vw, 28px);
+  }
+
+  .death-customizer > header .ghost-button {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 11px;
   }
 
   .death-customizer-layout,
@@ -4142,9 +4202,20 @@ button {
   }
 
   .death-customizer-options {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
     height: 100%;
     overflow: hidden;
+  }
+
+  .death-customizer-options .customizer-tabs {
+    min-height: 36px;
+  }
+
+  .death-customizer-options .customizer-tabs button {
+    min-height: 34px;
+    font-size: 11px;
   }
 
   .death-customizer-scroll {
@@ -4678,13 +4749,20 @@ button {
   background: linear-gradient(90deg, #23e879, #adff72);
 }
 
-.death-screen button {
+.death-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.death-actions button {
   min-width: 190px;
   color: #161006;
   background: #f5a524;
 }
 
-.death-screen button:disabled {
+.death-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
