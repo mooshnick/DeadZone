@@ -105,7 +105,9 @@ export function MatchHud({
   const [mobileAdjustMode, setMobileAdjustMode] = useState('size');
   const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
+  const [mobileControlSession, setMobileControlSession] = useState(0);
   const [mobileResetSignal, setMobileResetSignal] = useState(0);
+  const [wasDead, setWasDead] = useState(false);
   const dir = LANGUAGES[language]?.dir || 'ltr';
   const weapon = displayWeapon(weaponId, WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle, language);
   const previewOutfit = displayOutfit(OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
@@ -162,6 +164,7 @@ export function MatchHud({
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
       document.activeElement?.blur?.();
+      setMobileControlSession((value) => value + 1);
       resetMobileInput();
     }
   };
@@ -197,10 +200,24 @@ export function MatchHud({
   };
 
   useEffect(() => {
-    if (deathInfo.isDead || showPauseMenu || matchResult) {
+    if (deathInfo.isDead) {
+      if (!wasDead) {
+        setWasDead(true);
+      }
+      resetMobileInput();
+      return;
+    }
+    if (wasDead) {
+      setWasDead(false);
+      setMobileControlSession((value) => value + 1);
+      resetMobileInput();
+      window.requestAnimationFrame(resetMobileInput);
+      return;
+    }
+    if (showPauseMenu || matchResult) {
       resetMobileInput();
     }
-  }, [deathInfo.isDead, matchResult, showPauseMenu]);
+  }, [deathInfo.isDead, matchResult, showPauseMenu, wasDead]);
 
   return (
     <main className={shellClassName} dir={dir}>
@@ -213,6 +230,7 @@ export function MatchHud({
       </div>
       <div className="crosshair" />
       <MobileTouchControls
+        key={mobileControlSession}
         controlConfig={mobileControls}
         disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
         editMode={showMobileSettings && mobileEditMode}

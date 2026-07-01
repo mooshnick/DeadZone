@@ -115,6 +115,12 @@ export function MobileTouchControls({
   }, [disabled, resetAllTouches]);
 
   useEffect(() => {
+    if (disabled) return undefined;
+    const frame = window.requestAnimationFrame(resetAllTouches);
+    return () => window.cancelAnimationFrame(frame);
+  }, [disabled, resetAllTouches]);
+
+  useEffect(() => {
     window.setTimeout(resetAllTouches, 0);
   }, [resetAllTouches, resetSignal]);
 
