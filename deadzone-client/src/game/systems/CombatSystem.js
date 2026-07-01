@@ -3,6 +3,7 @@ import { ASSIST_REWARD, ASSIST_SCORE, ASSIST_WINDOW, ASSIST_XP, KILL_REWARD, KIL
 import { nowMs } from '../utils';
 
 const SHOT_SOUND_URL = '/sound/shotSound_1.mp3';
+const RELOAD_SOUND_URL = '/sound/reloadGun_1.mp3';
 const SHOT_SOUND_POOL_SIZE = 6;
 
 export class CombatSystem {
@@ -22,6 +23,17 @@ export class CombatSystem {
     this.bullets = [];
     this.shotSoundIndex = 0;
     this.shotSounds = this.createShotSoundPool();
+    this.reloadSound = this.createSound(RELOAD_SOUND_URL, 0.52);
+  }
+
+  createSound(url, volume) {
+    if (typeof Audio === 'undefined') {
+      return null;
+    }
+    const sound = new Audio(url);
+    sound.preload = 'auto';
+    sound.volume = volume;
+    return sound;
   }
 
   createShotSoundPool() {
@@ -29,10 +41,7 @@ export class CombatSystem {
       return [];
     }
     return Array.from({ length: SHOT_SOUND_POOL_SIZE }, () => {
-      const sound = new Audio(SHOT_SOUND_URL);
-      sound.preload = 'auto';
-      sound.volume = 0.46;
-      return sound;
+      return this.createSound(SHOT_SOUND_URL, 0.46);
     });
   }
 
@@ -46,6 +55,15 @@ export class CombatSystem {
     sound.currentTime = 0;
     sound.volume = player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
     sound.play().catch(() => {});
+  }
+
+  playReloadSound(player) {
+    if (player.id !== this.localId || !this.reloadSound) {
+      return;
+    }
+    this.reloadSound.pause();
+    this.reloadSound.currentTime = 0;
+    this.reloadSound.play().catch(() => {});
   }
 
   isEnemy(player, ownerId, ownerTeam) {
@@ -66,6 +84,7 @@ export class CombatSystem {
 
   startReload(player, time) {
     if (player.startReload(time) && player.id === this.localId) {
+      this.playReloadSound(player);
       this.onEvent('Reloading...');
     }
   }
