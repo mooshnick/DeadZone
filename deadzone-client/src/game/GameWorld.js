@@ -108,6 +108,18 @@ export class GameWorld {
     this.animate();
   }
 
+  resetRuntimeInput() {
+    this.keys.current.clear();
+    this.mouse.current.down = false;
+    this.setScoped(false);
+    this.jumpWasDown = false;
+    this.qWasDown = false;
+    this.interactWasDown = false;
+    this.grenadeChargeStartedAt = 0;
+    this.grenadeCharge = 0;
+    this.onGrenadeChargeChange?.(0);
+  }
+
   dispose() {
     cancelAnimationFrame(this.frame);
     this.realtimeClient?.dispose();
@@ -705,21 +717,17 @@ export class GameWorld {
     if (!player || !player.isDead || nowMs() < player.respawnReadyAt) {
       return false;
     }
+    this.resetRuntimeInput();
     this.bumpLocalStateVersion();
     player.respawn();
     this.localRespawnedAt = nowMs();
     this.deathInputReleased = false;
-    this.jumpWasDown = false;
-    this.qWasDown = false;
-    this.interactWasDown = false;
-    this.grenadeChargeStartedAt = 0;
-    this.grenadeCharge = 0;
-    this.onGrenadeChargeChange?.(0);
     this.localDeathFocus = null;
     this.onHealthChange?.(player.health);
     this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
     this.realtimeClient?.sendMoveNow?.(this.networkPayloadFor(player), this.localRespawnedAt);
+    window.setTimeout(() => this.resetRuntimeInput(), 0);
     if (capturePointer) {
       this.capturePointer();
     }

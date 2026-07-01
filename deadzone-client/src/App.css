@@ -4092,12 +4092,15 @@ button {
   }
 
   .death-actions button {
+    display: grid;
+    place-items: center;
     width: 100%;
     min-width: 0;
     min-height: 44px;
     padding: 0 12px;
     font-size: 12px;
     line-height: 1.05;
+    text-align: center;
   }
 
   .death-action-return {
@@ -4785,11 +4788,14 @@ button {
 }
 
 .death-actions button {
+  display: grid;
+  place-items: center;
   width: 100%;
   min-width: 0;
   min-height: 48px;
   color: #161006;
   background: #f5a524;
+  text-align: center;
 }
 
 .death-actions button:disabled {

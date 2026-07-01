@@ -304,6 +304,14 @@ export function MobileTouchControls({
     callbacks.current.onShootEnd?.();
   };
 
+  const handleTapControl = (id, event, callback) => {
+    if (beginEditDrag(id, event)) return;
+    if (disabled) return;
+    event.preventDefault();
+    requestMobileFullscreen();
+    callback?.();
+  };
+
   return (
     <div
       className={editMode ? 'mobile-touch-layer mobile-touch-editing' : 'mobile-touch-layer'}
@@ -388,8 +396,7 @@ export function MobileTouchControls({
           selectedControl === 'jump' ? 'selected' : '',
         ].filter(Boolean).join(' ')}
         disabled={disabled && !editMode}
-        onClick={() => !editMode && callbacks.current.onJump?.()}
-        onPointerDown={(event) => beginEditDrag('jump', event)}
+        onPointerDown={(event) => handleTapControl('jump', event, callbacks.current.onJump)}
         onPointerMove={(event) => moveEditDrag('jump', event)}
         onPointerCancel={(event) => endEditDrag('jump', event)}
         onLostPointerCapture={(event) => endEditDrag('jump', event)}
@@ -407,8 +414,7 @@ export function MobileTouchControls({
           selectedControl === 'reload' ? 'selected' : '',
         ].filter(Boolean).join(' ')}
         disabled={disabled && !editMode}
-        onClick={() => !editMode && callbacks.current.onReload?.()}
-        onPointerDown={(event) => beginEditDrag('reload', event)}
+        onPointerDown={(event) => handleTapControl('reload', event, callbacks.current.onReload)}
         onPointerMove={(event) => moveEditDrag('reload', event)}
         onPointerCancel={(event) => endEditDrag('reload', event)}
         onLostPointerCapture={(event) => endEditDrag('reload', event)}
