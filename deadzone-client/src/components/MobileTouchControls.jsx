@@ -53,6 +53,7 @@ export function MobileTouchControls({
   const lastLookPoint = useRef(null);
   const lastShootPoint = useRef(null);
   const editDrag = useRef(null);
+  const editGesture = useRef(null);
 
   useEffect(() => {
     callbacks.current = {
@@ -132,6 +133,12 @@ export function MobileTouchControls({
     };
   };
 
+  const pointerDistance = (pointers) => {
+    const items = [...pointers.values()];
+    if (items.length < 2) return 0;
+    return Math.hypot(items[0].x - items[1].x, items[0].y - items[1].y);
+  };
+
   const updateControlPosition = (id, event) => {
     const rect = event.currentTarget.closest('.mobile-touch-layer')?.getBoundingClientRect();
     if (!rect) return;
@@ -145,23 +152,57 @@ export function MobileTouchControls({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    const current = editGesture.current?.id === id
+      ? editGesture.current
+      : {
+        id,
+        pointers: new Map(),
+        initialDistance: 0,
+        initialSize: controlConfig?.[id]?.size || 1,
+      };
+    current.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (current.pointers.size === 2) {
+      current.initialDistance = pointerDistance(current.pointers);
+      current.initialSize = controlConfig?.[id]?.size || 1;
+    }
+    editGesture.current = current;
     editDrag.current = { id, pointerId: event.pointerId };
     onSelectControl?.(id);
-    updateControlPosition(id, event);
+    if (current.pointers.size === 1) {
+      updateControlPosition(id, event);
+    }
     return true;
   };
 
   const moveEditDrag = (id, event) => {
-    if (!editMode || editDrag.current?.id !== id || editDrag.current?.pointerId !== event.pointerId) return false;
+    if (!editMode || editGesture.current?.id !== id || !editGesture.current.pointers.has(event.pointerId)) return false;
     event.preventDefault();
+    const gesture = editGesture.current;
+    gesture.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (gesture.pointers.size >= 2) {
+      const currentDistance = pointerDistance(gesture.pointers);
+      if (gesture.initialDistance > 0 && currentDistance > 0) {
+        const nextSize = Math.max(0.68, Math.min(1.65, gesture.initialSize * (currentDistance / gesture.initialDistance)));
+        onControlChange?.(id, { size: Number(nextSize.toFixed(2)) });
+      }
+      return true;
+    }
     updateControlPosition(id, event);
     return true;
   };
 
   const endEditDrag = (id, event) => {
-    if (!editMode || editDrag.current?.id !== id || editDrag.current?.pointerId !== event.pointerId) return false;
+    if (!editMode || editGesture.current?.id !== id || !editGesture.current.pointers.has(event.pointerId)) return false;
     event.preventDefault();
-    editDrag.current = null;
+    editGesture.current.pointers.delete(event.pointerId);
+    if (editGesture.current.pointers.size < 2) {
+      editGesture.current.initialDistance = 0;
+      editGesture.current.initialSize = controlConfig?.[id]?.size || 1;
+    }
+    if (editGesture.current.pointers.size === 0) {
+      editGesture.current = null;
+      editDrag.current = null;
+    }
     return true;
   };
 

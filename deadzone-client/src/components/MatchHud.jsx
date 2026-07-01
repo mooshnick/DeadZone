@@ -151,11 +151,17 @@ export function MatchHud({
   };
   const returnToMatch = () => {
     resetMobileInput();
+    setShowPauseMenu(false);
+    setShowMobileSettings(false);
+    setMobileEditMode(false);
+    worldRef.current?.setPaused(false);
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
+      document.activeElement?.blur?.();
       window.setTimeout(resetMobileInput, 0);
       window.setTimeout(resetMobileInput, 120);
       window.setTimeout(resetMobileInput, 260);
+      window.setTimeout(resetMobileInput, 520);
       setShowDeathCustomizer(false);
     }
   };
@@ -180,6 +186,8 @@ export function MatchHud({
       return next;
     });
   };
+  const opacityToPercent = (opacity) => Math.round(((Math.max(0.08, Math.min(1, opacity ?? 0.82)) - 0.08) / 0.92) * 100);
+  const percentToOpacity = (percent) => Number((0.08 + (Math.max(0, Math.min(100, Number(percent) || 0)) / 100) * 0.92).toFixed(2));
   const resetMobileControls = () => {
     setMobileControls(MOBILE_CONTROL_DEFAULTS);
     setSelectedMobileControl('shoot');
@@ -500,29 +508,18 @@ export function MatchHud({
             >
               {mobileEditMode ? t('mobile.dragging') : t('mobile.dragButtons')}
             </button>
-            <label>
-              {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.size')}
-              <input
-                max="1.45"
-                min="0.72"
-                onChange={(event) => updateMobileControl(selectedMobileControl, { size: Math.max(0.72, Math.min(1.45, Number(event.target.value) || 1)) })}
-                step="0.01"
-                type="range"
-                value={mobileControls[selectedMobileControl]?.size || 1}
-              />
-              <span>{Math.round((mobileControls[selectedMobileControl]?.size || 1) * 100)}%</span>
-            </label>
+            <p className="mobile-controls-hint">{t('mobile.pinchSize')}</p>
             <label>
               {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.opacity')}
               <input
-                max="1"
-                min="0.25"
-                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: Math.max(0.25, Math.min(1, Number(event.target.value) || 0.82)) })}
-                step="0.01"
+                max="100"
+                min="0"
+                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: percentToOpacity(event.target.value) })}
+                step="1"
                 type="range"
-                value={mobileControls[selectedMobileControl]?.opacity ?? 0.82}
+                value={opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
               />
-              <span>{Math.round((mobileControls[selectedMobileControl]?.opacity ?? 0.82) * 100)}%</span>
+              <span>{opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}%</span>
             </label>
             <small className="mobile-controls-hint">{t('mobile.dragButtons')}</small>
             <button className="secondary-command" type="button" onClick={resetMobileControls}>

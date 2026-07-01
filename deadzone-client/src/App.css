@@ -2821,12 +2821,34 @@ button {
 }
 
 .mobile-controls-dialog.editing {
-  background: rgba(2, 6, 12, 0.38);
+  align-items: start;
+  justify-items: center;
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: rgba(2, 6, 12, 0.16);
+  backdrop-filter: none;
   pointer-events: none;
 }
 
 .mobile-controls-dialog.editing > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.35fr) auto;
+  align-items: end;
+  width: min(720px, calc(100vw - 20px));
+  max-height: none;
+  padding: 10px;
+  gap: 9px;
+  background: rgba(5, 10, 18, 0.82);
   pointer-events: auto;
+}
+
+.mobile-controls-dialog.editing header {
+  grid-column: 1 / -1;
+}
+
+.mobile-controls-dialog.editing .mobile-controls-hint {
+  align-self: center;
+  margin: 0;
+  text-transform: none;
 }
 
 .mobile-controls-dialog header {
