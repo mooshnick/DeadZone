@@ -15,6 +15,7 @@ const MAX_ARC_FORCE = 0.58;
 const BLAST_RADIUS = 8.6;
 const BLAST_DAMAGE = 72;
 const GRENADE_SOUND_URL = '/sound/grenade_trimmed.wav';
+const GRENADE_SOUND_POOL_SIZE = 4;
 
 export class GrenadeSystem {
   constructor({ scene, players, combatSystem, collisionSystem, gameMode, onEvent }) {
@@ -27,26 +28,31 @@ export class GrenadeSystem {
     this.pickups = [];
     this.thrown = [];
     this.lastSpawnAt = 0;
-    this.grenadeSound = this.createGrenadeSound();
+    this.grenadeSoundIndex = 0;
+    this.grenadeSounds = this.createGrenadeSoundPool();
   }
 
-  createGrenadeSound() {
+  createGrenadeSoundPool() {
     if (typeof Audio === 'undefined') {
-      return null;
+      return [];
     }
-    const sound = new Audio(GRENADE_SOUND_URL);
-    sound.preload = 'auto';
-    sound.volume = 0.5;
-    return sound;
+    return Array.from({ length: GRENADE_SOUND_POOL_SIZE }, () => {
+      const sound = new Audio(GRENADE_SOUND_URL);
+      sound.preload = 'auto';
+      sound.volume = 0.5;
+      return sound;
+    });
   }
 
   playGrenadeSound(player) {
-    if (player.isBot || !this.grenadeSound) {
+    if (player.isBot || this.grenadeSounds.length === 0) {
       return;
     }
-    this.grenadeSound.pause();
-    this.grenadeSound.currentTime = 0;
-    this.grenadeSound.play().catch(() => {});
+    const sound = this.grenadeSounds[this.grenadeSoundIndex % this.grenadeSounds.length];
+    this.grenadeSoundIndex += 1;
+    sound.pause();
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
   }
 
   update(time, dt) {
