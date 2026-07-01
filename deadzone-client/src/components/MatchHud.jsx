@@ -571,8 +571,8 @@ export function MatchHud({
         </section>
       )}
 
-      {compactHud && (
-        <aside className="health-widget compact-health-bar" aria-label={t('hud.health')}>
+      {!deathInfo.isDead && !matchResult && (
+        <aside className="health-widget mobile-health-bar" aria-label={t('hud.health')}>
           <i><b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} /></i>
         </aside>
       )}
