@@ -286,10 +286,10 @@ export function MatchHud({
                 </div>
               </div>
               <div className="death-actions">
-                <button disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>{t('death.return')}</button>
-                <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>{t('death.customize')}</button>
-                <button className="ghost-button mobile-only-command" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>{t('death.mobileControls')}</button>
-                <button className="ghost-button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>{t('death.exitLobby')}</button>
+                <button className="death-action-return" disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>{t('death.return')}</button>
+                <button className="ghost-button death-action-customize" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>{t('death.customize')}</button>
+                <button className="ghost-button mobile-only-command death-action-controls" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>{t('death.mobileControls')}</button>
+                <button className="ghost-button death-action-exit" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>{t('death.exitLobby')}</button>
               </div>
             </>
           ) : (

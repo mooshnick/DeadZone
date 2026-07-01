@@ -4080,6 +4080,10 @@ button {
 
   .death-actions {
     width: min(520px, calc(100vw - 16px));
+    direction: ltr;
+    grid-template-areas:
+      "controls return"
+      "exit customize";
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     max-height: none;
@@ -4094,6 +4098,22 @@ button {
     padding: 0 12px;
     font-size: 12px;
     line-height: 1.05;
+  }
+
+  .death-action-return {
+    grid-area: return;
+  }
+
+  .death-action-customize {
+    grid-area: customize;
+  }
+
+  .death-action-controls {
+    grid-area: controls;
+  }
+
+  .death-action-exit {
+    grid-area: exit;
   }
 
   .death-customizer,
