@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { ASSIST_REWARD, ASSIST_SCORE, ASSIST_WINDOW, ASSIST_XP, KILL_REWARD, KILL_SCORE, KILL_XP, WEAPONS } from '../config';
 import { nowMs } from '../utils';
 
+const SHOT_SOUND_URL = '/sound/shotSound_1.mp3';
+const SHOT_SOUND_POOL_SIZE = 6;
+
 export class CombatSystem {
   constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil, onDamage, onElimination }) {
     this.scene = scene;
@@ -17,6 +20,32 @@ export class CombatSystem {
     this.onDamage = onDamage;
     this.onElimination = onElimination;
     this.bullets = [];
+    this.shotSoundIndex = 0;
+    this.shotSounds = this.createShotSoundPool();
+  }
+
+  createShotSoundPool() {
+    if (typeof Audio === 'undefined') {
+      return [];
+    }
+    return Array.from({ length: SHOT_SOUND_POOL_SIZE }, () => {
+      const sound = new Audio(SHOT_SOUND_URL);
+      sound.preload = 'auto';
+      sound.volume = 0.46;
+      return sound;
+    });
+  }
+
+  playShotSound(player, weapon) {
+    if (player.id !== this.localId || this.shotSounds.length === 0) {
+      return;
+    }
+    const sound = this.shotSounds[this.shotSoundIndex % this.shotSounds.length];
+    this.shotSoundIndex += 1;
+    sound.pause();
+    sound.currentTime = 0;
+    sound.volume = player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
+    sound.play().catch(() => {});
   }
 
   isEnemy(player, ownerId, ownerTeam) {
@@ -69,6 +98,7 @@ export class CombatSystem {
   }
 
   spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex = 0, shotOrigin = null) {
+    this.playShotSound(player, weapon);
     const origin = (shotOrigin || player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(targetDirection.clone().multiplyScalar(1.6))).clone();
     for (let index = 0; index < weapon.pellets; index += 1) {
       const pelletOffset = weapon.pellets === 1 ? 0 : index - (weapon.pellets - 1) / 2;
