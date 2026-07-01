@@ -102,6 +102,7 @@ export function MatchHud({
   const [compactHud, setCompactHud] = useState(false);
   const [showMobileSettings, setShowMobileSettings] = useState(false);
   const [mobileEditMode, setMobileEditMode] = useState(false);
+  const [mobileAdjustMode, setMobileAdjustMode] = useState('size');
   const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
   const [mobileResetSignal, setMobileResetSignal] = useState(0);
@@ -188,6 +189,8 @@ export function MatchHud({
   };
   const opacityToPercent = (opacity) => Math.round(((Math.max(0.04, Math.min(1, opacity ?? 0.82)) - 0.04) / 0.96) * 200);
   const percentToOpacity = (percent) => Number((0.04 + (Math.max(0, Math.min(200, Number(percent) || 0)) / 200) * 0.96).toFixed(2));
+  const sizeToPercent = (size) => Math.round((Math.max(0.5, Math.min(2, size || 1))) * 100);
+  const percentToSize = (percent) => Number((Math.max(50, Math.min(200, Number(percent) || 100)) / 100).toFixed(2));
   const resetMobileControls = () => {
     setMobileControls(MOBILE_CONTROL_DEFAULTS);
     setSelectedMobileControl('shoot');
@@ -489,19 +492,37 @@ export function MatchHud({
       {showMobileSettings && (
         <section className={mobileEditMode ? 'mobile-controls-dialog editing' : 'mobile-controls-dialog'} role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
           {mobileEditMode ? (
+            <>
+            <button className="mobile-layout-save" type="button" onClick={() => setMobileEditMode(false)}>
+              {t('mobile.saveLayout')}
+            </button>
             <div className="mobile-opacity-strip">
               <input
-                aria-label={t('mobile.opacity')}
+                aria-label={mobileAdjustMode === 'size' ? t('mobile.adjustSize') : t('mobile.adjustOpacity')}
                 max="200"
-                min="0"
-                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: percentToOpacity(event.target.value) })}
+                min={mobileAdjustMode === 'size' ? '50' : '0'}
+                onChange={(event) => updateMobileControl(
+                  selectedMobileControl,
+                  mobileAdjustMode === 'size'
+                    ? { size: percentToSize(event.target.value) }
+                    : { opacity: percentToOpacity(event.target.value) },
+                )}
                 step="1"
                 type="range"
-                value={opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
+                value={mobileAdjustMode === 'size'
+                  ? sizeToPercent(mobileControls[selectedMobileControl]?.size)
+                  : opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
               />
-              <span>{opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}</span>
-              <button type="button" onClick={() => setMobileEditMode(false)}>×</button>
+              <span>
+                {mobileAdjustMode === 'size'
+                  ? sizeToPercent(mobileControls[selectedMobileControl]?.size)
+                  : opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
+              </span>
+              <button type="button" onClick={() => setMobileAdjustMode((mode) => (mode === 'size' ? 'opacity' : 'size'))}>
+                {mobileAdjustMode === 'size' ? t('mobile.switchToOpacity') : t('mobile.switchToSize')}
+              </button>
             </div>
+            </>
           ) : (
           <div>
             <header>
@@ -523,7 +544,6 @@ export function MatchHud({
             >
               {mobileEditMode ? t('mobile.dragging') : t('mobile.dragButtons')}
             </button>
-            <p className="mobile-controls-hint">{t('mobile.pinchSize')}</p>
             <label>
               {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.opacity')}
               <input

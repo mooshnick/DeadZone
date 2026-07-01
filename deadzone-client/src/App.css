@@ -2823,7 +2823,7 @@ button {
 .mobile-controls-dialog.editing {
   align-items: end;
   justify-items: center;
-  padding: 0 max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   background: rgba(2, 6, 12, 0.16);
   backdrop-filter: none;
   pointer-events: none;
@@ -2839,7 +2839,7 @@ button {
 
 .mobile-opacity-strip {
   display: grid;
-  grid-template-columns: 1fr 42px 38px;
+  grid-template-columns: 1fr 42px 64px;
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -2856,17 +2856,34 @@ button {
 
 .mobile-opacity-strip button {
   display: grid;
-  width: 34px;
+  width: 60px;
   height: 34px;
   padding: 0;
   place-items: center;
   border: 0;
   border-radius: 999px;
   color: #101318;
-  font-size: 21px;
+  font-size: 11px;
   font-weight: 950;
   line-height: 1;
   background: #ffc247;
+}
+
+.mobile-layout-save {
+  position: fixed;
+  z-index: 151;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  min-width: 76px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  color: #101318;
+  font-size: 13px;
+  font-weight: 950;
+  background: #4cff91;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  pointer-events: auto;
 }
 
 .mobile-controls-dialog header {
