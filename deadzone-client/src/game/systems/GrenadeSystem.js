@@ -14,7 +14,7 @@ const MIN_ARC_FORCE = 0.38;
 const MAX_ARC_FORCE = 0.58;
 const BLAST_RADIUS = 8.6;
 const BLAST_DAMAGE = 72;
-const GRENADE_SOUND_URL = '/sound/grenade.mp3';
+const GRENADE_SOUND_URL = '/sound/grenade_trimmed.wav';
 
 export class GrenadeSystem {
   constructor({ scene, players, combatSystem, collisionSystem, gameMode, onEvent }) {
