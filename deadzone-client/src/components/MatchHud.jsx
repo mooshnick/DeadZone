@@ -143,11 +143,16 @@ export function MatchHud({
     onMobileReset?.();
     setMobileResetSignal((value) => value + 1);
   };
+  const releaseMobileInput = () => {
+    resetMobileInput();
+    window.requestAnimationFrame(resetMobileInput);
+    window.setTimeout(resetMobileInput, 0);
+    window.setTimeout(resetMobileInput, 120);
+    window.setTimeout(resetMobileInput, 320);
+  };
   const setPaused = (value) => {
     if (!value) {
-      resetMobileInput();
-      window.setTimeout(resetMobileInput, 0);
-      window.setTimeout(resetMobileInput, 120);
+      releaseMobileInput();
     }
     setShowPauseMenu(value);
     worldRef.current?.setPaused(value);
@@ -165,7 +170,7 @@ export function MatchHud({
     if (returned) {
       document.activeElement?.blur?.();
       setMobileControlSession((value) => value + 1);
-      resetMobileInput();
+      releaseMobileInput();
     }
   };
   const exitPausedMatch = () => {
@@ -210,8 +215,7 @@ export function MatchHud({
     if (wasDead) {
       setWasDead(false);
       setMobileControlSession((value) => value + 1);
-      resetMobileInput();
-      window.requestAnimationFrame(resetMobileInput);
+      releaseMobileInput();
       return;
     }
     if (showPauseMenu || matchResult) {
