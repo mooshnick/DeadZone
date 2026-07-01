@@ -14,6 +14,7 @@ const MIN_ARC_FORCE = 0.38;
 const MAX_ARC_FORCE = 0.58;
 const BLAST_RADIUS = 8.6;
 const BLAST_DAMAGE = 72;
+const GRENADE_SOUND_URL = '/sound/grenade.mp3';
 
 export class GrenadeSystem {
   constructor({ scene, players, combatSystem, collisionSystem, gameMode, onEvent }) {
@@ -26,6 +27,26 @@ export class GrenadeSystem {
     this.pickups = [];
     this.thrown = [];
     this.lastSpawnAt = 0;
+    this.grenadeSound = this.createGrenadeSound();
+  }
+
+  createGrenadeSound() {
+    if (typeof Audio === 'undefined') {
+      return null;
+    }
+    const sound = new Audio(GRENADE_SOUND_URL);
+    sound.preload = 'auto';
+    sound.volume = 0.5;
+    return sound;
+  }
+
+  playGrenadeSound(player) {
+    if (player.isBot || !this.grenadeSound) {
+      return;
+    }
+    this.grenadeSound.pause();
+    this.grenadeSound.currentTime = 0;
+    this.grenadeSound.play().catch(() => {});
   }
 
   update(time, dt) {
@@ -43,6 +64,7 @@ export class GrenadeSystem {
     const arcForce = MIN_ARC_FORCE + (MAX_ARC_FORCE - MIN_ARC_FORCE) * throwCharge;
     const throwDirection = direction.clone().normalize();
     player.grenades -= 1;
+    this.playGrenadeSound(player);
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.34, 16, 12),
       new THREE.MeshStandardMaterial({ color: '#243042', emissive: '#53ff9a', emissiveIntensity: 0.28 }),
