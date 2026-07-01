@@ -118,7 +118,7 @@ export function MobileTouchControls({
     window.setTimeout(resetAllTouches, 0);
   }, [resetAllTouches, resetSignal]);
 
-  if (!enabled || (disabled && !editMode)) return null;
+  if (!enabled) return null;
 
   const controlStyle = (id) => {
     const control = controlConfig?.[id];
@@ -312,7 +312,10 @@ export function MobileTouchControls({
 
   return (
     <div
-      className={editMode ? 'mobile-touch-layer mobile-touch-editing' : 'mobile-touch-layer'}
+      className={[
+        editMode ? 'mobile-touch-layer mobile-touch-editing' : 'mobile-touch-layer',
+        disabled && !editMode ? 'mobile-touch-disabled' : '',
+      ].filter(Boolean).join(' ')}
       aria-hidden={disabled ? 'true' : 'false'}
     >
       <div

@@ -3151,6 +3151,16 @@ button {
   pointer-events: auto;
 }
 
+.mobile-touch-disabled {
+  pointer-events: none;
+}
+
+.mobile-touch-disabled .mobile-look-pad,
+.mobile-touch-disabled .mobile-joystick,
+.mobile-touch-disabled .mobile-action {
+  pointer-events: none;
+}
+
 .mobile-touch-editing .mobile-look-pad {
   pointer-events: none;
 }

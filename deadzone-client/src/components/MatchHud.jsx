@@ -218,7 +218,6 @@ export function MatchHud({
         editMode={showMobileSettings && mobileEditMode}
         grenadeCharge={grenadeCharge}
         grenadeCount={grenadeCount}
-        key={mobileResetSignal}
         onControlChange={updateMobileControl}
         onGrenadeEnd={onMobileGrenadeEnd}
         onGrenadeStart={onMobileGrenadeStart}

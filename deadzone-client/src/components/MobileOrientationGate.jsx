@@ -54,7 +54,7 @@ export function MobileOrientationGate({ paused = false }) {
     }
   }, [paused, portrait, touchDevice]);
 
-  if (!touchDevice || (!portrait && fullscreen)) {
+  if (!touchDevice || !portrait) {
     return null;
   }
 
