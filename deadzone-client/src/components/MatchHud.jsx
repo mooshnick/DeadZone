@@ -615,6 +615,9 @@ export function MatchHud({
       <aside className={compactHud ? 'compact-combat-widget minimized' : 'compact-combat-widget'}>
           <strong>{ammo.reloading ? `${reloadPercent}%` : `${ammo.ammo}/${ammo.magazineSize}`}</strong>
           <small><span aria-hidden="true">{'\u{1F4A3}'}</span>{grenadeCount}</small>
+          <i className="compact-health-meter" aria-label={t('hud.health')}>
+            <b style={{ width: `${Math.max(0, Math.min(100, Math.round(health ?? 100)))}%` }} />
+          </i>
       </aside>
 
       <footer className={compactHud ? 'match-panel overlay compact' : 'match-panel overlay'}>

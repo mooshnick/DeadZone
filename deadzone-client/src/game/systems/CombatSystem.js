@@ -33,6 +33,7 @@ export class CombatSystem {
     const sound = new Audio(url);
     sound.preload = 'auto';
     sound.volume = volume;
+    sound.load();
     return sound;
   }
 
@@ -51,10 +52,33 @@ export class CombatSystem {
     }
     const sound = this.shotSounds[this.shotSoundIndex % this.shotSounds.length];
     this.shotSoundIndex += 1;
+    this.unlockShotSounds(sound);
     sound.pause();
     sound.currentTime = 0;
     sound.volume = player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
     sound.play().catch(() => {});
+  }
+
+  unlockShotSounds(activeSound = null) {
+    if (this.shotSoundsUnlocked) {
+      return;
+    }
+    this.shotSoundsUnlocked = true;
+    this.shotSounds.forEach((sound) => {
+      if (sound === activeSound) {
+        return;
+      }
+      sound.muted = true;
+      sound.play()
+        .then(() => {
+          sound.pause();
+          sound.currentTime = 0;
+          sound.muted = false;
+        })
+        .catch(() => {
+          sound.muted = false;
+        });
+    });
   }
 
   playReloadSound(player) {
