@@ -162,12 +162,7 @@ export function MatchHud({
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
       document.activeElement?.blur?.();
-      window.setTimeout(() => worldRef.current?.resetRuntimeInput?.(), 0);
-      window.setTimeout(() => worldRef.current?.resetRuntimeInput?.(), 120);
-      window.setTimeout(resetMobileInput, 0);
-      window.setTimeout(resetMobileInput, 120);
-      window.setTimeout(resetMobileInput, 260);
-      window.setTimeout(resetMobileInput, 520);
+      resetMobileInput();
     }
   };
   const exitPausedMatch = () => {

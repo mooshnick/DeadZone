@@ -727,7 +727,6 @@ export class GameWorld {
     this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
     this.realtimeClient?.sendMoveNow?.(this.networkPayloadFor(player), this.localRespawnedAt);
-    window.setTimeout(() => this.resetRuntimeInput(), 0);
     if (capturePointer) {
       this.capturePointer();
     }
