@@ -4775,13 +4775,19 @@ button {
 
 .death-actions {
   display: grid;
-  grid-template-columns: 1fr;
+  direction: ltr;
+  grid-template-areas:
+    "controls return"
+    "exit customize";
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  width: min(420px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
 }
 
 .death-actions button {
-  min-width: 190px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
   color: #161006;
   background: #f5a524;
 }
@@ -4789,6 +4795,22 @@ button {
 .death-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.death-action-return {
+  grid-area: return;
+}
+
+.death-action-customize {
+  grid-area: customize;
+}
+
+.death-action-controls {
+  grid-area: controls;
+}
+
+.death-action-exit {
+  grid-area: exit;
 }
 
 .death-customizer {
