@@ -2821,34 +2821,52 @@ button {
 }
 
 .mobile-controls-dialog.editing {
-  align-items: start;
+  align-items: end;
   justify-items: center;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 0 max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   background: rgba(2, 6, 12, 0.16);
   backdrop-filter: none;
   pointer-events: none;
 }
 
 .mobile-controls-dialog.editing > div {
-  display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.35fr) auto;
-  align-items: end;
-  width: min(720px, calc(100vw - 20px));
+  width: min(460px, calc(100vw - 24px));
   max-height: none;
-  padding: 10px;
-  gap: 9px;
+  padding: 8px 10px;
   background: rgba(5, 10, 18, 0.82);
   pointer-events: auto;
 }
 
-.mobile-controls-dialog.editing header {
-  grid-column: 1 / -1;
+.mobile-opacity-strip {
+  display: grid;
+  grid-template-columns: 1fr 42px 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36);
 }
 
-.mobile-controls-dialog.editing .mobile-controls-hint {
-  align-self: center;
-  margin: 0;
-  text-transform: none;
+.mobile-opacity-strip span {
+  color: #ffc247;
+  font-size: 13px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.mobile-opacity-strip button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #101318;
+  font-size: 21px;
+  font-weight: 950;
+  line-height: 1;
+  background: #ffc247;
 }
 
 .mobile-controls-dialog header {
@@ -3108,7 +3126,7 @@ button {
 
 .mobile-touch-editing {
   z-index: 130;
-  background: rgba(3, 7, 12, 0.18);
+  background: rgba(3, 7, 12, 0.05);
   pointer-events: auto;
 }
 
@@ -3169,9 +3187,22 @@ button {
 }
 
 .mobile-control-free.selected {
-  opacity: max(var(--control-opacity, 0.82), 0.58);
+  opacity: var(--control-opacity, 0.82);
   outline: 3px solid rgba(255, 194, 71, 0.9);
   outline-offset: 5px;
+}
+
+.mobile-touch-editing .mobile-action {
+  color: transparent;
+  text-shadow: none;
+}
+
+.mobile-touch-editing .mobile-joystick.editable em {
+  display: none;
+}
+
+.mobile-touch-editing .mobile-control-free.mobile-action:active {
+  transform: translate(-50%, -50%) scale(var(--control-size, 1));
 }
 
 .mobile-joystick.editable em {

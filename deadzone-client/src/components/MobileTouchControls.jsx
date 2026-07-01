@@ -354,6 +354,8 @@ export function MobileTouchControls({
           callbacks.current.onScopeToggle?.();
         }}
         onPointerMove={(event) => moveEditDrag('aim', event)}
+        onPointerCancel={(event) => endEditDrag('aim', event)}
+        onLostPointerCapture={(event) => endEditDrag('aim', event)}
         onPointerUp={(event) => endEditDrag('aim', event)}
         style={controlStyle('aim')}
         type="button"
@@ -389,6 +391,8 @@ export function MobileTouchControls({
         onClick={() => !editMode && callbacks.current.onJump?.()}
         onPointerDown={(event) => beginEditDrag('jump', event)}
         onPointerMove={(event) => moveEditDrag('jump', event)}
+        onPointerCancel={(event) => endEditDrag('jump', event)}
+        onLostPointerCapture={(event) => endEditDrag('jump', event)}
         onPointerUp={(event) => endEditDrag('jump', event)}
         style={controlStyle('jump')}
         type="button"
@@ -406,6 +410,8 @@ export function MobileTouchControls({
         onClick={() => !editMode && callbacks.current.onReload?.()}
         onPointerDown={(event) => beginEditDrag('reload', event)}
         onPointerMove={(event) => moveEditDrag('reload', event)}
+        onPointerCancel={(event) => endEditDrag('reload', event)}
+        onLostPointerCapture={(event) => endEditDrag('reload', event)}
         onPointerUp={(event) => endEditDrag('reload', event)}
         style={controlStyle('reload')}
         type="button"
@@ -420,7 +426,10 @@ export function MobileTouchControls({
           selectedControl === 'grenade' ? 'selected' : '',
         ].filter(Boolean).join(' ')}
         disabled={(disabled || grenadeCount <= 0) && !editMode}
-        onPointerCancel={() => callbacks.current.onGrenadeEnd?.()}
+        onPointerCancel={(event) => {
+          if (endEditDrag('grenade', event)) return;
+          callbacks.current.onGrenadeEnd?.();
+        }}
         onPointerDown={(event) => {
           if (beginEditDrag('grenade', event)) return;
           event.preventDefault();
@@ -429,6 +438,7 @@ export function MobileTouchControls({
         }}
         onPointerLeave={() => !editMode && callbacks.current.onGrenadeEnd?.()}
         onPointerMove={(event) => moveEditDrag('grenade', event)}
+        onLostPointerCapture={(event) => endEditDrag('grenade', event)}
         onPointerUp={(event) => {
           if (endEditDrag('grenade', event)) return;
           callbacks.current.onGrenadeEnd?.();

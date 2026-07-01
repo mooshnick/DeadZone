@@ -186,8 +186,8 @@ export function MatchHud({
       return next;
     });
   };
-  const opacityToPercent = (opacity) => Math.round(((Math.max(0.08, Math.min(1, opacity ?? 0.82)) - 0.08) / 0.92) * 100);
-  const percentToOpacity = (percent) => Number((0.08 + (Math.max(0, Math.min(100, Number(percent) || 0)) / 100) * 0.92).toFixed(2));
+  const opacityToPercent = (opacity) => Math.round(((Math.max(0.04, Math.min(1, opacity ?? 0.82)) - 0.04) / 0.96) * 200);
+  const percentToOpacity = (percent) => Number((0.04 + (Math.max(0, Math.min(200, Number(percent) || 0)) / 200) * 0.96).toFixed(2));
   const resetMobileControls = () => {
     setMobileControls(MOBILE_CONTROL_DEFAULTS);
     setSelectedMobileControl('shoot');
@@ -488,6 +488,21 @@ export function MatchHud({
 
       {showMobileSettings && (
         <section className={mobileEditMode ? 'mobile-controls-dialog editing' : 'mobile-controls-dialog'} role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
+          {mobileEditMode ? (
+            <div className="mobile-opacity-strip">
+              <input
+                aria-label={t('mobile.opacity')}
+                max="200"
+                min="0"
+                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: percentToOpacity(event.target.value) })}
+                step="1"
+                type="range"
+                value={opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
+              />
+              <span>{opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}</span>
+              <button type="button" onClick={() => setMobileEditMode(false)}>×</button>
+            </div>
+          ) : (
           <div>
             <header>
               <strong id="mobile-controls-title">{t('mobile.controls')}</strong>
@@ -512,7 +527,7 @@ export function MatchHud({
             <label>
               {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.opacity')}
               <input
-                max="100"
+                max="200"
                 min="0"
                 onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: percentToOpacity(event.target.value) })}
                 step="1"
@@ -526,6 +541,7 @@ export function MatchHud({
               {t('mobile.resetLayout')}
             </button>
           </div>
+          )}
         </section>
       )}
 

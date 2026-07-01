@@ -794,6 +794,7 @@ export function useDeadzoneController() {
   }
 
   function clearVirtualControls() {
+    keys.current.clear();
     setVirtualMovement({ x: 0, y: 0 });
     [
       keybinds.grenade || 'KeyQ',
