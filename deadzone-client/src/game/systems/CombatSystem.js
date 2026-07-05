@@ -168,9 +168,11 @@ export class CombatSystem {
   updateBullets() {
     const players = [...this.players.values()];
     this.bullets = this.bullets.filter((bullet) => {
+      const previousPosition = bullet.mesh.position.clone();
       bullet.mesh.position.add(bullet.velocity);
       bullet.life -= 1;
-      if (this.collisionSystem.hitsSolid(bullet.mesh.position)) {
+      if (this.collisionSystem.hitsSolidSegment?.(previousPosition, bullet.mesh.position, bullet.radius > 0 ? 0.35 : 0.18)
+        || this.collisionSystem.hitsSolid(bullet.mesh.position)) {
         this.explodeOrRemove(bullet);
         return false;
       }

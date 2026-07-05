@@ -390,6 +390,7 @@ function SettingsScreen({
   const [mobileAdjustMode, setMobileAdjustMode] = useState('size');
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
   const [mobileLookSensitivity, setMobileLookSensitivity] = useState(loadMobileLookSensitivity);
+  const [mobileEditorViewport, setMobileEditorViewport] = useState({ width: '100vw', height: '100dvh' });
 
   useEffect(() => {
     const update = () => setTouchDevice(isTouchDevice());
@@ -397,6 +398,30 @@ function SettingsScreen({
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  useEffect(() => {
+    if (!mobileEditMode || typeof window === 'undefined') {
+      return undefined;
+    }
+    const update = () => {
+      const viewport = window.visualViewport;
+      setMobileEditorViewport({
+        width: `${Math.round(viewport?.width || window.innerWidth)}px`,
+        height: `${Math.round(viewport?.height || window.innerHeight)}px`,
+      });
+    };
+    update();
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    window.addEventListener('orientationchange', update);
+    window.addEventListener('resize', update);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+      window.removeEventListener('orientationchange', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [mobileEditMode]);
 
   const updateMobileControl = (id, patch) => {
     setMobileControls((current) => {
@@ -500,7 +525,16 @@ function SettingsScreen({
         )}
       </section>
       {mobileEditMode && typeof document !== 'undefined' && createPortal((
-        <section className="mobile-controls-dialog editing lobby-mobile-controls-editor" role="dialog" aria-modal="true" aria-label={t('death.mobileControls')}>
+        <section
+          className="mobile-controls-dialog editing lobby-mobile-controls-editor"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('death.mobileControls')}
+          style={{
+            '--mobile-editor-width': mobileEditorViewport.width,
+            '--mobile-editor-height': mobileEditorViewport.height,
+          }}
+        >
           <button className="mobile-layout-save" type="button" onClick={() => setMobileEditMode(false)}>
             {t('mobile.saveLayout')}
           </button>

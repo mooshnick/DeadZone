@@ -205,12 +205,27 @@ export class CollisionSystem {
     if (Math.abs(position.x) > ARENA_LIMIT || Math.abs(position.z) > ARENA_LIMIT) {
       return true;
     }
+    if (position.y <= FLOOR_Y - 0.08) {
+      return true;
+    }
     return this.blocks.some((block) => (
       Math.abs(position.x - block.x) <= block.w / 2
       && Math.abs(position.z - block.z) <= block.d / 2
       && position.y >= block.y - block.h / 2
       && position.y <= block.y + block.h / 2
     ));
+  }
+
+  hitsSolidSegment(from, to, radius = 0) {
+    const distance = from.distanceTo(to);
+    const samples = Math.max(2, Math.ceil(distance / Math.max(0.12, radius || 0.18)));
+    for (let index = 0; index <= samples; index += 1) {
+      const point = from.clone().lerp(to, index / samples);
+      if (this.hitsSolid(point)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isOnRaisedBlock(position) {
