@@ -4,7 +4,10 @@ import { nowMs } from '../utils';
 
 const SHOT_SOUND_URL = '/sound/shotSound_1.mp3';
 const RELOAD_SOUND_URL = '/sound/reloadGun_1.mp3';
+const RPG_LAUNCH_SOUND_URL = '/sound/RPG_1.mp3';
+const RPG_EXPLOSION_SOUND_URL = '/sound/RPG_2.mp3';
 const SHOT_SOUND_POOL_SIZE = 6;
+const RPG_SOUND_POOL_SIZE = 4;
 
 export class CombatSystem {
   constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil, onDamage, onElimination }) {
@@ -22,7 +25,11 @@ export class CombatSystem {
     this.onElimination = onElimination;
     this.bullets = [];
     this.shotSoundIndex = 0;
+    this.rpgLaunchSoundIndex = 0;
+    this.rpgExplosionSoundIndex = 0;
     this.shotSounds = this.createShotSoundPool();
+    this.rpgLaunchSounds = this.createSoundPool(RPG_LAUNCH_SOUND_URL, RPG_SOUND_POOL_SIZE, 0.62);
+    this.rpgExplosionSounds = this.createSoundPool(RPG_EXPLOSION_SOUND_URL, RPG_SOUND_POOL_SIZE, 0.78);
     this.reloadSound = this.createSound(RELOAD_SOUND_URL, 0.52);
   }
 
@@ -46,6 +53,27 @@ export class CombatSystem {
     });
   }
 
+  createSoundPool(url, size, volume) {
+    if (typeof Audio === 'undefined') {
+      return [];
+    }
+    return Array.from({ length: size }, () => this.createSound(url, volume));
+  }
+
+  playPooledSound(pool, indexKey, volume = null) {
+    if (!pool?.length) {
+      return;
+    }
+    const sound = pool[this[indexKey] % pool.length];
+    this[indexKey] += 1;
+    sound.pause();
+    sound.currentTime = 0;
+    if (volume != null) {
+      sound.volume = volume;
+    }
+    sound.play().catch(() => {});
+  }
+
   playShotSound(player, weapon) {
     if (player.id !== this.localId || this.shotSounds.length === 0) {
       return;
@@ -57,6 +85,16 @@ export class CombatSystem {
     sound.currentTime = 0;
     sound.volume = player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
     sound.play().catch(() => {});
+  }
+
+  playWeaponFireSound(player, weapon) {
+    if (player.weaponId === 'rpg') {
+      if (player.id === this.localId) {
+        this.playPooledSound(this.rpgLaunchSounds, 'rpgLaunchSoundIndex', 0.66);
+      }
+      return;
+    }
+    this.playShotSound(player, weapon);
   }
 
   unlockShotSounds(activeSound = null) {
@@ -141,7 +179,7 @@ export class CombatSystem {
   }
 
   spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex = 0, shotOrigin = null) {
-    this.playShotSound(player, weapon);
+    this.playWeaponFireSound(player, weapon);
     const origin = (shotOrigin || player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(targetDirection.clone().multiplyScalar(1.6))).clone();
     for (let index = 0; index < weapon.pellets; index += 1) {
       const pelletOffset = weapon.pellets === 1 ? 0 : index - (weapon.pellets - 1) / 2;
@@ -161,6 +199,7 @@ export class CombatSystem {
         damage,
         life: player.weaponId === 'shotgun' ? 55 : 110,
         radius: weapon.explosiveRadius || 0,
+        weaponId: player.weaponId,
       });
     }
   }
@@ -201,6 +240,9 @@ export class CombatSystem {
     if (bullet.radius <= 0) {
       this.scene.remove(bullet.mesh);
       return;
+    }
+    if (bullet.weaponId === 'rpg') {
+      this.playPooledSound(this.rpgExplosionSounds, 'rpgExplosionSoundIndex', 0.82);
     }
     this.makeExplosion(bullet.mesh.position, bullet.radius, bullet.damage, bullet.ownerId, bullet.team);
     this.scene.remove(bullet.mesh);
