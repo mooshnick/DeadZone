@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MobileTouchControls } from './MobileTouchControls';
@@ -498,7 +499,7 @@ function SettingsScreen({
           </div>
         )}
       </section>
-      {mobileEditMode && (
+      {mobileEditMode && typeof document !== 'undefined' && createPortal((
         <section className="mobile-controls-dialog editing lobby-mobile-controls-editor" role="dialog" aria-modal="true" aria-label={t('death.mobileControls')}>
           <button className="mobile-layout-save" type="button" onClick={() => setMobileEditMode(false)}>
             {t('mobile.saveLayout')}
@@ -548,7 +549,7 @@ function SettingsScreen({
             }}
           />
         </section>
-      )}
+      ), document.body)}
     </main>
   );
 }

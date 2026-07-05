@@ -2871,17 +2871,23 @@ button {
 }
 
 .lobby-mobile-controls-editor {
-  z-index: 220;
   position: fixed;
+  z-index: 9998;
   inset: 0;
   width: 100vw;
-  height: 100svh;
+  height: 100dvh;
+  min-height: 100svh;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .lobby-mobile-controls-editor .mobile-touch-layer {
-  z-index: 221;
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
   display: block;
+  width: 100vw;
+  height: 100dvh;
 }
 
 .mobile-controls-dialog.editing > div {
