@@ -33,6 +33,16 @@ const MOBILE_CONTROL_NAMES = {
   reload: 'Reload',
   shoot: 'Shoot',
 };
+const MOBILE_LOOK_SENSITIVITY_KEY = 'deadzone-mobile-look-sensitivity';
+
+function loadMobileLookSensitivity() {
+  try {
+    const value = Number(localStorage.getItem(MOBILE_LOOK_SENSITIVITY_KEY));
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 function damageIndicatorStyle(indicator) {
   const angle = Number(indicator.angle) || 0;
@@ -137,6 +147,7 @@ export function MatchHud({
   const [mobileControls, setMobileControls] = useState(loadMobileControls);
   const [mobileControlSession, setMobileControlSession] = useState(0);
   const [mobileResetSignal, setMobileResetSignal] = useState(0);
+  const [mobileLookSensitivity, setMobileLookSensitivity] = useState(loadMobileLookSensitivity);
   const [wasDead, setWasDead] = useState(false);
   const dir = LANGUAGES[language]?.dir || 'ltr';
   const weapon = displayWeapon(weaponId, WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle, language);
@@ -233,6 +244,15 @@ export function MatchHud({
     setSelectedMobileControl('shoot');
     localStorage.setItem('deadzone-mobile-controls', JSON.stringify(MOBILE_CONTROL_DEFAULTS));
   };
+  const updateMobileLookSensitivity = (value) => {
+    const next = Math.max(0, Math.min(100, Number(value) || 0));
+    setMobileLookSensitivity(next);
+    localStorage.setItem(MOBILE_LOOK_SENSITIVITY_KEY, String(next));
+  };
+  const handleMobileLook = (dx, dy) => {
+    const multiplier = 1 + (mobileLookSensitivity / 100) * 1.6;
+    onMobileLook?.(dx * multiplier, dy * multiplier);
+  };
 
   useEffect(() => {
     if (deathInfo.isDead) {
@@ -283,7 +303,7 @@ export function MatchHud({
         onGrenadeEnd={onMobileGrenadeEnd}
         onGrenadeStart={onMobileGrenadeStart}
         onJump={onMobileJump}
-        onLook={onMobileLook}
+        onLook={handleMobileLook}
         onMove={onMobileMove}
         onReload={onMobileReload}
         onScopeToggle={onMobileScopeToggle}
@@ -616,6 +636,18 @@ export function MatchHud({
                 value={opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
               />
               <span>{opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}%</span>
+            </label>
+            <label>
+              {t('mobile.lookSensitivity')}
+              <input
+                max="100"
+                min="0"
+                onChange={(event) => updateMobileLookSensitivity(event.target.value)}
+                step="1"
+                type="range"
+                value={mobileLookSensitivity}
+              />
+              <span>{mobileLookSensitivity}%</span>
             </label>
             <small className="mobile-controls-hint">{t('mobile.dragButtons')}</small>
             <button className="secondary-command" type="button" onClick={resetMobileControls}>
