@@ -34,6 +34,35 @@ const MOBILE_CONTROL_NAMES = {
   shoot: 'Shoot',
 };
 
+function damageIndicatorStyle(indicator) {
+  const angle = Number(indicator.angle) || 0;
+  const fallback = {
+    '--damage-angle': `${angle}deg`,
+    '--damage-intensity': indicator.intensity ?? 0.6,
+  };
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+  const radians = (angle * Math.PI) / 180;
+  const dx = Math.sin(radians);
+  const dy = -Math.cos(radians);
+  const width = Math.max(1, window.innerWidth);
+  const height = Math.max(1, window.innerHeight);
+  const edgePadding = window.matchMedia?.('(pointer: coarse)').matches ? 34 : 28;
+  const tx = Math.abs(dx) > 0.001
+    ? (dx > 0 ? (width / 2 - edgePadding) / dx : (-width / 2 + edgePadding) / dx)
+    : Number.POSITIVE_INFINITY;
+  const ty = Math.abs(dy) > 0.001
+    ? (dy > 0 ? (height / 2 - edgePadding) / dy : (-height / 2 + edgePadding) / dy)
+    : Number.POSITIVE_INFINITY;
+  const distance = Math.max(0, Math.min(Math.abs(tx), Math.abs(ty)));
+  return {
+    ...fallback,
+    left: `${width / 2 + dx * distance}px`,
+    top: `${height / 2 + dy * distance}px`,
+  };
+}
+
 function loadMobileControls() {
   try {
     const savedControls = JSON.parse(localStorage.getItem('deadzone-mobile-controls')) || {};
@@ -239,10 +268,7 @@ export function MatchHud({
           <span
             className="damage-direction-indicator"
             key={indicator.id}
-            style={{
-              '--damage-angle': `${indicator.angle || 0}deg`,
-              '--damage-intensity': indicator.intensity ?? 0.6,
-            }}
+            style={damageIndicatorStyle(indicator)}
           />
         ))}
       </div>
