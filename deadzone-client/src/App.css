@@ -1862,6 +1862,24 @@ html:fullscreen .game-3d-shell {
   font-size: 26px;
 }
 
+.mobile-settings-card label {
+  display: grid;
+  gap: 8px;
+  color: #9fb0c7;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.mobile-settings-card input[type='range'] {
+  width: 100%;
+}
+
+.mobile-settings-card label span {
+  color: #ffc247;
+  font-size: 15px;
+}
+
 .language-toggle {
   display: flex;
   align-items: center;

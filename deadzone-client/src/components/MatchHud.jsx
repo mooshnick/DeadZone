@@ -25,14 +25,6 @@ const MOBILE_CONTROL_DEFAULTS = {
   shoot: { x: 89, y: 49, size: 1, opacity: 0.82 },
 };
 
-const MOBILE_CONTROL_NAMES = {
-  aim: 'Aim',
-  grenade: 'Grenade',
-  joystick: 'Movement',
-  jump: 'Jump',
-  reload: 'Reload',
-  shoot: 'Shoot',
-};
 const MOBILE_LOOK_SENSITIVITY_KEY = 'deadzone-mobile-look-sensitivity';
 
 function loadMobileLookSensitivity() {
@@ -610,14 +602,6 @@ export function MatchHud({
               <strong id="mobile-controls-title">{t('mobile.controls')}</strong>
               <button type="button" onClick={() => setShowMobileSettings(false)}>{t('mobile.close')}</button>
             </header>
-            <label>
-              {t('mobile.control')}
-              <select value={selectedMobileControl} onChange={(event) => setSelectedMobileControl(event.target.value)}>
-                {Object.entries(MOBILE_CONTROL_NAMES).map(([id, label]) => (
-                  <option value={id} key={id}>{t(`mobile.${id === 'joystick' ? 'movement' : id}`)}</option>
-                ))}
-              </select>
-            </label>
             <button
               className={mobileEditMode ? 'primary-command active' : 'secondary-command'}
               type="button"
@@ -625,18 +609,6 @@ export function MatchHud({
             >
               {mobileEditMode ? t('mobile.dragging') : t('mobile.dragButtons')}
             </button>
-            <label>
-              {t(`mobile.${selectedMobileControl === 'joystick' ? 'movement' : selectedMobileControl}`)} {t('mobile.opacity')}
-              <input
-                max="200"
-                min="0"
-                onChange={(event) => updateMobileControl(selectedMobileControl, { opacity: percentToOpacity(event.target.value) })}
-                step="1"
-                type="range"
-                value={opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
-              />
-              <span>{opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}%</span>
-            </label>
             <label>
               {t('mobile.lookSensitivity')}
               <input

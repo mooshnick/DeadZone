@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
+import { MobileTouchControls } from './MobileTouchControls';
 import { googleClientId } from '../api/users';
 import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
@@ -17,6 +18,46 @@ import {
   displayWeaponSkin,
   LANGUAGES,
 } from '../i18n';
+
+const MOBILE_CONTROL_DEFAULTS = {
+  aim: { x: 76, y: 25, size: 1, opacity: 0.82 },
+  grenade: { x: 76, y: 72, size: 1, opacity: 0.82 },
+  joystick: { x: 14, y: 72, size: 1, opacity: 0.76 },
+  jump: { x: 76, y: 41, size: 1, opacity: 0.82 },
+  reload: { x: 76, y: 56, size: 1, opacity: 0.82 },
+  shoot: { x: 89, y: 49, size: 1, opacity: 0.82 },
+};
+
+const MOBILE_LOOK_SENSITIVITY_KEY = 'deadzone-mobile-look-sensitivity';
+
+function loadMobileControls() {
+  try {
+    const savedControls = JSON.parse(localStorage.getItem('deadzone-mobile-controls')) || {};
+    return {
+      ...MOBILE_CONTROL_DEFAULTS,
+      ...Object.fromEntries(Object.entries(MOBILE_CONTROL_DEFAULTS).map(([id, defaults]) => [
+        id,
+        { ...defaults, ...(savedControls[id] || {}) },
+      ])),
+    };
+  } catch {
+    return MOBILE_CONTROL_DEFAULTS;
+  }
+}
+
+function loadMobileLookSensitivity() {
+  try {
+    const value = Number(localStorage.getItem(MOBILE_LOOK_SENSITIVITY_KEY));
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function isTouchDevice() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+}
 
 export function Lobby(props) {
   const t = props.t || createTranslator(props.language);
@@ -337,6 +378,44 @@ function SettingsScreen({
   xp,
 }) {
   const dir = LANGUAGES[language]?.dir || 'ltr';
+  const [touchDevice, setTouchDevice] = useState(isTouchDevice);
+  const [mobileEditMode, setMobileEditMode] = useState(false);
+  const [selectedMobileControl, setSelectedMobileControl] = useState('shoot');
+  const [mobileAdjustMode, setMobileAdjustMode] = useState('size');
+  const [mobileControls, setMobileControls] = useState(loadMobileControls);
+  const [mobileLookSensitivity, setMobileLookSensitivity] = useState(loadMobileLookSensitivity);
+
+  useEffect(() => {
+    const update = () => setTouchDevice(isTouchDevice());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const updateMobileControl = (id, patch) => {
+    setMobileControls((current) => {
+      const next = {
+        ...current,
+        [id]: { ...current[id], ...patch },
+      };
+      localStorage.setItem('deadzone-mobile-controls', JSON.stringify(next));
+      return next;
+    });
+  };
+  const opacityToPercent = (opacity) => Math.round(((Math.max(0.04, Math.min(1, opacity ?? 0.82)) - 0.04) / 0.96) * 200);
+  const percentToOpacity = (percent) => Number((0.04 + (Math.max(0, Math.min(200, Number(percent) || 0)) / 200) * 0.96).toFixed(2));
+  const sizeToPercent = (size) => Math.round((Math.max(0.5, Math.min(2, size || 1))) * 100);
+  const percentToSize = (percent) => Number((Math.max(50, Math.min(200, Number(percent) || 100)) / 100).toFixed(2));
+  const resetMobileControls = () => {
+    setMobileControls(MOBILE_CONTROL_DEFAULTS);
+    setSelectedMobileControl('shoot');
+    localStorage.setItem('deadzone-mobile-controls', JSON.stringify(MOBILE_CONTROL_DEFAULTS));
+  };
+  const updateMobileLookSensitivity = (value) => {
+    const next = Math.max(0, Math.min(100, Number(value) || 0));
+    setMobileLookSensitivity(next);
+    localStorage.setItem(MOBILE_LOOK_SENSITIVITY_KEY, String(next));
+  };
 
   return (
     <main className="menu-shell" dir={dir}>
@@ -356,29 +435,107 @@ function SettingsScreen({
             <strong>{LANGUAGES[language]?.label || LANGUAGES.en.label}</strong>
           </button>
         </div>
-        <div className="settings-card">
-          <header>
-            <span>{t('settings.controls')}</span>
-            <strong>{t('settings.keyboard')}</strong>
-          </header>
-          <div className="keybind-list">
-            {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
-              <button
-                className={editingKeybind === action ? 'keybind-row listening' : 'keybind-row'}
-                key={action}
-                onClick={() => setEditingKeybind(action)}
-              >
-                <span>{displayKeybindLabel(action, label, language)}</span>
-                <strong>{editingKeybind === action ? t('settings.pressKey') : keybinds[action]}</strong>
-              </button>
-            ))}
+        {touchDevice ? (
+          <div className="settings-card mobile-settings-card">
+            <header>
+              <span>{t('settings.controls')}</span>
+              <strong>{t('death.mobileControls')}</strong>
+            </header>
+            <button className="secondary-command" type="button" onClick={() => setMobileEditMode(true)}>
+              {t('mobile.dragButtons')}
+            </button>
+            <label>
+              {t('mobile.lookSensitivity')}
+              <input
+                max="100"
+                min="0"
+                onChange={(event) => updateMobileLookSensitivity(event.target.value)}
+                step="1"
+                type="range"
+                value={mobileLookSensitivity}
+              />
+              <span>{mobileLookSensitivity}%</span>
+            </label>
+            <div className="settings-actions">
+              <button className="secondary-command" onClick={resetMobileControls}>{t('mobile.resetLayout')}</button>
+              <button className="primary-command" onClick={() => setPanel('main')}>{t('settings.done')}</button>
+            </div>
           </div>
-          <div className="settings-actions">
-            <button className="secondary-command" onClick={resetKeybinds}>{t('settings.reset')}</button>
-            <button className="primary-command" onClick={() => setPanel('main')}>{t('settings.done')}</button>
+        ) : (
+          <div className="settings-card">
+            <header>
+              <span>{t('settings.controls')}</span>
+              <strong>{t('settings.keyboard')}</strong>
+            </header>
+            <div className="keybind-list">
+              {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
+                <button
+                  className={editingKeybind === action ? 'keybind-row listening' : 'keybind-row'}
+                  key={action}
+                  onClick={() => setEditingKeybind(action)}
+                >
+                  <span>{displayKeybindLabel(action, label, language)}</span>
+                  <strong>{editingKeybind === action ? t('settings.pressKey') : keybinds[action]}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="settings-actions">
+              <button className="secondary-command" onClick={resetKeybinds}>{t('settings.reset')}</button>
+              <button className="primary-command" onClick={() => setPanel('main')}>{t('settings.done')}</button>
+            </div>
           </div>
-        </div>
+        )}
       </section>
+      {mobileEditMode && (
+        <section className="mobile-controls-dialog editing lobby-mobile-controls-editor" role="dialog" aria-modal="true" aria-label={t('death.mobileControls')}>
+          <button className="mobile-layout-save" type="button" onClick={() => setMobileEditMode(false)}>
+            {t('mobile.saveLayout')}
+          </button>
+          <div className="mobile-opacity-strip">
+            <input
+              aria-label={mobileAdjustMode === 'size' ? t('mobile.adjustSize') : t('mobile.adjustOpacity')}
+              max="200"
+              min={mobileAdjustMode === 'size' ? '50' : '0'}
+              onChange={(event) => updateMobileControl(
+                selectedMobileControl,
+                mobileAdjustMode === 'size'
+                  ? { size: percentToSize(event.target.value) }
+                  : { opacity: percentToOpacity(event.target.value) },
+              )}
+              step="1"
+              type="range"
+              value={mobileAdjustMode === 'size'
+                ? sizeToPercent(mobileControls[selectedMobileControl]?.size)
+                : opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
+            />
+            <span>
+              {mobileAdjustMode === 'size'
+                ? sizeToPercent(mobileControls[selectedMobileControl]?.size)
+                : opacityToPercent(mobileControls[selectedMobileControl]?.opacity)}
+            </span>
+            <button type="button" onClick={() => setMobileAdjustMode((mode) => (mode === 'size' ? 'opacity' : 'size'))}>
+              {mobileAdjustMode === 'size' ? t('mobile.switchToOpacity') : t('mobile.switchToSize')}
+            </button>
+          </div>
+          <MobileTouchControls
+            controlConfig={mobileControls}
+            editMode
+            grenadeCount={3}
+            onControlChange={updateMobileControl}
+            onSelectControl={setSelectedMobileControl}
+            selectedControl={selectedMobileControl}
+            labels={{
+              aim: t('mobile.aim'),
+              grenade: t('mobile.grenade'),
+              joystick: t('mobile.move'),
+              jump: t('mobile.jump'),
+              reload: t('mobile.reload'),
+              shoot: t('mobile.shoot'),
+              throw: t('mobile.throw'),
+            }}
+          />
+        </section>
+      )}
     </main>
   );
 }
