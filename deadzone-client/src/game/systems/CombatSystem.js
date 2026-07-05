@@ -74,6 +74,33 @@ export class CombatSystem {
     sound.play().catch(() => {});
   }
 
+  unlockSoundPool(pool) {
+    if (!pool?.length) {
+      return;
+    }
+    pool.forEach((sound) => {
+      sound.muted = true;
+      sound.play()
+        .then(() => {
+          sound.pause();
+          sound.currentTime = 0;
+          sound.muted = false;
+        })
+        .catch(() => {
+          sound.muted = false;
+        });
+    });
+  }
+
+  unlockRpgSounds() {
+    if (this.rpgSoundsUnlocked) {
+      return;
+    }
+    this.rpgSoundsUnlocked = true;
+    this.unlockSoundPool(this.rpgLaunchSounds);
+    this.unlockSoundPool(this.rpgExplosionSounds);
+  }
+
   playShotSound(player, weapon) {
     if (player.id !== this.localId || this.shotSounds.length === 0) {
       return;
@@ -89,12 +116,17 @@ export class CombatSystem {
 
   playWeaponFireSound(player, weapon) {
     if (player.weaponId === 'rpg') {
-      if (player.id === this.localId) {
-        this.playPooledSound(this.rpgLaunchSounds, 'rpgLaunchSoundIndex', 0.66);
-      }
+      this.playRpgLaunchSound(player);
       return;
     }
     this.playShotSound(player, weapon);
+  }
+
+  playRpgLaunchSound(player) {
+    if (player.id === this.localId) {
+      this.unlockRpgSounds();
+    }
+    this.playPooledSound(this.rpgLaunchSounds, 'rpgLaunchSoundIndex', 0.66);
   }
 
   unlockShotSounds(activeSound = null) {
@@ -165,6 +197,10 @@ export class CombatSystem {
     player.ammo -= shotsToFire;
     player.lastShot = time;
     this.onRecoil?.(player, weapon);
+    const playedImmediateRpgSound = player.weaponId === 'rpg';
+    if (playedImmediateRpgSound) {
+      this.playRpgLaunchSound(player);
+    }
 
     const upgradeMultiplier = 1 + (player.weaponLevel || 0) * 0.08;
     const damage = Math.round(weapon.damage * upgradeMultiplier * (player.buffs.damage ? 1.45 : 1));
@@ -173,13 +209,15 @@ export class CombatSystem {
       const delay = (weapon.burstDelay || 0) * shotIndex;
       window.setTimeout(() => {
         if (player.isDead) return;
-        this.spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex, shotOrigin);
+        this.spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex, shotOrigin, playedImmediateRpgSound);
       }, delay);
     }
   }
 
-  spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex = 0, shotOrigin = null) {
-    this.playWeaponFireSound(player, weapon);
+  spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex = 0, shotOrigin = null, skipFireSound = false) {
+    if (!skipFireSound) {
+      this.playWeaponFireSound(player, weapon);
+    }
     const origin = (shotOrigin || player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(targetDirection.clone().multiplyScalar(1.6))).clone();
     for (let index = 0; index < weapon.pellets; index += 1) {
       const pelletOffset = weapon.pellets === 1 ? 0 : index - (weapon.pellets - 1) / 2;
