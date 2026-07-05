@@ -59,6 +59,11 @@ function isTouchDevice() {
   return window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 }
 
+function requestMobileFullscreen() {
+  if (typeof document === 'undefined' || document.fullscreenElement) return;
+  document.documentElement.requestFullscreen?.().catch?.(() => {});
+}
+
 export function Lobby(props) {
   const t = props.t || createTranslator(props.language);
   const dir = LANGUAGES[props.language || 'en']?.dir || 'ltr';
@@ -441,7 +446,14 @@ function SettingsScreen({
               <span>{t('settings.controls')}</span>
               <strong>{t('death.mobileControls')}</strong>
             </header>
-            <button className="secondary-command" type="button" onClick={() => setMobileEditMode(true)}>
+            <button
+              className="secondary-command"
+              type="button"
+              onClick={() => {
+                requestMobileFullscreen();
+                setMobileEditMode(true);
+              }}
+            >
               {t('mobile.dragButtons')}
             </button>
             <label>
@@ -525,12 +537,13 @@ function SettingsScreen({
             onSelectControl={setSelectedMobileControl}
             selectedControl={selectedMobileControl}
             labels={{
-              aim: t('mobile.aim'),
-              grenade: t('mobile.grenade'),
-              joystick: t('mobile.move'),
-              jump: t('mobile.jump'),
-              reload: t('mobile.reload'),
-              shoot: t('mobile.shoot'),
+              aim: '🎯',
+              grenade: '💣',
+              grenadeEmpty: '🍅',
+              joystick: '🕹',
+              jump: '⬆',
+              reload: '♻',
+              shoot: '🔥',
               throw: t('mobile.throw'),
             }}
           />

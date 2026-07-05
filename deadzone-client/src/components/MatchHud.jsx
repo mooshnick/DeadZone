@@ -306,12 +306,13 @@ export function MatchHud({
         selectedControl={selectedMobileControl}
         scoped={isScoped}
         labels={{
-          aim: t('mobile.aim'),
-          grenade: t('mobile.grenade'),
-          joystick: t('mobile.move'),
-          jump: t('mobile.jump'),
-          reload: t('mobile.reload'),
-          shoot: t('mobile.shoot'),
+          aim: '🎯',
+          grenade: '💣',
+          grenadeEmpty: '🍅',
+          joystick: '🕹',
+          jump: '⬆',
+          reload: '♻',
+          shoot: '🔥',
           throw: t('mobile.throw'),
         }}
       />

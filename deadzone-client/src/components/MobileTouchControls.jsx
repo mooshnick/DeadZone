@@ -315,6 +315,11 @@ export function MobileTouchControls({
     requestMobileFullscreen();
     callback?.();
   };
+  const actionIcon = (id, fallback) => (
+    <span className={`mobile-action-icon mobile-action-icon--${id}`}>
+      {fallback}
+    </span>
+  );
 
   return (
     <div
@@ -375,7 +380,7 @@ export function MobileTouchControls({
         style={controlStyle('aim')}
         type="button"
       >
-        {labels.aim || CONTROL_LABELS.aim}
+        {actionIcon('aim', labels.aim || CONTROL_LABELS.aim)}
       </button>
       <button
         className={[
@@ -393,7 +398,7 @@ export function MobileTouchControls({
         style={controlStyle('shoot')}
         type="button"
       >
-        {labels.shoot || CONTROL_LABELS.shoot}
+        {actionIcon('shoot', labels.shoot || CONTROL_LABELS.shoot)}
       </button>
       <button
         className={[
@@ -411,7 +416,7 @@ export function MobileTouchControls({
         style={controlStyle('jump')}
         type="button"
       >
-        {labels.jump || CONTROL_LABELS.jump}
+        {actionIcon('jump', labels.jump || CONTROL_LABELS.jump)}
       </button>
       <button
         className={[
@@ -429,7 +434,7 @@ export function MobileTouchControls({
         style={controlStyle('reload')}
         type="button"
       >
-        {labels.reload || CONTROL_LABELS.reload}
+        {actionIcon('reload', labels.reload || CONTROL_LABELS.reload)}
       </button>
       <button
         className={[
@@ -459,7 +464,7 @@ export function MobileTouchControls({
         style={controlStyle('grenade')}
         type="button"
       >
-        {labels.grenade || CONTROL_LABELS.grenade}
+        {actionIcon('grenade', grenadeCount > 0 ? (labels.grenade || CONTROL_LABELS.grenade) : (labels.grenadeEmpty || '🍅'))}
       </button>
 
       {grenadeCount > 0 && grenadeCharge > 0 && (
