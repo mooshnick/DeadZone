@@ -21,17 +21,20 @@ function localNetworkOrigin(configured) {
 
 function serverOrigin() {
   const configured = import.meta.env.VITE_API_ORIGIN;
+  const { hostname, protocol } = window.location;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+  if (isLocal) {
+    return `${protocol}//127.0.0.1:${DEFAULT_SERVER_PORT}`;
+  }
+
   if (configured) {
     return localNetworkOrigin(configured);
   }
 
-  const { hostname, protocol } = window.location;
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
   if (!isLocal) {
     return DEFAULT_PRODUCTION_API_ORIGIN;
   }
-  const host = isLocal ? '127.0.0.1' : hostname;
-  return `${protocol}//${host}:${DEFAULT_SERVER_PORT}`;
+  return `${protocol}//127.0.0.1:${DEFAULT_SERVER_PORT}`;
 }
 
 export function apiBase(path) {
@@ -39,7 +42,7 @@ export function apiBase(path) {
 }
 
 export function sameOriginApiBase(path) {
-  return path;
+  return apiBase(path);
 }
 
 export function gameSocketUrl() {
