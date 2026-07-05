@@ -3108,6 +3108,68 @@ button {
   height: 2px;
 }
 
+.damage-indicator-layer {
+  position: fixed;
+  z-index: 19;
+  inset: 0;
+  pointer-events: none;
+}
+
+.damage-direction-indicator {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: calc(0.38 + (var(--damage-intensity, 0.6) * 0.42));
+  transform: translate(-50%, -50%) rotate(var(--damage-angle, 0deg));
+  animation: damageDirectionPulse 850ms ease-out forwards;
+}
+
+.damage-direction-indicator::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: min(-22vh, -132px);
+  width: clamp(54px, 8vw, 96px);
+  height: clamp(30px, 4vw, 48px);
+  border-radius: 999px 999px 16px 16px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.86), transparent 10%),
+    linear-gradient(180deg, rgba(255, 53, 74, 0.95), rgba(255, 53, 74, 0.24) 68%, transparent);
+  filter: drop-shadow(0 0 16px rgba(255, 48, 72, 0.68));
+  transform: translateX(-50%);
+}
+
+.damage-direction-indicator::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: min(-18vh, -108px);
+  width: 0;
+  height: 0;
+  border-right: 12px solid transparent;
+  border-left: 12px solid transparent;
+  border-bottom: 18px solid rgba(255, 58, 78, 0.92);
+  filter: drop-shadow(0 0 10px rgba(255, 58, 78, 0.72));
+  transform: translateX(-50%) rotate(180deg);
+}
+
+@keyframes damageDirectionPulse {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--damage-angle, 0deg)) scale(0.82);
+  }
+  16% {
+    opacity: calc(0.5 + (var(--damage-intensity, 0.6) * 0.45));
+    transform: translate(-50%, -50%) rotate(var(--damage-angle, 0deg)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--damage-angle, 0deg)) scale(1.06);
+  }
+}
+
 .grenade-charge-reticle {
   position: fixed;
   z-index: 3;

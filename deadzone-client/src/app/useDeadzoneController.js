@@ -242,6 +242,7 @@ export function useDeadzoneController() {
   const [isScoped, setIsScoped] = useState(false);
   const [ammo, setAmmo] = useState({ ammo: 0, magazineSize: 0, reloading: false, reloadProgress: 1 });
   const [health, setHealth] = useState(100);
+  const [damageIndicators, setDamageIndicators] = useState([]);
   const [deathInfo, setDeathInfo] = useState({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
   const [grenadeCharge, setGrenadeCharge] = useState(0);
   const [showScoreboard, setShowScoreboard] = useState(false);
@@ -494,6 +495,13 @@ export function useDeadzoneController() {
       onWalletChange: handleWalletChange,
       onScopeChange: setIsScoped,
       onGrenadeChargeChange: setGrenadeCharge,
+      onDamageIndicator: (indicator) => {
+        const id = `${indicator.id}-${Math.random().toString(36).slice(2)}`;
+        setDamageIndicators((items) => [...items.slice(-3), { ...indicator, id }]);
+        window.setTimeout(() => {
+          setDamageIndicators((items) => items.filter((item) => item.id !== id));
+        }, 850);
+      },
       onMatchEnd: setMatchResult,
       onEvent: (message) => setEvents((items) => [message, ...items].slice(0, 5)),
     });
@@ -872,6 +880,7 @@ export function useDeadzoneController() {
     updateRoute(ROUTES.play);
     setIsScoped(false);
     setGrenadeCharge(0);
+    setDamageIndicators([]);
     setShowScoreboard(false);
     setHealth(100);
     setDeathInfo({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
@@ -1080,6 +1089,7 @@ export function useDeadzoneController() {
     setName(trimmedName);
     setIsScoped(false);
     setGrenadeCharge(0);
+    setDamageIndicators([]);
     setShowScoreboard(false);
     setHealth(100);
     setDeathInfo({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
@@ -1377,6 +1387,7 @@ export function useDeadzoneController() {
       ammo,
       canvasRef,
       currentMatch: matchConfig.current,
+      damageIndicators,
       deathInfo,
       equippedAccessoryIds: accessoryIds,
       equipOwnedOutfitDuringMatch,

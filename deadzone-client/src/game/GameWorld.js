@@ -33,7 +33,7 @@ const OBJECTIVE_REWARDS = {
 };
 
 export class GameWorld {
-  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onHealthChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange, onMatchEnd }) {
+  constructor({ canvas, config, localId, keys, mouse, onScoreChange, onBuffsChange, onAmmoChange, onDeathChange, onHealthChange, onWalletChange, onEvent, onScopeChange, onGrenadeChargeChange, onDamageIndicator, onMatchEnd }) {
     this.canvas = canvas;
     this.config = config;
     this.localId = localId;
@@ -48,6 +48,7 @@ export class GameWorld {
     this.onEvent = onEvent;
     this.onScopeChange = onScopeChange;
     this.onGrenadeChargeChange = onGrenadeChargeChange;
+    this.onDamageIndicator = onDamageIndicator;
     this.onMatchEnd = onMatchEnd;
     this.onProgressChange = config.onProgressChange;
 
@@ -392,6 +393,7 @@ export class GameWorld {
       return;
     }
     const damage = Math.max(1, Math.min(100, Math.round(Number(message.damage) || 0)));
+    this.emitDamageIndicator(shooter, damage);
     if (!target.applyDamage(damage)) {
       this.onHealthChange?.(Math.round(target.health));
       return;
@@ -649,6 +651,10 @@ export class GameWorld {
   }
 
   reportHit({ shooterId, targetId, damage }) {
+    if (targetId === this.localId) {
+      this.emitDamageIndicator(this.players.get(shooterId), damage);
+      return;
+    }
     if (shooterId !== this.localId || !this.realtimeClient || targetId === this.localId) {
       return;
     }
@@ -656,6 +662,27 @@ export class GameWorld {
       shooterId,
       playerId: targetId,
       damage,
+    });
+  }
+
+  emitDamageIndicator(shooter, damage = 0) {
+    const localPlayer = this.localPlayer();
+    if (!localPlayer || !shooter || shooter.id === this.localId) {
+      return;
+    }
+    const direction = shooter.position.clone().sub(localPlayer.position);
+    direction.y = 0;
+    if (direction.lengthSq() < 0.001) {
+      return;
+    }
+    direction.normalize();
+    const forward = new THREE.Vector3(-Math.sin(localPlayer.yaw), 0, -Math.cos(localPlayer.yaw)).normalize();
+    const right = new THREE.Vector3(-forward.z, 0, forward.x).normalize();
+    const angle = THREE.MathUtils.radToDeg(Math.atan2(direction.dot(right), direction.dot(forward)));
+    this.onDamageIndicator?.({
+      id: nowMs(),
+      angle,
+      intensity: clamp((Number(damage) || 0) / 80, 0.35, 1),
     });
   }
 

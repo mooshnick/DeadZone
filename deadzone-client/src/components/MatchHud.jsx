@@ -54,6 +54,7 @@ export function MatchHud({
   ammo,
   canvasRef,
   currentMatch,
+  damageIndicators = [],
   deathInfo,
   equippedAccessoryIds,
   equipOwnedOutfitDuringMatch,
@@ -233,6 +234,18 @@ export function MatchHud({
         <span />
       </div>
       <div className="crosshair" />
+      <div className="damage-indicator-layer" aria-hidden="true">
+        {damageIndicators.map((indicator) => (
+          <span
+            className="damage-direction-indicator"
+            key={indicator.id}
+            style={{
+              '--damage-angle': `${indicator.angle || 0}deg`,
+              '--damage-intensity': indicator.intensity ?? 0.6,
+            }}
+          />
+        ))}
+      </div>
       <MobileTouchControls
         key={mobileControlSession}
         controlConfig={mobileControls}
