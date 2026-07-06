@@ -10,6 +10,12 @@ const SHOT_SOUND_POOL_SIZE = 6;
 const RPG_SOUND_POOL_SIZE = 4;
 const RPG_WHISTLE_LOOP_START = 0.05;
 const RPG_WHISTLE_LOOP_END = 0.82;
+const PROJECTILE_LIFE_BY_WEAPON = {
+  rpg: 260,
+  shotgun: 55,
+  sniper: 150,
+  default: 110,
+};
 
 export class CombatSystem {
   constructor({ scene, players, localId, collisionSystem, gameMode, onScoreChange, onWalletChange, onProgressChange, onEvent, onRecoil, onDamage, onElimination }) {
@@ -265,7 +271,7 @@ export class CombatSystem {
         mesh,
         velocity: direction.multiplyScalar(weapon.speed),
         damage,
-        life: player.weaponId === 'shotgun' ? 55 : 110,
+        life: PROJECTILE_LIFE_BY_WEAPON[player.weaponId] || PROJECTILE_LIFE_BY_WEAPON.default,
         radius: weapon.explosiveRadius || 0,
         weaponId: player.weaponId,
         flightSound,
@@ -285,6 +291,10 @@ export class CombatSystem {
         return false;
       }
       if (bullet.life <= 0 || bullet.mesh.position.length() > 135) {
+        if (bullet.radius > 0) {
+          this.explodeOrRemove(bullet);
+          return false;
+        }
         this.stopRpgFlightSound(bullet.flightSound);
         this.scene.remove(bullet.mesh);
         return false;
