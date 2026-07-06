@@ -8,8 +8,6 @@ const RPG_LAUNCH_SOUND_URL = '/sound/RPG_1.mp3';
 const RPG_EXPLOSION_SOUND_URL = '/sound/RPG_2.mp3';
 const SHOT_SOUND_POOL_SIZE = 6;
 const RPG_SOUND_POOL_SIZE = 4;
-const RPG_WHISTLE_LOOP_START = 0.05;
-const RPG_WHISTLE_LOOP_END = 0.82;
 const PROJECTILE_LIFE_BY_WEAPON = {
   rpg: 260,
   shotgun: 55,
@@ -140,26 +138,21 @@ export class CombatSystem {
     const sound = this.rpgLaunchSounds[this.rpgLaunchSoundIndex % this.rpgLaunchSounds.length];
     this.rpgLaunchSoundIndex += 1;
     sound.pause();
-    sound.currentTime = RPG_WHISTLE_LOOP_START;
+    sound.currentTime = 0;
     sound.volume = 0.66;
+    sound.loop = false;
     sound.play().catch(() => {});
-    const loopTimer = window.setInterval(() => {
-      if (sound.paused) {
-        return;
-      }
-      if (sound.currentTime >= RPG_WHISTLE_LOOP_END || sound.ended) {
-        sound.currentTime = RPG_WHISTLE_LOOP_START;
-        sound.play().catch(() => {});
-      }
-    }, 45);
-    return { loopTimer, sound };
+    return { sound };
   }
 
   stopRpgFlightSound(flightSound) {
     if (!flightSound?.sound) {
       return;
     }
-    window.clearInterval(flightSound.loopTimer);
+    if (flightSound.loopTimer) {
+      window.clearInterval(flightSound.loopTimer);
+    }
+    flightSound.sound.loop = false;
     flightSound.sound.pause();
     flightSound.sound.currentTime = 0;
   }
