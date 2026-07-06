@@ -80,11 +80,14 @@ export class CombatSystem {
     sound.play().catch(() => {});
   }
 
-  unlockSoundPool(pool) {
+  unlockSoundPool(pool, skipSound = null) {
     if (!pool?.length) {
       return;
     }
     pool.forEach((sound) => {
+      if (sound === skipSound) {
+        return;
+      }
       sound.muted = true;
       sound.play()
         .then(() => {
@@ -98,12 +101,12 @@ export class CombatSystem {
     });
   }
 
-  unlockRpgSounds() {
+  unlockRpgSounds(activeLaunchSound = null) {
     if (this.rpgSoundsUnlocked) {
       return;
     }
     this.rpgSoundsUnlocked = true;
-    this.unlockSoundPool(this.rpgLaunchSounds);
+    this.unlockSoundPool(this.rpgLaunchSounds, activeLaunchSound);
     this.unlockSoundPool(this.rpgExplosionSounds);
   }
 
@@ -132,16 +135,23 @@ export class CombatSystem {
     if (!this.rpgLaunchSounds?.length) {
       return null;
     }
-    if (player.id === this.localId) {
-      this.unlockRpgSounds();
-    }
     const sound = this.rpgLaunchSounds[this.rpgLaunchSoundIndex % this.rpgLaunchSounds.length];
     this.rpgLaunchSoundIndex += 1;
+    if (player.id === this.localId) {
+      this.unlockRpgSounds(sound);
+    }
     sound.pause();
+    sound.muted = false;
     sound.currentTime = 0;
     sound.volume = 0.66;
     sound.loop = false;
-    sound.play().catch(() => {});
+    sound.play().catch(() => {
+      sound.load();
+      window.setTimeout(() => {
+        sound.currentTime = 0;
+        sound.play().catch(() => {});
+      }, 30);
+    });
     return { sound };
   }
 
