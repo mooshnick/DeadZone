@@ -227,6 +227,10 @@ export class CombatSystem {
     this.onRecoil?.(player, weapon);
     const rpgFlightSound = player.weaponId === 'rpg' ? this.playRpgFlightSound(player) : null;
     const playedImmediateRpgSound = Boolean(rpgFlightSound);
+    const playedImmediateShotSound = player.weaponId !== 'rpg' && player.id === this.localId;
+    if (playedImmediateShotSound) {
+      this.playShotSound(player, weapon);
+    }
 
     const upgradeMultiplier = 1 + (player.weaponLevel || 0) * 0.08;
     const damage = Math.round(weapon.damage * upgradeMultiplier * (player.buffs.damage ? 1.45 : 1));
@@ -238,7 +242,8 @@ export class CombatSystem {
           this.stopRpgFlightSound(rpgFlightSound);
           return;
         }
-        this.spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex, shotOrigin, playedImmediateRpgSound, rpgFlightSound);
+        const soundAlreadyPlayed = playedImmediateRpgSound || (playedImmediateShotSound && shotIndex === 0);
+        this.spawnWeaponShot(player, weapon, targetDirection, damage, shotIndex, shotOrigin, soundAlreadyPlayed, rpgFlightSound);
       }, delay);
     }
   }

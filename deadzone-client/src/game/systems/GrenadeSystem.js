@@ -14,7 +14,7 @@ const MIN_ARC_FORCE = 0.38;
 const MAX_ARC_FORCE = 0.58;
 const BLAST_RADIUS = 8.6;
 const BLAST_DAMAGE = 72;
-const GRENADE_SOUND_URL = '/sound/grenade_trimmed.wav';
+const GRENADE_SOUND_URL = '/sound/grenade.mp3';
 const GRENADE_SOUND_POOL_SIZE = 4;
 
 export class GrenadeSystem {
@@ -39,7 +39,8 @@ export class GrenadeSystem {
     return Array.from({ length: GRENADE_SOUND_POOL_SIZE }, () => {
       const sound = new Audio(GRENADE_SOUND_URL);
       sound.preload = 'auto';
-      sound.volume = 0.5;
+      sound.volume = 0.68;
+      sound.load();
       return sound;
     });
   }
