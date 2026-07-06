@@ -10,6 +10,7 @@ const PARACHUTE_HIDE_DELAY = 1200;
 const POWERUP_MARKER_Y = 0.035;
 const SURPRISE_SOUND_URL = '/sound/surprise.mp3';
 const SURPRISE_DROP_WARNING_MS = 1800;
+const SURPRISE_DROP_SPEED = 0.003;
 const SURPRISE_DROP_MIN_DELAY = 120000;
 const SURPRISE_DROP_MAX_DELAY = 240000;
 const POWERUP_MARKER_ICONS = {
@@ -42,6 +43,8 @@ export class PowerupSystem {
     this.powerups = [];
     this.lastPowerupAt = 0;
     this.markerTextures = new Map();
+    this.iconTextures = new Map();
+    this.colorScratch = new THREE.Color();
     this.nextSurpriseAt = this.randomSurpriseDelay(0);
     this.surpriseSound = this.createSound(SURPRISE_SOUND_URL, 0.78);
   }
@@ -53,7 +56,7 @@ export class PowerupSystem {
     this.lastPowerupAt = time;
     const type = randomItem(Object.keys(POWERUPS));
     const data = POWERUPS[type];
-    const drop = this.createPowerupDrop(data);
+    const drop = this.createPowerupDrop(data, 1, type);
     const landingX = (Math.random() - 0.5) * 70;
     const landingZ = (Math.random() - 0.5) * 70;
     const marker = this.createLandingMarker(type);
@@ -69,7 +72,7 @@ export class PowerupSystem {
       return;
     }
     this.nextSurpriseAt = time + this.randomSurpriseDelay();
-    const drop = this.createPowerupDrop(SURPRISE_POWERUP, 1.18);
+    const drop = this.createPowerupDrop(SURPRISE_POWERUP, 1.18, 'surprise');
     const landingX = (Math.random() - 0.5) * 70;
     const landingZ = (Math.random() - 0.5) * 70;
     const marker = this.createLandingMarker('surprise', 4.1);
@@ -167,7 +170,41 @@ export class PowerupSystem {
     return texture;
   }
 
-  createPowerupDrop(data, scale = 1) {
+  iconTextureFor(type) {
+    if (this.iconTextures.has(type)) {
+      return this.iconTextures.get(type);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext('2d');
+    const color = POWERUP_MARKER_COLORS[type] || '#ffffff';
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
+    context.shadowColor = color;
+    context.shadowBlur = 28;
+    context.fillStyle = 'rgba(6, 10, 18, 0.78)';
+    context.strokeStyle = color;
+    context.lineWidth = 10;
+    context.beginPath();
+    context.roundRect(28, 28, 200, 200, 42);
+    context.fill();
+    context.stroke();
+    context.fillStyle = type === 'health' ? '#40ff7a' : '#ffffff';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = type === 'health' ? 'bold 150px Arial' : '132px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+    context.fillText(POWERUP_MARKER_ICONS[type] || '?', 128, type === 'health' ? 121 : 132);
+    context.restore();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    this.iconTextures.set(type, texture);
+    return texture;
+  }
+
+  createPowerupDrop(data, scale = 1, type = 'health') {
     const group = new THREE.Group();
     const crateMaterial = new THREE.MeshStandardMaterial({
       color: data.color,
@@ -198,7 +235,14 @@ export class PowerupSystem {
     bottomBand.position.y = -0.55;
     const glow = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.12, 1.5), crateMaterial);
     glow.position.y = 0.03;
-    crate.add(body, topBand, bottomBand, glow);
+    const icon = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.iconTextureFor(type),
+      transparent: true,
+      depthWrite: false,
+    }));
+    icon.position.set(0, 0.08, 0.78);
+    icon.scale.set(1.25, 1.25, 1);
+    crate.add(body, topBand, bottomBand, glow, icon);
     group.add(crate);
 
     const parachute = new THREE.Group();
@@ -232,7 +276,7 @@ export class PowerupSystem {
     landingShadow.position.y = -0.64;
     group.add(landingShadow);
 
-    group.userData = { crate, parachute, landingShadow };
+    group.userData = { crate, crateMaterial, canopyMaterial, parachute, landingShadow };
     group.scale.setScalar(scale);
     return group;
   }
@@ -245,16 +289,26 @@ export class PowerupSystem {
       const dropStartsAt = powerup.dropStartsAt || powerup.bornAt;
       const elapsed = Math.max(0, time - dropStartsAt);
       const dropStartY = powerup.type === 'surprise' ? POWERUP_DROP_Y + 7 : POWERUP_DROP_Y;
-      const nextY = Math.max(POWERUP_LAND_Y, dropStartY - elapsed * POWERUP_DROP_SPEED);
+      const dropSpeed = powerup.type === 'surprise' ? SURPRISE_DROP_SPEED : POWERUP_DROP_SPEED;
+      const nextY = Math.max(POWERUP_LAND_Y, dropStartY - elapsed * dropSpeed);
       const isLanded = nextY <= POWERUP_LAND_Y + 0.001;
       powerup.mesh.position.y = isLanded
         ? POWERUP_LAND_Y + Math.sin(time / 420 + powerup.bornAt) * 0.12
         : nextY + Math.sin(time / 260) * 0.12;
       powerup.mesh.rotation.y += isLanded ? 0.025 : 0.008;
       powerup.mesh.userData.crate.rotation.y += isLanded ? 0.035 : 0.012;
-      powerup.mesh.userData.landingShadow.scale.setScalar(isLanded ? 0.72 : 1 + (POWERUP_DROP_Y - nextY) / POWERUP_DROP_Y * 0.32);
+      const dropProgress = (dropStartY - nextY) / Math.max(1, dropStartY - POWERUP_LAND_Y);
+      powerup.mesh.userData.landingShadow.scale.setScalar(isLanded ? 0.72 : 1 + dropProgress * 0.32);
       powerup.marker.rotation.z += 0.004;
       powerup.marker.material.opacity = isLanded ? 0.5 : 0.78 + Math.sin(time / 240) * 0.12;
+
+      if (powerup.type === 'surprise') {
+        const hue = (time / 1700) % 1;
+        this.colorScratch.setHSL(hue, 0.92, 0.58);
+        powerup.mesh.userData.crateMaterial.color.copy(this.colorScratch);
+        powerup.mesh.userData.crateMaterial.emissive.copy(this.colorScratch);
+        powerup.mesh.userData.canopyMaterial.emissive.copy(this.colorScratch);
+      }
 
       if (isLanded && !powerup.landedAt) {
         powerup.landedAt = time;
