@@ -8,12 +8,17 @@ const POWERUP_DROP_SPEED = 0.0042;
 const POWERUP_PICKUP_RADIUS = 2.2;
 const PARACHUTE_HIDE_DELAY = 1200;
 const POWERUP_MARKER_Y = 0.035;
+const SURPRISE_SOUND_URL = '/sound/surprise.mp3';
+const SURPRISE_DROP_WARNING_MS = 1800;
+const SURPRISE_DROP_MIN_DELAY = 120000;
+const SURPRISE_DROP_MAX_DELAY = 240000;
 const POWERUP_MARKER_ICONS = {
   health: '+',
-  damage: '💪',
-  shield: '🛡️',
-  speed: '🏃',
-  rapid: '⚡',
+  damage: '\u{1F4AA}',
+  shield: '\u{1F6E1}\uFE0F',
+  speed: '\u{1F3C3}',
+  rapid: '\u26A1',
+  surprise: '\u{1F921}',
 };
 const POWERUP_MARKER_COLORS = {
   health: '#40ff7a',
@@ -21,6 +26,12 @@ const POWERUP_MARKER_COLORS = {
   shield: '#74d7ff',
   speed: '#c993ff',
   rapid: '#ff8c5f',
+  surprise: '#ff55d9',
+};
+const SURPRISE_POWERUP = {
+  name: 'Surprise Bonus',
+  color: '#ff55d9',
+  duration: 11500,
 };
 
 export class PowerupSystem {
@@ -31,6 +42,8 @@ export class PowerupSystem {
     this.powerups = [];
     this.lastPowerupAt = 0;
     this.markerTextures = new Map();
+    this.nextSurpriseAt = this.randomSurpriseDelay(0);
+    this.surpriseSound = this.createSound(SURPRISE_SOUND_URL, 0.78);
   }
 
   spawn(time) {
@@ -51,7 +64,55 @@ export class PowerupSystem {
     this.powerups.push({ type, mesh: drop, marker, bornAt: time, landedAt: 0 });
   }
 
-  createLandingMarker(type) {
+  spawnSurprise(time) {
+    if (time < this.nextSurpriseAt || this.powerups.some((powerup) => powerup.type === 'surprise')) {
+      return;
+    }
+    this.nextSurpriseAt = time + this.randomSurpriseDelay();
+    const drop = this.createPowerupDrop(SURPRISE_POWERUP, 1.18);
+    const landingX = (Math.random() - 0.5) * 70;
+    const landingZ = (Math.random() - 0.5) * 70;
+    const marker = this.createLandingMarker('surprise', 4.1);
+    drop.position.set(landingX, POWERUP_DROP_Y + 7, landingZ);
+    marker.position.set(landingX, POWERUP_MARKER_Y, landingZ);
+    this.scene.add(drop);
+    this.scene.add(marker);
+    this.playSurpriseSound();
+    this.powerups.push({
+      type: 'surprise',
+      mesh: drop,
+      marker,
+      bornAt: time,
+      dropStartsAt: time + SURPRISE_DROP_WARNING_MS,
+      landedAt: 0,
+    });
+  }
+
+  randomSurpriseDelay(baseTime = 0) {
+    return baseTime + SURPRISE_DROP_MIN_DELAY + Math.random() * (SURPRISE_DROP_MAX_DELAY - SURPRISE_DROP_MIN_DELAY);
+  }
+
+  createSound(url, volume) {
+    if (typeof Audio === 'undefined') {
+      return null;
+    }
+    const sound = new Audio(url);
+    sound.preload = 'auto';
+    sound.volume = volume;
+    sound.load();
+    return sound;
+  }
+
+  playSurpriseSound() {
+    if (!this.surpriseSound) {
+      return;
+    }
+    this.surpriseSound.pause();
+    this.surpriseSound.currentTime = 0;
+    this.surpriseSound.play().catch(() => {});
+  }
+
+  createLandingMarker(type, size = 3.2) {
     const material = new THREE.MeshBasicMaterial({
       map: this.markerTextureFor(type),
       transparent: true,
@@ -62,7 +123,7 @@ export class PowerupSystem {
     material.polygonOffset = true;
     material.polygonOffsetFactor = -2;
     material.polygonOffsetUnits = -2;
-    const marker = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), material);
+    const marker = new THREE.Mesh(new THREE.PlaneGeometry(size, size), material);
     marker.rotation.x = -Math.PI / 2;
     return marker;
   }
@@ -106,7 +167,7 @@ export class PowerupSystem {
     return texture;
   }
 
-  createPowerupDrop(data) {
+  createPowerupDrop(data, scale = 1) {
     const group = new THREE.Group();
     const crateMaterial = new THREE.MeshStandardMaterial({
       color: data.color,
@@ -172,15 +233,19 @@ export class PowerupSystem {
     group.add(landingShadow);
 
     group.userData = { crate, parachute, landingShadow };
+    group.scale.setScalar(scale);
     return group;
   }
 
   update(time) {
     this.spawn(time);
+    this.spawnSurprise(time);
     const players = [...this.players.values()];
     this.powerups = this.powerups.filter((powerup) => {
-      const elapsed = time - powerup.bornAt;
-      const nextY = Math.max(POWERUP_LAND_Y, POWERUP_DROP_Y - elapsed * POWERUP_DROP_SPEED);
+      const dropStartsAt = powerup.dropStartsAt || powerup.bornAt;
+      const elapsed = Math.max(0, time - dropStartsAt);
+      const dropStartY = powerup.type === 'surprise' ? POWERUP_DROP_Y + 7 : POWERUP_DROP_Y;
+      const nextY = Math.max(POWERUP_LAND_Y, dropStartY - elapsed * POWERUP_DROP_SPEED);
       const isLanded = nextY <= POWERUP_LAND_Y + 0.001;
       powerup.mesh.position.y = isLanded
         ? POWERUP_LAND_Y + Math.sin(time / 420 + powerup.bornAt) * 0.12
@@ -201,8 +266,13 @@ export class PowerupSystem {
         : null;
       if (!taker) return true;
 
-      const data = POWERUPS[powerup.type];
-      if (powerup.type === 'health') {
+      const data = powerup.type === 'surprise' ? SURPRISE_POWERUP : POWERUPS[powerup.type];
+      if (powerup.type === 'surprise') {
+        taker.health = 100;
+        ['speed', 'shield', 'damage'].forEach((buffType) => {
+          taker.buffs[buffType] = time + SURPRISE_POWERUP.duration;
+        });
+      } else if (powerup.type === 'health') {
         taker.health = Math.min(100, taker.health + 35);
       } else {
         taker.buffs[powerup.type] = time + data.duration;
