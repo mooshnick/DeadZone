@@ -321,11 +321,15 @@ export class GameWorld {
   }
 
   addPlayer(player) {
-    const mesh = new PlayerMeshFactory(this.localId).create(player);
+    const mesh = this.playerMeshFactory().create(player);
     mesh.position.copy(player.position);
     mesh.rotation.y = player.yaw;
     this.scene.add(mesh);
     this.players.set(player.id, player);
+  }
+
+  playerMeshFactory() {
+    return new PlayerMeshFactory(this.localId, this.localPlayer()?.team || this.config.team || 'blue');
   }
 
   setupRealtime() {
@@ -491,7 +495,7 @@ export class GameWorld {
   }
 
   applyRemotePlayerState(player, remote) {
-    const previousWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
+    const previousWeaponKey = `${player.team}:${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
     const time = nowMs();
     const previousNetworkPosition = player.networkTargetPosition?.clone() || player.position.clone();
     const targetPosition = new THREE.Vector3(
@@ -537,10 +541,10 @@ export class GameWorld {
       player.pitch = player.networkTargetPitch;
     }
 
-    const nextWeaponKey = `${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
+    const nextWeaponKey = `${player.team}:${player.weaponId}:${player.weaponSkinId}:${player.outfitId}:${(player.accessoryIds || []).join('|')}`;
     if (previousWeaponKey !== nextWeaponKey) {
       const previousMesh = player.mesh;
-      const nextMesh = new PlayerMeshFactory(this.localId).create(player);
+      const nextMesh = this.playerMeshFactory().create(player);
       nextMesh.position.copy(player.position);
       nextMesh.rotation.y = player.yaw;
       if (previousMesh) {
@@ -606,7 +610,7 @@ export class GameWorld {
       player.ammo = player.isDead ? player.weapon.magazineSize : Math.min(player.ammo, player.weapon.magazineSize);
     }
     const previousMesh = player.mesh;
-    const nextMesh = new PlayerMeshFactory(this.localId).create(player);
+    const nextMesh = this.playerMeshFactory().create(player);
     nextMesh.position.copy(player.position);
     nextMesh.rotation.copy(previousMesh?.rotation || nextMesh.rotation);
     nextMesh.visible = previousMesh?.visible ?? true;
@@ -985,7 +989,7 @@ export class GameWorld {
       if (this.viewWeapon) {
         this.camera.remove(this.viewWeapon);
       }
-      this.viewWeapon = new PlayerMeshFactory(this.localId).createWeapon(localPlayer.weaponId, weaponSkin.color);
+      this.viewWeapon = this.playerMeshFactory().createWeapon(localPlayer.weaponId, weaponSkin.color);
       this.viewWeapon.scale.setScalar(0.48);
       this.viewWeapon.rotation.set(-0.08, 0.18, 0.02);
       this.viewWeapon.traverse((object) => {

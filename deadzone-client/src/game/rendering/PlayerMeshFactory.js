@@ -3,14 +3,16 @@ import { ACCESSORIES, OUTFITS, PLAYER_RADIUS, WEAPON_SKINS } from '../config.js'
 import { NameSpriteFactory } from './NameSpriteFactory.js';
 
 export class PlayerMeshFactory {
-  constructor(localId) {
+  constructor(localId, localTeam = 'blue') {
     this.localId = localId;
+    this.localTeam = localTeam;
   }
 
   create(player) {
     const group = new THREE.Group();
     const outfit = OUTFITS.find((item) => item.id === player.outfitId) || OUTFITS[0];
     const shellColor = outfit.displayColor || outfit.shell;
+    const displayTeamColor = this.displayTeamColor(player);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: shellColor, roughness: 0.45 });
     const shellMaterial = new THREE.MeshStandardMaterial({ color: shellColor, roughness: 0.38 });
     const body = new THREE.Mesh(new THREE.SphereGeometry(PLAYER_RADIUS, 28, 20), shellMaterial);
@@ -18,7 +20,15 @@ export class PlayerMeshFactory {
     body.scale.y = 1.18;
     body.castShadow = true;
 
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.17, 1.17, 0.62, 28), bodyMaterial);
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.17, 1.17, 0.62, 28),
+      new THREE.MeshStandardMaterial({
+        color: displayTeamColor,
+        emissive: displayTeamColor,
+        emissiveIntensity: 0.08,
+        roughness: 0.42,
+      }),
+    );
     band.position.y = 0.72;
     band.castShadow = true;
 
@@ -51,7 +61,7 @@ export class PlayerMeshFactory {
     const fill = new THREE.Mesh(
       new THREE.PlaneGeometry(2.12, 0.14),
       new THREE.MeshBasicMaterial({
-        color: player.gameMode === 'free-for-all' ? '#ffc247' : player.team === 'blue' ? '#51b7ff' : '#ff6676',
+        color: this.displayTeamColor(player),
       }),
     );
     fill.position.set(-0.01, 0, 0.01);
@@ -63,6 +73,16 @@ export class PlayerMeshFactory {
     player.healthBar = bar;
     player.healthFill = fill;
     return bar;
+  }
+
+  displayTeamColor(player) {
+    if (player.id === this.localId) {
+      return '#51b7ff';
+    }
+    if (player.gameMode === 'free-for-all') {
+      return '#ff6676';
+    }
+    return player.team === this.localTeam ? '#51b7ff' : '#ff6676';
   }
 
   createWeapon(weaponId, trimColor) {
