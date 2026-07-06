@@ -1262,7 +1262,19 @@ export class GameWorld {
         }))
         .sort((a, b) => b.score - a.score),
     });
-    this.onBuffsChange(Object.keys(localPlayer.buffs).map((buff) => POWERUPS[buff].short).join(' / ') || 'No buffs');
+    this.onBuffsChange(Object.entries(localPlayer.buffs).map(([buff, expiresAt]) => {
+      const data = POWERUPS[buff];
+      const duration = localPlayer.buffDurations[buff] || data?.duration || 1;
+      const remaining = clamp(expiresAt - nowMs(), 0, duration);
+      return {
+        type: buff,
+        label: data?.short || buff,
+        color: data?.color || '#ffffff',
+        remaining,
+        duration,
+        progress: clamp(remaining / duration, 0, 1),
+      };
+    }));
     this.onHealthChange?.(Math.round(localPlayer.health));
     const weapon = WEAPONS[localPlayer.weaponId] || WEAPONS.rifle;
     this.onAmmoChange({

@@ -26,6 +26,12 @@ const MOBILE_CONTROL_DEFAULTS = {
 };
 
 const MOBILE_LOOK_SENSITIVITY_KEY = 'deadzone-mobile-look-sensitivity';
+const BUFF_ICONS = {
+  damage: '\u{1F4AA}',
+  shield: '\u{1F6E1}\uFE0F',
+  speed: '\u{1F3C3}',
+  rapid: '\u26A1',
+};
 
 function loadMobileLookSensitivity() {
   try {
@@ -153,6 +159,8 @@ export function MatchHud({
   const grenadeCount = Math.min(3, ammo.grenades ?? 0);
   const freeForAll = mode.id === 'free-for-all';
   const leader = score.players[0];
+  const activeBuffList = Array.isArray(activeBuffs) ? activeBuffs : [];
+  const activeBuffText = activeBuffList.length ? activeBuffList.map((buff) => buff.label).join(' / ') : t('hud.noBuffs');
   const remainingMinutes = Math.floor((score.remainingSeconds || 0) / 60);
   const remainingClockSeconds = String((score.remainingSeconds || 0) % 60).padStart(2, '0');
   const bluePlayers = score.players.filter((player) => player.team === 'blue');
@@ -320,6 +328,8 @@ export function MatchHud({
         <span>{grenadeCharge > 0.82 ? t('grenade.perfect') : t('grenade.power')}</span>
         <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
       </div>
+
+      <BuffTimerStack buffs={activeBuffList} />
 
       {deathInfo.isDead && deathInfo.focusSeconds > 0 && !showDeathCustomizer && (
         <div className="kill-cam-overlay">
@@ -674,9 +684,9 @@ export function MatchHud({
         </button>
         <div className="combat-readout">
           <div className="readout-card weapon-card">
-          <span>{t('hud.weapon')}</span>
+            <span>{t('hud.weapon')}</span>
             <strong>{weapon.name}</strong>
-            <small>{activeBuffs}</small>
+            <small>{activeBuffText}</small>
           </div>
           <div className={ammo.reloading ? 'readout-card ammo-card reloading' : 'readout-card ammo-card'}>
             <span>{ammo.reloading ? t('hud.reload') : t('hud.ammo')}</span>
@@ -709,6 +719,34 @@ export function MatchHud({
         </div>
       </footer>
     </main>
+  );
+}
+
+function BuffTimerStack({ buffs }) {
+  if (!buffs.length) {
+    return null;
+  }
+  return (
+    <aside className="buff-timer-stack" aria-label="Active bonuses">
+      {buffs.map((buff) => {
+        const progress = Math.max(0, Math.min(1, Number(buff.progress) || 0));
+        const seconds = Math.max(0, Math.ceil((Number(buff.remaining) || 0) / 1000));
+        return (
+          <div
+            className="buff-timer"
+            key={buff.type}
+            style={{
+              '--buff-color': buff.color || '#ffffff',
+              '--buff-progress': `${progress * 360}deg`,
+            }}
+            title={`${buff.label} ${seconds}s`}
+          >
+            <span>{BUFF_ICONS[buff.type] || buff.label}</span>
+            <small>{seconds}</small>
+          </div>
+        );
+      })}
+    </aside>
   );
 }
 

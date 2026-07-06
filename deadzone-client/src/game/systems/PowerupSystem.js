@@ -235,14 +235,26 @@ export class PowerupSystem {
     bottomBand.position.y = -0.55;
     const glow = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.12, 1.5), crateMaterial);
     glow.position.y = 0.03;
-    const icon = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: this.iconTextureFor(type),
-      transparent: true,
-      depthWrite: false,
-    }));
-    icon.position.set(0, 0.08, 0.78);
-    icon.scale.set(1.25, 1.25, 1);
-    crate.add(body, topBand, bottomBand, glow, icon);
+    [
+      { position: [0, 0.08, 0.705], rotation: [0, 0, 0] },
+      { position: [0, 0.08, -0.705], rotation: [0, Math.PI, 0] },
+      { position: [0.705, 0.08, 0], rotation: [0, Math.PI / 2, 0] },
+      { position: [-0.705, 0.08, 0], rotation: [0, -Math.PI / 2, 0] },
+    ].forEach(({ position, rotation }) => {
+      const icon = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.98, 0.98),
+        new THREE.MeshBasicMaterial({
+          map: this.iconTextureFor(type),
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      icon.position.set(...position);
+      icon.rotation.set(...rotation);
+      crate.add(icon);
+    });
+    crate.add(body, topBand, bottomBand, glow);
     group.add(crate);
 
     const parachute = new THREE.Group();
@@ -295,8 +307,8 @@ export class PowerupSystem {
       powerup.mesh.position.y = isLanded
         ? POWERUP_LAND_Y + Math.sin(time / 420 + powerup.bornAt) * 0.12
         : nextY + Math.sin(time / 260) * 0.12;
-      powerup.mesh.rotation.y += isLanded ? 0.025 : 0.008;
-      powerup.mesh.userData.crate.rotation.y += isLanded ? 0.035 : 0.012;
+      powerup.mesh.rotation.y += isLanded ? 0.012 : 0.004;
+      powerup.mesh.userData.crate.rotation.y += isLanded ? 0.016 : 0.006;
       const dropProgress = (dropStartY - nextY) / Math.max(1, dropStartY - POWERUP_LAND_Y);
       powerup.mesh.userData.landingShadow.scale.setScalar(isLanded ? 0.72 : 1 + dropProgress * 0.32);
       powerup.marker.rotation.z += 0.004;
@@ -325,11 +337,13 @@ export class PowerupSystem {
         taker.health = 100;
         ['speed', 'shield', 'damage'].forEach((buffType) => {
           taker.buffs[buffType] = time + SURPRISE_POWERUP.duration;
+          taker.buffDurations[buffType] = SURPRISE_POWERUP.duration;
         });
       } else if (powerup.type === 'health') {
         taker.health = Math.min(100, taker.health + 35);
       } else {
         taker.buffs[powerup.type] = time + data.duration;
+        taker.buffDurations[powerup.type] = data.duration;
       }
       if (!taker.isBot) {
         this.onEvent(`Picked ${data.name}`);

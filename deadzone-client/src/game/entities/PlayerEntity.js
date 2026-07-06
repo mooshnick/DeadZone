@@ -36,6 +36,7 @@ export class PlayerEntity {
     this.grenades = 1;
     this.damageLog = new Map();
     this.buffs = {};
+    this.buffDurations = {};
     this.lastShot = 0;
     this.invulnerableUntil = nowMs() + 3000;
     this.mesh = null;
@@ -48,6 +49,7 @@ export class PlayerEntity {
 
   clearExpiredBuffs(time) {
     this.buffs = Object.fromEntries(Object.entries(this.buffs).filter(([, expiry]) => expiry > time));
+    this.buffDurations = Object.fromEntries(Object.entries(this.buffDurations).filter(([type]) => this.buffs[type]));
   }
 
   canShoot(time) {
@@ -114,6 +116,7 @@ export class PlayerEntity {
   respawn(index = Math.floor(Math.random() * 4)) {
     this.health = 100;
     this.buffs = {};
+    this.buffDurations = {};
     this.isDead = false;
     this.isReloading = false;
     this.reloadEndsAt = 0;

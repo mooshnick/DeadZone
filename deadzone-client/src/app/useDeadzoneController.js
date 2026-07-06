@@ -238,7 +238,7 @@ export function useDeadzoneController() {
   const [keybinds, setKeybinds] = useState(DEFAULT_KEYBINDS);
   const [editingKeybind, setEditingKeybind] = useState(null);
   const [events, setEvents] = useState(['Choose a room and enter the 3D arena.']);
-  const [activeBuffs, setActiveBuffs] = useState('No buffs');
+  const [activeBuffs, setActiveBuffs] = useState([]);
   const [isScoped, setIsScoped] = useState(false);
   const [ammo, setAmmo] = useState({ ammo: 0, magazineSize: 0, reloading: false, reloadProgress: 1 });
   const [health, setHealth] = useState(100);
