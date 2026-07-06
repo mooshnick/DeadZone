@@ -20,15 +20,7 @@ export class PlayerMeshFactory {
     body.scale.y = 1.18;
     body.castShadow = true;
 
-    const band = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.17, 1.17, 0.62, 28),
-      new THREE.MeshStandardMaterial({
-        color: displayTeamColor,
-        emissive: displayTeamColor,
-        emissiveIntensity: 0.08,
-        roughness: 0.42,
-      }),
-    );
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.17, 1.17, 0.62, 28), bodyMaterial);
     band.position.y = 0.72;
     band.castShadow = true;
 
