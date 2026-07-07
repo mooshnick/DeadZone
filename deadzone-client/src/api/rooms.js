@@ -5,6 +5,9 @@ const API_BASE = sameOriginApiBase('/api/rooms');
 
 async function request(path = '', options = {}) {
   const token = localStorage.getItem(sessionTokenKey);
+  if (!token) {
+    throw new Error('Please log in again before opening or joining rooms.');
+  }
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -14,7 +17,14 @@ async function request(path = '', options = {}) {
     },
   });
   if (!response.ok) {
-    const message = await response.text();
+    const body = await response.text();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      message = parsed.detail || parsed.message || parsed.error || body;
+    } catch {
+      // Keep plain-text server errors unchanged.
+    }
     throw new Error(message || 'Room request failed.');
   }
   return response.json();

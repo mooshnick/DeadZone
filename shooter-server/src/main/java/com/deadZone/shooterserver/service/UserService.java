@@ -43,7 +43,7 @@ public class UserService {
     private final ObjectMapper objectMapper;
     private final StoreCatalog storeCatalog;
     private final HttpClient httpClient;
-    private final String googleClientId;
+    private final Set<String> googleClientIds;
 
     public UserService(
             UserRepository userRepository,
@@ -52,7 +52,7 @@ public class UserService {
             EmailVerificationService emailVerificationService,
             ObjectMapper objectMapper,
             StoreCatalog storeCatalog,
-            @Value("${deadzone.google.client-id:}") String googleClientId
+            @Value("${deadzone.google.client-ids:${deadzone.google.client-id:}}") String googleClientIds
     ) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
@@ -61,7 +61,7 @@ public class UserService {
         this.objectMapper = objectMapper;
         this.storeCatalog = storeCatalog;
         this.httpClient = HttpClient.newHttpClient();
-        this.googleClientId = googleClientId == null ? "" : googleClientId.trim();
+        this.googleClientIds = parseGoogleClientIds(googleClientIds);
     }
 
     @Transactional
@@ -331,7 +331,7 @@ public class UserService {
     }
 
     private GoogleProfile verifyGoogleToken(GoogleLoginRequest request) {
-        if (googleClientId.isBlank()) {
+        if (googleClientIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google login is not configured on the server.");
         }
         if (request == null || request.idToken() == null || request.idToken().isBlank()) {
@@ -353,7 +353,7 @@ public class UserService {
             String subject = root.path("sub").asText("").trim();
             String email = root.path("email").asText("").trim().toLowerCase();
             boolean emailVerified = root.path("email_verified").asBoolean("true".equalsIgnoreCase(root.path("email_verified").asText("")));
-            if (!googleClientId.equals(audience) || subject.isBlank() || email.isBlank() || !emailVerified) {
+            if (!googleClientIds.contains(audience) || subject.isBlank() || email.isBlank() || !emailVerified) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google account could not be verified.");
             }
             return new GoogleProfile(subject, email, root.path("name").asText(""), root.path("given_name").asText(""));
@@ -385,6 +385,16 @@ public class UserService {
             suffix += 1;
         }
         return candidate;
+    }
+
+    private Set<String> parseGoogleClientIds(String value) {
+        if (value == null || value.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private AuthResponse authResponse(User user) {

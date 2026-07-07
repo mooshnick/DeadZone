@@ -30,7 +30,7 @@ public class LobbyRoomController {
 
     @GetMapping
     public ResponseEntity<List<LobbyRoomResponse>> list(
-            @RequestHeader("Authorization") String authorization
+            @RequestHeader(value = "Authorization", required = false) String authorization
     ) {
         jwtService.requireUserId(authorization);
         return ResponseEntity.ok(lobbyRoomService.listOpenRooms());
@@ -38,7 +38,7 @@ public class LobbyRoomController {
 
     @GetMapping("/{code}")
     public ResponseEntity<LobbyRoomResponse> byCode(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String code
     ) {
         jwtService.requireUserId(authorization);
@@ -47,7 +47,7 @@ public class LobbyRoomController {
 
     @PostMapping
     public ResponseEntity<LobbyRoomResponse> create(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody CreateRoomRequest request
     ) {
         jwtService.requireUserId(authorization);
@@ -56,7 +56,7 @@ public class LobbyRoomController {
 
     @PostMapping("/{code}/join")
     public ResponseEntity<LobbyRoomResponse> join(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String code
     ) {
         jwtService.requireUserId(authorization);
@@ -65,7 +65,7 @@ public class LobbyRoomController {
 
     @PostMapping("/{code}/leave")
     public ResponseEntity<LobbyRoomResponse> leave(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String code
     ) {
         jwtService.requireUserId(authorization);

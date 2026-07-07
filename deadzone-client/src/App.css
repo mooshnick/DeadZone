@@ -365,6 +365,7 @@ html:fullscreen .game-3d-shell {
 }
 
 .google-login {
+  align-items: center;
   display: grid;
   justify-content: center;
   margin-top: 4px;
@@ -374,6 +375,7 @@ html:fullscreen .game-3d-shell {
 
 .google-login > div {
   max-width: 100%;
+  overflow: hidden;
 }
 
 .google-login.compact {
@@ -5643,15 +5645,13 @@ button {
   }
 
   .auth-choice .google-login {
-    min-height: 34px;
+    min-height: 40px;
     margin-top: 0;
-    transform: scale(0.86);
-    transform-origin: top center;
   }
 
   .auth-form {
     width: min(380px, 100%);
-    max-height: calc(100vh - 52px);
+    max-height: calc(100svh - 44px);
     gap: 6px;
     padding: 9px 10px;
     overflow: hidden;
@@ -5693,10 +5693,8 @@ button {
   }
 
   .auth-form .google-login.compact {
-    min-height: 30px;
-    margin-top: -2px;
-    transform: scale(0.82);
-    transform-origin: top center;
+    min-height: 38px;
+    margin-top: 0;
   }
 }
 
