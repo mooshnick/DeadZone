@@ -388,6 +388,7 @@ const entityNames = {
       ice: 'רכס הקרח',
       station: 'תחנת החלל',
       apocalyptic: 'עיר ההריסות',
+      'zombie-outpost': 'מוצב הלילה',
     },
     gameModes: {
       'team-deathmatch': { name: 'אדומים נגד כחולים', short: 'קבוצות', description: 'שתי קבוצות נלחמות על הריגות.' },
@@ -395,6 +396,7 @@ const entityNames = {
       'capture-flag': { name: 'כיבוש הדגל', short: 'דגלים', description: 'קח את דגל האויב והחזר אותו לבסיס כשהדגל שלך במקום.' },
       'attack-defend': { name: 'תוקפים נגד מגינים', short: 'תקיפה', description: 'האדומים מניחים חרב באזור היריב. הכחולים מגינים.' },
       'circle-control': { name: 'מילוי עיגולים', short: 'אזורים', description: 'עמדו בתוך העיגולים כדי לכבוש ולצבור נקודות.' },
+      'zombie-survival': { name: 'מתקפת זומבים', short: 'זומבים', description: 'שרדו את הלילה, אספו תגי Recall והחזירו חברים שנפלו.' },
     },
     weapons: {
       rifle: { name: 'רובה אוטומטי', tag: 'רתע נשלט' },

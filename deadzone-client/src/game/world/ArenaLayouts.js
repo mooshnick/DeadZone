@@ -385,6 +385,29 @@ export class ArenaLayouts {
         ...fs(-34, -38, 1, 0, 0.7, 4.95, 8, 'city-ramp'),
         ...fs(34, -38, -1, 0, 0.7, 4.95, 8, 'city-ramp'),
       ],
+      zombie: [
+        b(0, -124, 112, 5, 9, 4.5, 'zombie-wall'),
+        b(0, 124, 112, 5, 9, 4.5, 'zombie-wall'),
+        b(-124, 0, 5, 112, 9, 4.5, 'zombie-wall'),
+        b(124, 0, 5, 112, 9, 4.5, 'zombie-wall'),
+
+        b(-54, -32, 28, 6, 3.2, 1.6, 'ruined-barricade'),
+        b(58, 34, 30, 6, 3.2, 1.6, 'ruined-barricade'),
+        b(-26, 66, 8, 28, 3.4, 1.7, 'ruined-barricade'),
+        b(36, -70, 8, 30, 3.4, 1.7, 'ruined-barricade'),
+        b(-82, 24, 14, 14, 5, 2.5, 'watch-cover'),
+        b(84, -18, 14, 14, 5, 2.5, 'watch-cover'),
+        b(0, 42, 36, 7, 2.8, 1.4, 'roadblock'),
+        b(0, -48, 38, 7, 2.8, 1.4, 'roadblock'),
+        b(-42, 0, 7, 36, 2.8, 1.4, 'roadblock'),
+        b(46, 0, 7, 36, 2.8, 1.4, 'roadblock'),
+
+        b(0, 0, 10, 10, 2.4, 1.2, 'recall-center-cover'),
+        b(-18, -18, 16, 4, 2.6, 1.3, 'supply-cover'),
+        b(18, 18, 16, 4, 2.6, 1.3, 'supply-cover'),
+        b(-18, 18, 4, 16, 2.6, 1.3, 'supply-cover'),
+        b(18, -18, 4, 16, 2.6, 1.3, 'supply-cover'),
+      ],
     };
     return layouts[theme] || layouts.foundry;
   }

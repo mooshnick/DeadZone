@@ -33,6 +33,15 @@ export function spawnFor(team, index = 0, mapId = 'foundry') {
     const point = (team === 'blue' ? blueSpawns : redSpawns)[index % 4];
     return new THREE.Vector3(...point);
   }
+  if (mapId === 'zombie-outpost') {
+    const squadSpawns = [
+      [-10, 1.25, 12],
+      [-4, 1.25, 18],
+      [6, 1.25, 15],
+      [12, 1.25, 8],
+    ];
+    return new THREE.Vector3(...squadSpawns[index % squadSpawns.length]);
+  }
   const side = team === 'blue' ? -1 : 1;
   return new THREE.Vector3(side * (28 + index * 2), 1.25, -18 + index * 7);
 }

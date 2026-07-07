@@ -30,6 +30,16 @@ const MOBILE_CONTROL_DEFAULTS = {
 };
 
 const MOBILE_LOOK_SENSITIVITY_KEY = 'deadzone-mobile-look-sensitivity';
+const SPEND_COINS_SOUND_URL = '/sound/spend_coins.mp3';
+
+function playMenuSound(url, volume = 0.72) {
+  if (typeof Audio === 'undefined') {
+    return;
+  }
+  const sound = new Audio(url);
+  sound.volume = volume;
+  sound.play().catch(() => {});
+}
 
 function loadMobileControls() {
   try {
@@ -135,6 +145,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                 <input
                   autoFocus
                   autoComplete="username"
+                  placeholder={t('auth.username')}
                   value={credentials.username}
                   onChange={(event) => setCredentials((draft) => ({ ...draft, username: event.target.value }))}
                 />
@@ -147,6 +158,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                   autoFocus={mode === 'verify'}
                   type="email"
                   autoComplete="email"
+                  placeholder={t('auth.email')}
                   value={credentials.email}
                   onChange={(event) => setCredentials((draft) => ({ ...draft, email: event.target.value }))}
                 />
@@ -158,6 +170,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                 <input
                   type="password"
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  placeholder={t('auth.password')}
                   value={credentials.password}
                   onChange={(event) => setCredentials((draft) => ({ ...draft, password: event.target.value }))}
                 />
@@ -169,6 +182,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                 <input
                   type="password"
                   autoComplete="new-password"
+                  placeholder={t('auth.confirmPassword')}
                   value={credentials.confirmPassword}
                   onChange={(event) => setCredentials((draft) => ({ ...draft, confirmPassword: event.target.value }))}
                 />
@@ -181,6 +195,7 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
                   autoComplete="one-time-code"
                   inputMode="numeric"
                   maxLength={6}
+                  placeholder={t('auth.code')}
                   value={credentials.verificationCode}
                   onChange={(event) => setCredentials((draft) => ({ ...draft, verificationCode: event.target.value.replace(/\D/g, '').slice(0, 6) }))}
                 />
@@ -843,7 +858,7 @@ function PlayerScreen({
             <span>{t('store.costs', { name: pendingPurchase.item.name, price: pendingPurchase.item.price })}</span>
             <div className="purchase-actions">
               <button className="secondary-command" onClick={() => setPendingPurchase(null)}>{t('store.cancel')}</button>
-              <button className="primary-command" onClick={() => { pendingPurchase.action(); setPendingPurchase(null); }}>{t('store.buy')}</button>
+              <button className="primary-command" onClick={() => { playMenuSound(SPEND_COINS_SOUND_URL, 0.78); pendingPurchase.action(); setPendingPurchase(null); }}>{t('store.buy')}</button>
             </div>
           </div>
         </div>

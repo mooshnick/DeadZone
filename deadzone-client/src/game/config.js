@@ -15,6 +15,7 @@ export const KILL_XP = 120;
 export const ASSIST_XP = 45;
 export const ASSIST_WINDOW = 7000;
 export const DEFAULT_GAME_MODE = 'team-deathmatch';
+export const ZOMBIE_SURVIVAL_MODE = 'zombie-survival';
 
 export const GAME_MODES = [
   { id: 'team-deathmatch', name: 'Red vs Blue', short: 'TDM', description: 'Two teams fight for eliminations.' },
@@ -22,6 +23,7 @@ export const GAME_MODES = [
   { id: 'capture-flag', name: 'Capture the Flag', short: 'CTF', description: 'Bring the enemy flag home while your flag is safe.' },
   { id: 'attack-defend', name: 'Attackers vs Defenders', short: 'A/D', description: 'Red plants the sword. Blue defends the zone.' },
   { id: 'circle-control', name: 'Circle Control', short: 'Zones', description: 'Stand inside circles to capture and score.' },
+  { id: ZOMBIE_SURVIVAL_MODE, name: 'Zombie Survival', short: 'Zombies', description: 'Survive the night, collect tags, and recall fallen squadmates.' },
 ];
 
 export const GAME_MODE_RULES = {
@@ -30,6 +32,7 @@ export const GAME_MODE_RULES = {
   'capture-flag': { minScore: 3, maxScore: 15, defaultScore: 5, scoreStep: 1 },
   'attack-defend': { minScore: 15, maxScore: 60, defaultScore: 30, scoreStep: 5 },
   'circle-control': { minScore: 10, maxScore: 30, defaultScore: 20, scoreStep: 5 },
+  [ZOMBIE_SURVIVAL_MODE]: { minScore: 5, maxScore: 20, defaultScore: 10, scoreStep: 5 },
 };
 
 export const MATCH_TIME_OPTIONS = [5, 10, 15, 20];
@@ -122,6 +125,7 @@ export const MAPS = [
   { id: 'ice', name: 'Ice Ridge', unlockLevel: 6, theme: 'ice', sky: '#a4e9ff', ground: '#315a76', accent: '#9cf7ff' },
   { id: 'station', name: 'Orbital Station', unlockLevel: 8, theme: 'station', sky: '#111827', ground: '#20263a', accent: '#d7e3ff' },
   { id: 'apocalyptic', name: 'Apocalyptic City', unlockLevel: 1, theme: 'apocalyptic', sky: '#111821', ground: '#25282b', accent: '#ff9f43' },
+  { id: 'zombie-outpost', name: 'Night Outpost', unlockLevel: 1, theme: 'zombie', sky: '#06120c', ground: '#172216', accent: '#80ff65', arenaSize: 280 },
 ];
 
 export const MISSIONS = [

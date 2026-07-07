@@ -18,12 +18,14 @@ const GRENADE_SOUND_URL = '/sound/grenade.mp3';
 const GRENADE_SOUND_POOL_SIZE = 4;
 
 export class GrenadeSystem {
-  constructor({ scene, players, combatSystem, collisionSystem, gameMode, onEvent }) {
+  constructor({ scene, players, combatSystem, collisionSystem, gameMode, arenaLimit = ARENA_LIMIT, zombieSystem, onEvent }) {
     this.scene = scene;
     this.players = players;
     this.combatSystem = combatSystem;
     this.collisionSystem = collisionSystem;
     this.gameMode = gameMode;
+    this.arenaLimit = arenaLimit;
+    this.zombieSystem = zombieSystem;
     this.onEvent = onEvent;
     this.pickups = [];
     this.thrown = [];
@@ -72,10 +74,12 @@ export class GrenadeSystem {
     const throwDirection = direction.clone().normalize();
     player.grenades -= 1;
     this.playGrenadeSound(player);
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.34, 16, 12),
-      new THREE.MeshStandardMaterial({ color: '#243042', emissive: '#53ff9a', emissiveIntensity: 0.28 }),
-    );
+    const mesh = this.gameMode === 'zombie-survival'
+      ? this.createMolotovMesh()
+      : new THREE.Mesh(
+        new THREE.SphereGeometry(0.34, 16, 12),
+        new THREE.MeshStandardMaterial({ color: '#243042', emissive: '#53ff9a', emissiveIntensity: 0.28 }),
+      );
     mesh.position.copy(player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).add(throwDirection.clone().multiplyScalar(1.0)));
     this.scene.add(mesh);
     this.thrown.push({
@@ -85,7 +89,22 @@ export class GrenadeSystem {
       velocity: throwDirection.multiplyScalar(throwForce).add(new THREE.Vector3(0, arcForce, 0)),
       fuse: 132,
     });
-    this.onEvent(`${player.name} threw a grenade`);
+    this.onEvent(`${player.name} threw ${this.gameMode === 'zombie-survival' ? 'a molotov' : 'a grenade'}`);
+  }
+
+  createMolotovMesh() {
+    const group = new THREE.Group();
+    const bottle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.22, 0.72, 12),
+      new THREE.MeshStandardMaterial({ color: '#38634a', transparent: true, opacity: 0.72, roughness: 0.38 }),
+    );
+    const rag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.3, 0.16),
+      new THREE.MeshBasicMaterial({ color: '#ff9d36' }),
+    );
+    rag.position.y = 0.48;
+    group.add(bottle, rag);
+    return group;
   }
 
   spawn(time) {
@@ -184,7 +203,7 @@ export class GrenadeSystem {
   }
 
   isBlocked(position) {
-    if (Math.abs(position.x) > ARENA_LIMIT - GRENADE_RADIUS || Math.abs(position.z) > ARENA_LIMIT - GRENADE_RADIUS) {
+    if (Math.abs(position.x) > this.arenaLimit - GRENADE_RADIUS || Math.abs(position.z) > this.arenaLimit - GRENADE_RADIUS) {
       return true;
     }
     return this.collisionSystem.hitsSolid(position);
@@ -201,6 +220,11 @@ export class GrenadeSystem {
   }
 
   explode(grenade) {
+    if (this.gameMode === 'zombie-survival' && this.zombieSystem) {
+      this.zombieSystem.addFireZone(grenade.mesh.position, grenade.ownerId);
+      this.scene.remove(grenade.mesh);
+      return;
+    }
     this.combatSystem.makeExplosion(grenade.mesh.position, BLAST_RADIUS, BLAST_DAMAGE, grenade.ownerId, grenade.team);
     this.scene.remove(grenade.mesh);
   }

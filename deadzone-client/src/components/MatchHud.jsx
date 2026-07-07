@@ -191,6 +191,19 @@ export function MatchHud({
     window.setTimeout(resetMobileInput, 120);
     window.setTimeout(resetMobileInput, 320);
   };
+  const wakeRespawnInput = () => {
+    const wake = () => {
+      canvasRef.current?.focus?.({ preventScroll: true });
+      worldRef.current?.wakeGameplayInput?.(true);
+      releaseMobileInput();
+      setMobileControlSession((value) => value + 1);
+    };
+    wake();
+    window.requestAnimationFrame(wake);
+    window.setTimeout(wake, 0);
+    window.setTimeout(wake, 120);
+    window.setTimeout(wake, 320);
+  };
   const setPaused = (value) => {
     if (!value) {
       releaseMobileInput();
@@ -210,8 +223,7 @@ export function MatchHud({
     const returned = worldRef.current?.respawnLocal(true);
     if (returned) {
       document.activeElement?.blur?.();
-      setMobileControlSession((value) => value + 1);
-      releaseMobileInput();
+      wakeRespawnInput();
     }
   };
   const exitPausedMatch = () => {

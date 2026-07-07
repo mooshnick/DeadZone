@@ -39,15 +39,16 @@ export class ArenaBuilder {
   }
 
   addGround() {
+    const arenaSize = this.selectedMap.arenaSize || 140;
     const ground = new THREE.Mesh(
-      new THREE.BoxGeometry(140, 0.5, 140),
+      new THREE.BoxGeometry(arenaSize, 0.5, arenaSize),
       new THREE.MeshStandardMaterial({ color: this.selectedMap.ground, roughness: 0.92, metalness: 0.04 }),
     );
     ground.receiveShadow = true;
     ground.position.y = -0.25;
     this.scene.add(ground);
 
-    const grid = new THREE.GridHelper(140, 40, this.selectedMap.accent, '#ffffff');
+    const grid = new THREE.GridHelper(arenaSize, Math.max(40, Math.floor(arenaSize / 3.5)), this.selectedMap.accent, '#ffffff');
     grid.material.opacity = 0.16;
     grid.material.transparent = true;
     this.scene.add(grid);
@@ -97,16 +98,19 @@ export class ArenaBuilder {
   }
 
   addWalls() {
+    const arenaSize = this.selectedMap.arenaSize || 140;
+    const half = arenaSize / 2 - 2;
+    const length = arenaSize - 4;
     const wallMaterial = new THREE.MeshStandardMaterial({
-      color: this.selectedMap.theme === 'castle' ? '#6f7888' : '#192332',
+      color: this.selectedMap.theme === 'castle' ? '#6f7888' : this.selectedMap.theme === 'zombie' ? '#263224' : '#192332',
       roughness: 0.8,
       metalness: this.selectedMap.theme === 'station' ? 0.18 : 0.04,
     });
     [
-      { x: 0, z: -68, w: 138, d: 1.5 },
-      { x: 0, z: 68, w: 138, d: 1.5 },
-      { x: -68, z: 0, w: 1.5, d: 138 },
-      { x: 68, z: 0, w: 1.5, d: 138 },
+      { x: 0, z: -half, w: length, d: 1.5 },
+      { x: 0, z: half, w: length, d: 1.5 },
+      { x: -half, z: 0, w: 1.5, d: length },
+      { x: half, z: 0, w: 1.5, d: length },
     ].forEach((wall) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(wall.w, 7, wall.d), wallMaterial);
       mesh.position.set(wall.x, 3.5, wall.z);

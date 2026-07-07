@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEFAULT_GAME_MODE, MAX_PLAYERS, PLAYER_EYE_HEIGHT, POWERUPS, WEAPONS, WEAPON_SKINS } from './config';
+import { DEFAULT_GAME_MODE, FLOOR_Y, MAX_PLAYERS, PLAYER_EYE_HEIGHT, POWERUPS, WEAPONS, WEAPON_SKINS, ZOMBIE_SURVIVAL_MODE } from './config';
 import { makeBot, makePlayer } from './players';
 import { InputController } from './input/InputController';
 import { PlayerMeshFactory } from './rendering/PlayerMeshFactory';
@@ -10,6 +10,7 @@ import { CombatSystem } from './systems/CombatSystem';
 import { GrenadeSystem } from './systems/GrenadeSystem';
 import { PowerupSystem } from './systems/PowerupSystem';
 import { PlayerCollisionSystem } from './systems/PlayerCollisionSystem';
+import { ZombieSurvivalSystem } from './systems/ZombieSurvivalSystem';
 import { RealtimeClient } from './network/RealtimeClient';
 import { ArenaLayouts } from './world/ArenaLayouts';
 import { clamp, nowMs } from './utils';
@@ -55,7 +56,8 @@ export class GameWorld {
     this.mapIndex = Math.max(0, config.maps.findIndex((map) => map.id === config.mapId));
     this.selectedMap = config.maps[this.mapIndex] || config.maps[0];
     this.gameMode = config.gameMode || DEFAULT_GAME_MODE;
-    this.maxPlayers = config.maxPlayers || MAX_PLAYERS;
+    this.isZombieSurvival = this.gameMode === ZOMBIE_SURVIVAL_MODE;
+    this.maxPlayers = this.isZombieSurvival ? 4 : (config.maxPlayers || MAX_PLAYERS);
     this.scoreLimit = config.scoreLimit || 30;
     this.timeLimitMinutes = Math.min(20, Math.max(5, config.timeLimitMinutes || 20));
     this.matchStartedAt = nowMs();
@@ -65,6 +67,7 @@ export class GameWorld {
     this.pauseStartedAt = 0;
     this.keybinds = config.keybinds || {};
     this.blocks = ArenaLayouts.blocksFor(this.selectedMap);
+    this.arenaLimit = (this.selectedMap.arenaSize || 140) / 2 - 4;
     this.players = new Map();
     this.isScoped = false;
     this.scopeVisualProgress = 0;
@@ -82,12 +85,13 @@ export class GameWorld {
     this.objectiveState = this.createObjectiveState();
 
     this.inputController = null;
-    this.collisionSystem = new CollisionSystem(this.blocks);
+    this.collisionSystem = new CollisionSystem(this.blocks, this.arenaLimit);
     this.combatSystem = null;
     this.powerupSystem = null;
     this.botSystem = null;
     this.grenadeSystem = null;
     this.playerCollisionSystem = null;
+    this.zombieSystem = null;
     this.qWasDown = false;
     this.grenadeChargeStartedAt = 0;
     this.grenadeCharge = 0;
@@ -121,6 +125,16 @@ export class GameWorld {
     this.onGrenadeChargeChange?.(0);
   }
 
+  wakeGameplayInput(capturePointer = false) {
+    this.isPaused = false;
+    this.pauseStartedAt = 0;
+    this.resetRuntimeInput();
+    this.canvas.focus?.({ preventScroll: true });
+    if (capturePointer) {
+      this.capturePointer();
+    }
+  }
+
   dispose() {
     cancelAnimationFrame(this.frame);
     this.realtimeClient?.dispose();
@@ -138,6 +152,7 @@ export class GameWorld {
 
   setupRenderer() {
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.canvas.tabIndex = 0;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -267,7 +282,7 @@ export class GameWorld {
       players: this.players,
       onEvent: this.onEvent,
     });
-    this.botSystem = new BotSystem({
+    this.botSystem = this.isZombieSurvival ? null : new BotSystem({
       players: this.players,
       combatSystem: this.combatSystem,
       collisionSystem: this.collisionSystem,
@@ -275,15 +290,32 @@ export class GameWorld {
       gameMode: this.gameMode,
       objectiveTargetFor: (player) => this.objectiveTargetFor(player),
     });
+    if (this.isZombieSurvival) {
+      this.zombieSystem = new ZombieSurvivalSystem({
+        scene: this.scene,
+        players: this.players,
+        combatSystem: this.combatSystem,
+        collisionSystem: this.collisionSystem,
+        localId: this.localId,
+        onEvent: this.onEvent,
+        onHealthChange: this.onHealthChange,
+        onDeathChange: this.onDeathChange,
+        onScoreChange: this.onScoreChange,
+        onMatchEnd: (result) => this.finishZombieSurvival(result),
+        revivePlayer: (playerId, position) => this.reviveZombieSurvivor(playerId, position),
+      });
+    }
     this.grenadeSystem = new GrenadeSystem({
       scene: this.scene,
       players: this.players,
       combatSystem: this.combatSystem,
       collisionSystem: this.collisionSystem,
       gameMode: this.gameMode,
+      arenaLimit: this.arenaLimit,
+      zombieSystem: this.zombieSystem,
       onEvent: this.onEvent,
     });
-    this.playerCollisionSystem = new PlayerCollisionSystem(this.players, this.collisionSystem);
+    this.playerCollisionSystem = new PlayerCollisionSystem(this.players, this.collisionSystem, this.arenaLimit);
     this.inputController = new InputController({
       canvas: this.canvas,
       keys: this.keys,
@@ -299,7 +331,7 @@ export class GameWorld {
     this.addPlayer(makePlayer({
       id: this.localId,
       name: this.config.name,
-      team: this.config.team,
+      team: this.isZombieSurvival ? 'blue' : this.config.team,
       gameMode: this.gameMode,
       weaponId: this.config.weaponId,
       outfitId: this.config.outfitId,
@@ -310,12 +342,15 @@ export class GameWorld {
       money: this.config.money || 0,
     }));
 
-    if (!this.config.allowBots) {
+    if (!this.config.allowBots && !this.isZombieSurvival) {
       return;
     }
 
-    for (let index = 0; index < this.maxPlayers - 1; index += 1) {
-      const botTeam = index % 2 === 0 ? (this.config.team === 'blue' ? 'red' : 'blue') : this.config.team;
+    const botSlots = this.isZombieSurvival
+      ? Math.max(0, this.maxPlayers - Math.max(1, Number(this.config.humanPlayers) || 1))
+      : this.maxPlayers - 1;
+    for (let index = 0; index < botSlots; index += 1) {
+      const botTeam = this.isZombieSurvival ? 'blue' : (index % 2 === 0 ? (this.config.team === 'blue' ? 'red' : 'blue') : this.config.team);
       this.addPlayer(makeBot({ index, team: botTeam, gameMode: this.gameMode, mapId: this.config.mapId }));
     }
   }
@@ -329,7 +364,7 @@ export class GameWorld {
   }
 
   playerMeshFactory() {
-    return new PlayerMeshFactory(this.localId, this.localPlayer()?.team || this.config.team || 'blue');
+    return new PlayerMeshFactory(this.localId, this.isZombieSurvival ? 'blue' : (this.localPlayer()?.team || this.config.team || 'blue'));
   }
 
   setupRealtime() {
@@ -745,6 +780,9 @@ export class GameWorld {
 
   respawnLocal(capturePointer = false) {
     const player = this.localPlayer();
+    if (this.isZombieSurvival) {
+      return false;
+    }
     if (!player || !player.isDead || nowMs() < player.respawnReadyAt) {
       return false;
     }
@@ -758,9 +796,7 @@ export class GameWorld {
     this.onDeathChange({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     this.onEvent('Back in the arena');
     this.realtimeClient?.sendMoveNow?.(this.networkPayloadFor(player), this.localRespawnedAt);
-    if (capturePointer) {
-      this.capturePointer();
-    }
+    this.wakeGameplayInput(capturePointer);
     return true;
   }
 
@@ -880,6 +916,10 @@ export class GameWorld {
     if (this.selectedMap.hazard === 'lava' && player.position.y <= 1.35 && !this.collisionSystem.isOnRaisedBlock(player.position)) {
       this.bumpLocalStateVersion();
       player.kill(time);
+      if (this.isZombieSurvival) {
+        player.respawnReadyAt = Number.POSITIVE_INFINITY;
+        this.zombieSystem?.createRecallTag(player);
+      }
       this.localDeathFocus = null;
       this.onHealthChange?.(0);
       this.onDeathChange?.({ isDead: true, ready: false, seconds: 5, killerName: '', focusSeconds: 0 });
@@ -1243,29 +1283,31 @@ export class GameWorld {
     const killScoreRed = [...this.players.values()].filter((player) => player.team === 'red').reduce((sum, player) => sum + player.kills, 0);
     const usesObjectiveScore = TEAM_MODES.has(this.gameMode) && this.gameMode !== 'team-deathmatch';
     const ffaLeader = [...this.players.values()].sort((a, b) => b.score - a.score)[0];
-    this.onScoreChange({
-      blue: usesObjectiveScore ? this.objectiveState.blue : killScoreBlue,
-      red: usesObjectiveScore ? this.objectiveState.red : killScoreRed,
-      mode: this.gameMode,
-      target: this.scoreLimit,
-      remainingSeconds: this.remainingSeconds(),
-      ended: this.matchEnded,
-      objective: this.gameMode === 'free-for-all'
-        ? `Leader: ${ffaLeader?.name || 'None'}`
-        : this.objectiveState.message,
-      players: [...this.players.values()]
-        .map((player) => ({
-          id: player.id,
-          name: player.name,
-          team: player.team,
-          kills: player.kills,
-          assists: player.assists,
-          deaths: player.deaths,
-          score: player.score,
-          money: player.money,
-        }))
-        .sort((a, b) => b.score - a.score),
-    });
+    if (!this.isZombieSurvival) {
+      this.onScoreChange({
+        blue: usesObjectiveScore ? this.objectiveState.blue : killScoreBlue,
+        red: usesObjectiveScore ? this.objectiveState.red : killScoreRed,
+        mode: this.gameMode,
+        target: this.scoreLimit,
+        remainingSeconds: this.remainingSeconds(),
+        ended: this.matchEnded,
+        objective: this.gameMode === 'free-for-all'
+          ? `Leader: ${ffaLeader?.name || 'None'}`
+          : this.objectiveState.message,
+        players: [...this.players.values()]
+          .map((player) => ({
+            id: player.id,
+            name: player.name,
+            team: player.team,
+            kills: player.kills,
+            assists: player.assists,
+            deaths: player.deaths,
+            score: player.score,
+            money: player.money,
+          }))
+          .sort((a, b) => b.score - a.score),
+      });
+    }
     this.onBuffsChange(Object.entries(localPlayer.buffs).map(([buff, expiresAt]) => {
       const data = POWERUPS[buff];
       const duration = localPlayer.buffDurations[buff] || data?.duration || 1;
@@ -1300,12 +1342,15 @@ export class GameWorld {
       this.sendRealtimeMove(time);
     }
     if (!this.matchEnded && !this.isPaused) {
-      this.botSystem.update(dt, time);
+      this.botSystem?.update(dt, time);
       this.playerCollisionSystem.resolve();
       this.combatSystem.updateBullets();
-      this.powerupSystem.update(time);
+      if (!this.isZombieSurvival) {
+        this.powerupSystem.update(time);
+      }
       this.grenadeSystem.update(time, dt);
       this.updateObjectives(time, dt);
+      this.zombieSystem?.update(dt, time, this.remainingSeconds());
       this.checkMatchEnd(time);
     }
     this.updateRemotePlayers(dt, time);
@@ -1323,6 +1368,10 @@ export class GameWorld {
   }
 
   handleElimination(shooter, target, time) {
+    if (this.isZombieSurvival) {
+      target.respawnReadyAt = Number.POSITIVE_INFINITY;
+      this.zombieSystem?.createRecallTag(target);
+    }
     if (target.id === this.localId) {
       this.bumpLocalStateVersion();
       document.exitPointerLock?.();
@@ -1391,6 +1440,7 @@ export class GameWorld {
 
   checkMatchEnd(time) {
     if (this.matchEnded) return;
+    if (this.isZombieSurvival) return;
     const scores = this.currentScores();
     const reachedTarget = this.gameMode === 'free-for-all'
       ? scores.highScore >= this.scoreLimit
@@ -1429,5 +1479,42 @@ export class GameWorld {
     };
     this.onMatchEnd?.(this.matchResult);
     this.onEvent?.(`${this.matchResult.winnerName} won. ${reason}`);
+  }
+
+  reviveZombieSurvivor(playerId, position) {
+    const player = this.players.get(playerId);
+    if (!player) return;
+    player.respawn(0);
+    const offset = new THREE.Vector3((Math.random() - 0.5) * 5, 0, (Math.random() - 0.5) * 5);
+    player.position.copy(position.clone().add(offset));
+    player.position.y = FLOOR_Y;
+    player.velocity.set(0, 0, 0);
+    player.respawnReadyAt = 0;
+    if (player.id === this.localId) {
+      this.localDeathFocus = null;
+      this.onHealthChange?.(player.health);
+      this.onDeathChange?.({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
+      this.wakeGameplayInput(false);
+    }
+  }
+
+  finishZombieSurvival(result) {
+    if (this.matchEnded) return;
+    this.matchEnded = true;
+    this.mouse.current.down = false;
+    document.exitPointerLock?.();
+    const localWon = result.winner === 'survivors';
+    const localPlayer = this.localPlayer();
+    if (localWon && localPlayer) {
+      this.awardObjective(localPlayer, { ...WIN_BONUS, label: 'night survived' });
+    }
+    this.matchResult = {
+      winner: result.winner,
+      winnerName: localWon ? 'Survivors' : 'Zombies',
+      reason: result.detail || result.title || 'Zombie Survival complete',
+      localWon,
+    };
+    this.onMatchEnd?.(this.matchResult);
+    this.onEvent?.(`${this.matchResult.winnerName}: ${this.matchResult.reason}`);
   }
 }

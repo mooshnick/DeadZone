@@ -3,10 +3,12 @@ import { ASSIST_REWARD, ASSIST_SCORE, ASSIST_WINDOW, ASSIST_XP, KILL_REWARD, KIL
 import { nowMs } from '../utils';
 
 const SHOT_SOUND_URL = '/sound/shotSound_1.mp3';
+const SHOTGUN_SOUND_URL = '/sound/shotgun.mp3';
 const RELOAD_SOUND_URL = '/sound/reloadGun_1.mp3';
 const RPG_LAUNCH_SOUND_URL = '/sound/RPG_1.mp3';
 const RPG_EXPLOSION_SOUND_URL = '/sound/RPG_2.mp3';
 const SHOT_SOUND_POOL_SIZE = 6;
+const SHOTGUN_SOUND_POOL_SIZE = 4;
 const RPG_SOUND_POOL_SIZE = 4;
 const PROJECTILE_LIFE_BY_WEAPON = {
   rpg: 260,
@@ -31,9 +33,11 @@ export class CombatSystem {
     this.onElimination = onElimination;
     this.bullets = [];
     this.shotSoundIndex = 0;
+    this.shotgunSoundIndex = 0;
     this.rpgLaunchSoundIndex = 0;
     this.rpgExplosionSoundIndex = 0;
     this.shotSounds = this.createShotSoundPool();
+    this.shotgunSounds = this.createSoundPool(SHOTGUN_SOUND_URL, SHOTGUN_SOUND_POOL_SIZE, 0.68);
     this.rpgLaunchSounds = this.createSoundPool(RPG_LAUNCH_SOUND_URL, RPG_SOUND_POOL_SIZE, 0.62);
     this.rpgExplosionSounds = this.createSoundPool(RPG_EXPLOSION_SOUND_URL, RPG_SOUND_POOL_SIZE, 0.78);
     this.reloadSound = this.createSound(RELOAD_SOUND_URL, 0.52);
@@ -111,15 +115,25 @@ export class CombatSystem {
   }
 
   playShotSound(player, weapon) {
-    if (player.id !== this.localId || this.shotSounds.length === 0) {
+    if (player.id !== this.localId) {
       return;
     }
-    const sound = this.shotSounds[this.shotSoundIndex % this.shotSounds.length];
-    this.shotSoundIndex += 1;
-    this.unlockShotSounds(sound);
+    const isShotgun = player.weaponId === 'shotgun';
+    const pool = isShotgun ? this.shotgunSounds : this.shotSounds;
+    if (pool.length === 0) {
+      return;
+    }
+    const indexKey = isShotgun ? 'shotgunSoundIndex' : 'shotSoundIndex';
+    const sound = pool[this[indexKey] % pool.length];
+    this[indexKey] += 1;
+    if (isShotgun) {
+      this.unlockShotgunSounds(sound);
+    } else {
+      this.unlockShotSounds(sound);
+    }
     sound.pause();
     sound.currentTime = 0;
-    sound.volume = player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
+    sound.volume = isShotgun ? 0.72 : player.weaponId === 'sniper' ? 0.58 : player.weaponId === 'rpg' ? 0.66 : 0.46;
     sound.play().catch(() => {});
   }
 
@@ -187,6 +201,14 @@ export class CombatSystem {
           sound.muted = false;
         });
     });
+  }
+
+  unlockShotgunSounds(activeSound = null) {
+    if (this.shotgunSoundsUnlocked) {
+      return;
+    }
+    this.shotgunSoundsUnlocked = true;
+    this.unlockSoundPool(this.shotgunSounds, activeSound);
   }
 
   playReloadSound(player) {

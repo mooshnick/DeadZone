@@ -12,7 +12,7 @@ import {
   sendFriendRequest,
 } from '../api/social';
 import { GameWorld } from '../game/GameWorld';
-import { ACCESSORIES, DEFAULT_GAME_MODE, GAME_MODE_RULES, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, xpForLevel } from '../game/config';
+import { ACCESSORIES, DEFAULT_GAME_MODE, GAME_MODE_RULES, GRENADE_SKINS, levelForXp, MAPS, MISSIONS, OUTFITS, WEAPONS, WEAPON_SKINS, ZOMBIE_SURVIVAL_MODE, xpForLevel } from '../game/config';
 import { makeId } from '../game/utils';
 import {
   ADMIN_WALLET,
@@ -38,6 +38,7 @@ const ROUTES = {
 };
 
 const DAILY_MISSION_COUNT = 3;
+const COLLECT_MISSION_SOUND_URL = '/sound/collect_mission.mp3';
 const EMPTY_MISSION_STATS = {
   activeMissionIds: [],
   claimed: [],
@@ -49,13 +50,26 @@ const EMPTY_MISSION_STATS = {
   weaponKills: {},
 };
 
+function playUiSound(url, volume = 0.72) {
+  if (typeof Audio === 'undefined') {
+    return;
+  }
+  const sound = new Audio(url);
+  sound.volume = volume;
+  sound.play().catch(() => {});
+}
+
 function normalizeRoom(room, fallback = {}) {
   const gameMode = room?.gameMode || fallback.gameMode || DEFAULT_GAME_MODE;
   const rules = GAME_MODE_RULES[gameMode] || GAME_MODE_RULES[DEFAULT_GAME_MODE];
+  const isZombieRoom = gameMode === ZOMBIE_SURVIVAL_MODE;
   return {
     ...fallback,
     ...room,
     gameMode,
+    mapId: isZombieRoom ? (room?.mapId || fallback.mapId || 'zombie-outpost') : (room?.mapId || fallback.mapId),
+    maxPlayers: isZombieRoom ? 4 : (room?.maxPlayers || fallback.maxPlayers),
+    allowBots: isZombieRoom ? true : (room?.allowBots ?? fallback.allowBots),
     scoreLimit: room?.scoreLimit || fallback.scoreLimit || rules.defaultScore,
     timeLimitMinutes: room?.timeLimitMinutes || fallback.timeLimitMinutes || 20,
   };
@@ -847,6 +861,7 @@ export function useDeadzoneController() {
 
   function autoTeamForRoom(room) {
     if (!room) return 'blue';
+    if (room.gameMode === ZOMBIE_SURVIVAL_MODE) return 'blue';
     const blue = room.bluePlayers ?? Math.ceil((room.players || 0) / 2);
     const red = room.redPlayers ?? Math.floor((room.players || 0) / 2);
     return blue <= red ? 'blue' : 'red';
@@ -895,11 +910,12 @@ export function useDeadzoneController() {
   }
 
   const createRoom = async () => {
+    const isZombieRoom = roomDraft.gameMode === ZOMBIE_SURVIVAL_MODE;
     const roomPayload = {
       name: roomDraft.name.trim() || 'Custom Arena',
-      mapId: roomDraft.mapId,
-      maxPlayers: Math.max(2, Math.min(10, Number(roomDraft.maxPlayers) || 10)),
-      allowBots: roomDraft.allowBots,
+      mapId: isZombieRoom ? 'zombie-outpost' : roomDraft.mapId,
+      maxPlayers: isZombieRoom ? 4 : Math.max(2, Math.min(10, Number(roomDraft.maxPlayers) || 10)),
+      allowBots: isZombieRoom ? true : roomDraft.allowBots,
       gameMode: roomDraft.gameMode || DEFAULT_GAME_MODE,
       scoreLimit: roomDraft.scoreLimit,
       timeLimitMinutes: roomDraft.timeLimitMinutes,
@@ -978,6 +994,7 @@ export function useDeadzoneController() {
     nextMissionStats.claimed = [...nextMissionStats.claimed, mission.id];
     const nextWallet = account?.admin ? ADMIN_WALLET : wallet + mission.rewardMoney;
     const nextXp = account?.admin ? ADMIN_XP : xp + mission.rewardXp;
+    playUiSound(COLLECT_MISSION_SOUND_URL, 0.78);
     setMissionStats(nextMissionStats);
     setWallet(nextWallet);
     setXp(nextXp);
@@ -1073,14 +1090,15 @@ export function useDeadzoneController() {
       accessoryIds,
       weaponSkinId,
       weaponLevel: weaponUpgrades[allowedWeaponId] || 0,
-      mapId: room.mapId,
-      roomId: room.id,
-      gameMode: room.gameMode || DEFAULT_GAME_MODE,
-      scoreLimit: room.scoreLimit,
-      timeLimitMinutes: room.timeLimitMinutes,
+      mapId: joinedRoom.mapId,
+      roomId: joinedRoom.id,
+      gameMode: joinedRoom.gameMode || DEFAULT_GAME_MODE,
+      scoreLimit: joinedRoom.scoreLimit,
+      timeLimitMinutes: joinedRoom.timeLimitMinutes,
       maps: MAPS,
-      maxPlayers: room.maxPlayers,
-      allowBots: room.allowBots,
+      maxPlayers: joinedRoom.maxPlayers,
+      humanPlayers: joinedRoom.players,
+      allowBots: joinedRoom.allowBots,
       keybinds,
       onProgressChange: handleProgressChange,
       money: wallet,
@@ -1095,8 +1113,8 @@ export function useDeadzoneController() {
     setDeathInfo({ isDead: false, ready: false, seconds: 0, killerName: '', focusSeconds: 0 });
     setMatchResult(null);
     setWeaponId(allowedWeaponId);
-    setEvents([`${trimmedName} entered ${room.name} with ${WEAPONS[allowedWeaponId].name}`]);
-    recordMapMission(room.mapId);
+    setEvents([`${trimmedName} entered ${joinedRoom.name} with ${WEAPONS[allowedWeaponId].name}`]);
+    recordMapMission(joinedRoom.mapId);
     setScreen('match');
     updateRoute(ROUTES.match);
   };

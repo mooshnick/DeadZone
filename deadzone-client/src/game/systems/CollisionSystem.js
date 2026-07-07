@@ -5,8 +5,9 @@ const MAX_STEP_UP = 0.9;
 const FLOOR_SNAP_DOWN = 1.15;
 
 export class CollisionSystem {
-  constructor(blocks) {
+  constructor(blocks, arenaLimit = ARENA_LIMIT) {
     this.blocks = blocks;
+    this.arenaLimit = arenaLimit;
   }
 
   isFloorLike(block) {
@@ -55,8 +56,8 @@ export class CollisionSystem {
   }
 
   keepInsideArena(position) {
-    position.x = clamp(position.x, -ARENA_LIMIT, ARENA_LIMIT);
-    position.z = clamp(position.z, -ARENA_LIMIT, ARENA_LIMIT);
+    position.x = clamp(position.x, -this.arenaLimit, this.arenaLimit);
+    position.z = clamp(position.z, -this.arenaLimit, this.arenaLimit);
   }
 
   resolve(position, velocity = null, dt = 0) {
@@ -149,7 +150,7 @@ export class CollisionSystem {
   }
 
   blocksHorizontalPosition(position, probeX, probeZ) {
-    if (Math.abs(probeX) > ARENA_LIMIT || Math.abs(probeZ) > ARENA_LIMIT) {
+    if (Math.abs(probeX) > this.arenaLimit || Math.abs(probeZ) > this.arenaLimit) {
       return true;
     }
 
@@ -202,7 +203,7 @@ export class CollisionSystem {
   }
 
   hitsSolid(position) {
-    if (Math.abs(position.x) > ARENA_LIMIT || Math.abs(position.z) > ARENA_LIMIT) {
+    if (Math.abs(position.x) > this.arenaLimit || Math.abs(position.z) > this.arenaLimit) {
       return true;
     }
     if (position.y <= FLOOR_Y - 0.08) {

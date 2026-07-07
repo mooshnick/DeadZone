@@ -6,9 +6,10 @@ const MIN_PLAYER_DISTANCE = PLAYER_RADIUS * 1.9;
 const VERTICAL_OVERLAP = PLAYER_HEIGHT * 0.9;
 
 export class PlayerCollisionSystem {
-    constructor(players, collisionSystem) {
+    constructor(players, collisionSystem, arenaLimit = ARENA_LIMIT) {
         this.players = players;
         this.collisionSystem = collisionSystem;
+        this.arenaLimit = arenaLimit;
         this.fallbackDirection = new THREE.Vector2();
     }
 
@@ -48,8 +49,8 @@ export class PlayerCollisionSystem {
         second.position.z += normalZ * correction;
 
         for (const player of [first, second]) {
-            player.position.x = clamp(player.position.x, -ARENA_LIMIT, ARENA_LIMIT);
-            player.position.z = clamp(player.position.z, -ARENA_LIMIT, ARENA_LIMIT);
+            player.position.x = clamp(player.position.x, -this.arenaLimit, this.arenaLimit);
+            player.position.z = clamp(player.position.z, -this.arenaLimit, this.arenaLimit);
             this.collisionSystem.resolve(player.position);
         }
     }

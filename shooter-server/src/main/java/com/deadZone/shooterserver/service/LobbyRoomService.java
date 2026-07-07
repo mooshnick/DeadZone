@@ -21,10 +21,10 @@ import java.util.List;
 public class LobbyRoomService {
     private static final String CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final List<String> MAP_IDS = List.of(
-            "foundry", "pitch", "castle", "jungle", "lava", "neon", "ice", "station", "apocalyptic"
+            "foundry", "pitch", "castle", "jungle", "lava", "neon", "ice", "station", "apocalyptic", "zombie-outpost"
     );
     private static final List<String> GAME_MODES = List.of(
-            "team-deathmatch", "free-for-all", "capture-flag", "attack-defend", "circle-control"
+            "team-deathmatch", "free-for-all", "capture-flag", "attack-defend", "circle-control", "zombie-survival"
     );
     private static final Duration EMPTY_ROOM_TTL = Duration.ofMinutes(5);
     private final LobbyRoomRepository lobbyRoomRepository;
@@ -55,10 +55,19 @@ public class LobbyRoomService {
                 : request.name().trim();
         String mapId = request == null || !MAP_IDS.contains(request.mapId()) ? "foundry" : request.mapId();
         String gameMode = request == null || !GAME_MODES.contains(request.gameMode()) ? "team-deathmatch" : request.gameMode();
+        if ("zombie-survival".equals(gameMode)) {
+            mapId = "zombie-outpost";
+        }
         int maxPlayers = request == null || request.maxPlayers() == null
                 ? GameConstants.MAX_PLAYERS_PER_ROOM
                 : Math.max(2, Math.min(GameConstants.MAX_PLAYERS_PER_ROOM, request.maxPlayers()));
+        if ("zombie-survival".equals(gameMode)) {
+            maxPlayers = 4;
+        }
         boolean allowBots = request == null || request.allowBots() == null || request.allowBots();
+        if ("zombie-survival".equals(gameMode)) {
+            allowBots = true;
+        }
         int scoreLimit = validScoreLimit(gameMode, request == null ? null : request.scoreLimit());
         int timeLimitMinutes = Math.max(5, Math.min(20, request == null || request.timeLimitMinutes() == null ? 20 : request.timeLimitMinutes()));
         LobbyRoom room = new LobbyRoom(
@@ -102,7 +111,9 @@ public class LobbyRoomService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This room is full.");
         }
         room.setPlayers(room.getPlayers() + 1);
-        if (!"free-for-all".equals(room.getGameMode())) {
+        if ("zombie-survival".equals(room.getGameMode())) {
+            room.setBluePlayers(room.getBluePlayers() + 1);
+        } else if (!"free-for-all".equals(room.getGameMode())) {
             if (room.getBluePlayers() <= room.getRedPlayers()) {
                 room.setBluePlayers(room.getBluePlayers() + 1);
             } else {
@@ -117,7 +128,9 @@ public class LobbyRoomService {
     public LobbyRoomResponse leave(String code) {
         LobbyRoom room = requireLockedRoom(code);
         room.setPlayers(Math.max(0, room.getPlayers() - 1));
-        if (!"free-for-all".equals(room.getGameMode())) {
+        if ("zombie-survival".equals(room.getGameMode())) {
+            room.setBluePlayers(Math.max(0, room.getBluePlayers() - 1));
+        } else if (!"free-for-all".equals(room.getGameMode())) {
             if (room.getBluePlayers() >= room.getRedPlayers() && room.getBluePlayers() > 0) {
                 room.setBluePlayers(room.getBluePlayers() - 1);
             } else if (room.getRedPlayers() > 0) {
@@ -209,6 +222,7 @@ public class LobbyRoomService {
             case "capture-flag" -> { min = 3; max = 15; fallback = 5; }
             case "circle-control" -> { min = 10; max = 30; fallback = 20; }
             case "attack-defend" -> { min = 15; max = 60; fallback = 30; }
+            case "zombie-survival" -> { min = 5; max = 20; fallback = 10; }
             default -> { min = 20; max = 60; fallback = 30; }
         }
         return Math.max(min, Math.min(max, requested == null ? fallback : requested));
