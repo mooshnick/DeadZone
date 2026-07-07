@@ -1,6 +1,35 @@
 import * as THREE from 'three';
 
-export function spawnFor(team, index = 0, mapId = 'foundry') {
+const FFA_SPAWNS = {
+  castle: [
+    [-48, 1.25, -42], [48, 1.25, 42], [-42, 1.25, 42], [42, 1.25, -42],
+    [-16, 1.25, 34], [16, 1.25, -34], [-24, 8.65, -18], [24, 8.65, 18],
+  ],
+  apocalyptic: [
+    [-54, 1.25, -46], [52, 1.25, 44], [-46, 1.25, 42], [46, 1.25, -42],
+    [-8, 1.25, 52], [12, 1.25, -52], [-56, 1.25, 4], [56, 1.25, -4],
+  ],
+  default: [
+    [-48, 1.25, -42], [48, 1.25, 42], [-48, 1.25, 42], [48, 1.25, -42],
+    [-12, 1.25, -50], [12, 1.25, 50], [-54, 1.25, 0], [54, 1.25, 0],
+    [-24, 1.25, 24], [24, 1.25, -24],
+  ],
+};
+
+function freeForAllSpawn(index, mapId) {
+  const points = FFA_SPAWNS[mapId] || FFA_SPAWNS.default;
+  const base = points[(index + Math.floor(Math.random() * points.length)) % points.length];
+  return new THREE.Vector3(
+    base[0] + (Math.random() - 0.5) * 5,
+    base[1],
+    base[2] + (Math.random() - 0.5) * 5,
+  );
+}
+
+export function spawnFor(team, index = 0, mapId = 'foundry', gameMode = 'team-deathmatch') {
+  if (gameMode === 'free-for-all') {
+    return freeForAllSpawn(index, mapId);
+  }
   if (mapId === 'castle') {
     const blueSpawns = [
       [-22, 1.65, 18],

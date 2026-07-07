@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POWERUPS } from '../config';
+import { ARENA_LIMIT, POWERUPS } from '../config';
 import { randomItem } from '../utils';
 
 const POWERUP_LAND_Y = 1.3;
@@ -36,9 +36,10 @@ const SURPRISE_POWERUP = {
 };
 
 export class PowerupSystem {
-  constructor({ scene, players, onEvent }) {
+  constructor({ scene, players, arenaLimit = ARENA_LIMIT, onEvent }) {
     this.scene = scene;
     this.players = players;
+    this.arenaLimit = arenaLimit;
     this.onEvent = onEvent;
     this.powerups = [];
     this.lastPowerupAt = 0;
@@ -57,8 +58,8 @@ export class PowerupSystem {
     const type = randomItem(Object.keys(POWERUPS));
     const data = POWERUPS[type];
     const drop = this.createPowerupDrop(data, 1, type);
-    const landingX = (Math.random() - 0.5) * 70;
-    const landingZ = (Math.random() - 0.5) * 70;
+    const landingX = this.randomLandingCoordinate();
+    const landingZ = this.randomLandingCoordinate();
     const marker = this.createLandingMarker(type);
     drop.position.set(landingX, POWERUP_DROP_Y, landingZ);
     marker.position.set(landingX, POWERUP_MARKER_Y, landingZ);
@@ -73,8 +74,8 @@ export class PowerupSystem {
     }
     this.nextSurpriseAt = time + this.randomSurpriseDelay();
     const drop = this.createPowerupDrop(SURPRISE_POWERUP, 1.18, 'surprise');
-    const landingX = (Math.random() - 0.5) * 70;
-    const landingZ = (Math.random() - 0.5) * 70;
+    const landingX = this.randomLandingCoordinate();
+    const landingZ = this.randomLandingCoordinate();
     const marker = this.createLandingMarker('surprise', 4.1);
     drop.position.set(landingX, POWERUP_DROP_Y + 7, landingZ);
     marker.position.set(landingX, POWERUP_MARKER_Y, landingZ);
@@ -93,6 +94,11 @@ export class PowerupSystem {
 
   randomSurpriseDelay(baseTime = 0) {
     return baseTime + SURPRISE_DROP_MIN_DELAY + Math.random() * (SURPRISE_DROP_MAX_DELAY - SURPRISE_DROP_MIN_DELAY);
+  }
+
+  randomLandingCoordinate() {
+    const usableLimit = Math.max(30, this.arenaLimit - 18);
+    return (Math.random() - 0.5) * usableLimit * 2;
   }
 
   createSound(url, volume) {

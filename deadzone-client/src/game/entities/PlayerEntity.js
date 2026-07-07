@@ -17,7 +17,7 @@ export class PlayerEntity {
     this.weaponLevel = weaponLevel;
     this.mapId = mapId;
     this.isBot = isBot;
-    this.position = spawnFor(team, index, mapId);
+    this.position = spawnFor(team, index, mapId, gameMode);
     this.velocity = new THREE.Vector3();
     this.isGrounded = true;
     this.yaw = team === 'blue' ? -Math.PI / 2 : Math.PI / 2;
@@ -121,7 +121,7 @@ export class PlayerEntity {
     this.isReloading = false;
     this.reloadEndsAt = 0;
     this.ammo = this.weapon.magazineSize;
-    this.position.copy(spawnFor(this.team, index, this.mapId));
+    this.position.copy(spawnFor(this.team, index, this.mapId, this.gameMode));
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
     this.damageLog.clear();

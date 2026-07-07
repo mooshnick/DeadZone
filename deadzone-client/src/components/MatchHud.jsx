@@ -86,6 +86,11 @@ function loadMobileControls() {
   }
 }
 
+function isTouchDevice() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+}
+
 export function MatchHud({
   activeBuffs,
   ammo,
@@ -147,6 +152,7 @@ export function MatchHud({
   const [mobileResetSignal, setMobileResetSignal] = useState(0);
   const [mobileLookSensitivity, setMobileLookSensitivity] = useState(loadMobileLookSensitivity);
   const [wasDead, setWasDead] = useState(false);
+  const [touchDevice, setTouchDevice] = useState(isTouchDevice);
   const dir = LANGUAGES[language]?.dir || 'ltr';
   const weapon = displayWeapon(weaponId, WEAPONS[weaponId] || WEAPONS[currentMatch.weaponId] || WEAPONS.rifle, language);
   const previewOutfit = displayOutfit(OUTFITS.find((item) => item.id === outfitId) || OUTFITS[0], language);
@@ -158,6 +164,7 @@ export function MatchHud({
   const reloadPercent = Math.round((ammo.reloadProgress || 0) * 100);
   const grenadeCount = Math.min(3, ammo.grenades ?? 0);
   const freeForAll = mode.id === 'free-for-all';
+  const zombieSurvival = (score.mode || currentMatch.gameMode) === 'zombie-survival';
   const leader = score.players[0];
   const activeBuffList = Array.isArray(activeBuffs) ? activeBuffs : [];
   const activeBuffText = activeBuffList.length ? activeBuffList.map((buff) => buff.label).join(' / ') : t('hud.noBuffs');
@@ -267,6 +274,13 @@ export function MatchHud({
   };
 
   useEffect(() => {
+    const update = () => setTouchDevice(isTouchDevice());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useEffect(() => {
     if (deathInfo.isDead) {
       if (!wasDead) {
         setWasDead(true);
@@ -304,38 +318,40 @@ export function MatchHud({
           />
         ))}
       </div>
-      <MobileTouchControls
-        key={mobileControlSession}
-        controlConfig={mobileControls}
-        disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
-        editMode={showMobileSettings && mobileEditMode}
-        grenadeCharge={grenadeCharge}
-        grenadeCount={grenadeCount}
-        onControlChange={updateMobileControl}
-        onGrenadeEnd={onMobileGrenadeEnd}
-        onGrenadeStart={onMobileGrenadeStart}
-        onJump={onMobileJump}
-        onLook={handleMobileLook}
-        onMove={onMobileMove}
-        onReload={onMobileReload}
-        onScopeToggle={onMobileScopeToggle}
-        onSelectControl={setSelectedMobileControl}
-        onShootEnd={onMobileShootEnd}
-        onShootStart={onMobileShootStart}
-        resetSignal={mobileResetSignal}
-        selectedControl={selectedMobileControl}
-        scoped={isScoped}
-        labels={{
-          aim: '🎯',
-          grenade: '💣',
-          grenadeEmpty: '🍅',
-          joystick: '🕹',
-          jump: '⬆',
-          reload: '♻',
-          shoot: '🔥',
-          throw: t('mobile.throw'),
-        }}
-      />
+      {touchDevice && (
+        <MobileTouchControls
+          key={mobileControlSession}
+          controlConfig={mobileControls}
+          disabled={deathInfo.isDead || showPauseMenu || Boolean(matchResult)}
+          editMode={showMobileSettings && mobileEditMode}
+          grenadeCharge={grenadeCharge}
+          grenadeCount={grenadeCount}
+          onControlChange={updateMobileControl}
+          onGrenadeEnd={onMobileGrenadeEnd}
+          onGrenadeStart={onMobileGrenadeStart}
+          onJump={onMobileJump}
+          onLook={handleMobileLook}
+          onMove={onMobileMove}
+          onReload={onMobileReload}
+          onScopeToggle={onMobileScopeToggle}
+          onSelectControl={setSelectedMobileControl}
+          onShootEnd={onMobileShootEnd}
+          onShootStart={onMobileShootStart}
+          resetSignal={mobileResetSignal}
+          selectedControl={selectedMobileControl}
+          scoped={isScoped}
+          labels={{
+            aim: '🎯',
+            grenade: '💣',
+            grenadeEmpty: '🍅',
+            joystick: '🕹',
+            jump: '⬆',
+            reload: '♻',
+            shoot: '🔥',
+            throw: t('mobile.throw'),
+          }}
+        />
+      )}
       <div className={grenadeCharge > 0 && grenadeCount > 0 ? 'grenade-charge-reticle active' : 'grenade-charge-reticle'}>
         <span>{grenadeCharge > 0.82 ? t('grenade.perfect') : t('grenade.power')}</span>
         <i><b style={{ width: `${Math.round(grenadeCharge * 100)}%` }} /></i>
@@ -367,7 +383,7 @@ export function MatchHud({
                   {deathInfo.focusSeconds > 0 ? ` ֲ· focus ${deathInfo.focusSeconds}s` : ''}
                 </em>
               )}
-              <span>{deathInfo.ready ? t('death.ready') : t('death.respawnIn', { seconds: deathInfo.seconds })}</span>
+              <span>{zombieSurvival ? t('death.waitRecall') : deathInfo.ready ? t('death.ready') : t('death.respawnIn', { seconds: deathInfo.seconds })}</span>
               <div className="death-player-stats">
                 <div>
                   <span>{t('hud.cash')}</span>
@@ -380,9 +396,16 @@ export function MatchHud({
                 </div>
               </div>
               <div className="death-actions">
-                <button className="death-action-return" disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>{t('death.return')}</button>
+                {zombieSurvival ? (
+                  <>
+                    <button className="death-action-return" onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.spectateNextSurvivor?.(-1)}>{t('death.spectatePrev')}</button>
+                    <button className="death-action-return" onMouseDown={(event) => event.stopPropagation()} onClick={() => worldRef.current?.spectateNextSurvivor?.(1)}>{t('death.spectateNext')}</button>
+                  </>
+                ) : (
+                  <button className="death-action-return" disabled={!deathInfo.ready} onMouseDown={(event) => event.stopPropagation()} onClick={returnToMatch}>{t('death.return')}</button>
+                )}
                 <button className="ghost-button death-action-customize" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowDeathCustomizer(true)}>{t('death.customize')}</button>
-                <button className="ghost-button mobile-only-command death-action-controls" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>{t('death.mobileControls')}</button>
+                {touchDevice && <button className="ghost-button mobile-only-command death-action-controls" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowMobileSettings(true)}>{t('death.mobileControls')}</button>}
                 <button className="ghost-button death-action-exit" onMouseDown={(event) => event.stopPropagation()} onClick={() => setShowExitConfirm(true)}>{t('death.exitLobby')}</button>
               </div>
             </>
@@ -476,7 +499,7 @@ export function MatchHud({
                       onMouseDown={(event) => event.stopPropagation()}
                       onClick={returnToMatch}
                     >
-                      {deathInfo.ready ? t('store.continue') : t('death.respawnIn', { seconds: deathInfo.seconds })}
+                      {zombieSurvival ? t('death.waitRecall') : deathInfo.ready ? t('store.continue') : t('death.respawnIn', { seconds: deathInfo.seconds })}
                     </button>
                     <button className="secondary-command" onClick={() => setShowDeathCustomizer(false)}>{t('menu.back')}</button>
                   </div>
@@ -576,16 +599,16 @@ export function MatchHud({
         <span />
       </button>
 
-      <button
+      {touchDevice && <button
         aria-label={t('death.mobileControls')}
         className="mobile-settings-match"
         onClick={() => setShowMobileSettings(true)}
         type="button"
       >
         {'\u2699'}
-      </button>
+      </button>}
 
-      {showMobileSettings && (
+      {touchDevice && showMobileSettings && (
         <section className={mobileEditMode ? 'mobile-controls-dialog editing' : 'mobile-controls-dialog'} role="dialog" aria-modal="true" aria-labelledby="mobile-controls-title">
           {mobileEditMode ? (
             <>

@@ -98,6 +98,7 @@ export class GameWorld {
     this.jumpWasDown = false;
     this.deathInputReleased = false;
     this.localDeathFocus = null;
+    this.spectatorIndex = 0;
     this.realtimeClient = null;
     this.localStateVersion = 1;
     this.localRespawnedAt = 0;
@@ -280,6 +281,7 @@ export class GameWorld {
     this.powerupSystem = new PowerupSystem({
       scene: this.scene,
       players: this.players,
+      arenaLimit: this.arenaLimit,
       onEvent: this.onEvent,
     });
     this.botSystem = this.isZombieSurvival ? null : new BotSystem({
@@ -300,6 +302,7 @@ export class GameWorld {
         onEvent: this.onEvent,
         onHealthChange: this.onHealthChange,
         onDeathChange: this.onDeathChange,
+        camera: this.camera,
         onScoreChange: this.onScoreChange,
         onMatchEnd: (result) => this.finishZombieSurvival(result),
         revivePlayer: (playerId, position) => this.reviveZombieSurvivor(playerId, position),
@@ -457,9 +460,9 @@ export class GameWorld {
     this.onDeathChange?.({
       isDead: true,
       ready: false,
-      seconds: 5,
+      seconds: this.isZombieSurvival ? 0 : 5,
       killerName: shooter?.name || 'Enemy',
-      focusSeconds: 5,
+      focusSeconds: this.isZombieSurvival ? 0 : 5,
     });
     this.onEvent?.(`${shooter?.name || 'Enemy'} eliminated you`);
   }
@@ -894,14 +897,14 @@ export class GameWorld {
         this.qWasDown = false;
         this.interactWasDown = false;
       }
-      const remaining = Math.max(0, Math.ceil((player.respawnReadyAt - time) / 1000));
+      const remaining = this.isZombieSurvival ? 0 : Math.max(0, Math.ceil((player.respawnReadyAt - time) / 1000));
       const focusRemaining = Math.max(0, Math.ceil(((this.localDeathFocus?.until || 0) - time) / 1000));
       this.onDeathChange({
         isDead: true,
-        ready: remaining === 0,
+        ready: this.isZombieSurvival ? false : remaining === 0,
         seconds: remaining,
         killerName: this.localDeathFocus?.killerName || '',
-        focusSeconds: focusRemaining,
+        focusSeconds: this.isZombieSurvival ? 0 : focusRemaining,
       });
       return;
     }
@@ -1005,6 +1008,10 @@ export class GameWorld {
   syncCamera() {
     const localPlayer = this.localPlayer();
     if (!localPlayer) {
+      return;
+    }
+    if (localPlayer.isDead && this.isZombieSurvival && this.syncZombieSpectatorCamera()) {
+      this.updateFirstPersonWeapon(localPlayer);
       return;
     }
     if (localPlayer.isDead && this.syncDeathFocusCamera()) {
@@ -1370,9 +1377,7 @@ export class GameWorld {
       this.botSystem?.update(dt, time);
       this.playerCollisionSystem.resolve();
       this.combatSystem.updateBullets();
-      if (!this.isZombieSurvival) {
-        this.powerupSystem.update(time);
-      }
+      this.powerupSystem.update(time);
       this.grenadeSystem.update(time, dt);
       this.updateObjectives(time, dt);
       this.zombieSystem?.update(dt, time, this.remainingSeconds());
@@ -1382,6 +1387,34 @@ export class GameWorld {
     this.syncMeshes();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(() => this.animate());
+  }
+
+  syncZombieSpectatorCamera() {
+    const targets = this.livingSpectatorTargets();
+    if (!targets.length) {
+      return false;
+    }
+    const target = targets[this.spectatorIndex % targets.length];
+    const forward = new THREE.Vector3(-Math.sin(target.yaw), 0, -Math.cos(target.yaw)).normalize();
+    const cameraOffset = forward.clone().multiplyScalar(-7.5).add(new THREE.Vector3(0, 3.6, 0));
+    const head = target.position.clone().add(new THREE.Vector3(0, PLAYER_EYE_HEIGHT, 0));
+    this.camera.position.copy(target.position.clone().add(cameraOffset));
+    this.camera.lookAt(head.clone().add(forward.multiplyScalar(2.4)));
+    return true;
+  }
+
+  livingSpectatorTargets() {
+    return [...this.players.values()].filter((player) => player.id !== this.localId && !player.isDead && player.health > 0);
+  }
+
+  spectateNextSurvivor(direction = 1) {
+    const targets = this.livingSpectatorTargets();
+    if (!targets.length) {
+      this.onEvent?.('No living teammates to spectate');
+      return;
+    }
+    this.spectatorIndex = (this.spectatorIndex + direction + targets.length) % targets.length;
+    this.onEvent?.(`Spectating ${targets[this.spectatorIndex].name}`);
   }
 
   sendRealtimeMove(time) {
@@ -1410,9 +1443,9 @@ export class GameWorld {
       this.onDeathChange?.({
         isDead: true,
         ready: false,
-        seconds: 5,
+        seconds: this.isZombieSurvival ? 0 : 5,
         killerName: shooter.name,
-        focusSeconds: 5,
+        focusSeconds: this.isZombieSurvival ? 0 : 5,
       });
     }
     this.handleObjectiveElimination(shooter, target);

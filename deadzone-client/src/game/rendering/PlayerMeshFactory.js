@@ -72,7 +72,7 @@ export class PlayerMeshFactory {
       return '#51b7ff';
     }
     if (player.gameMode === 'free-for-all') {
-      return '#ff6676';
+      return '#58e59a';
     }
     return player.team === this.localTeam ? '#51b7ff' : '#ff6676';
   }

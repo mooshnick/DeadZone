@@ -26,12 +26,13 @@ const ALLY_BOT_RANGE = 54;
 const ALLY_BOT_SHOOT_RANGE = 42;
 
 export class ZombieSurvivalSystem {
-  constructor({ scene, players, combatSystem, collisionSystem, localId, onEvent, onHealthChange, onDeathChange, onScoreChange, onMatchEnd, revivePlayer }) {
+  constructor({ scene, players, combatSystem, collisionSystem, localId, camera, onEvent, onHealthChange, onDeathChange, onScoreChange, onMatchEnd, revivePlayer }) {
     this.scene = scene;
     this.players = players;
     this.combatSystem = combatSystem;
     this.collisionSystem = collisionSystem;
     this.localId = localId;
+    this.camera = camera;
     this.onEvent = onEvent;
     this.onHealthChange = onHealthChange;
     this.onDeathChange = onDeathChange;
@@ -97,17 +98,9 @@ export class ZombieSurvivalSystem {
       new THREE.MeshBasicMaterial({ color: '#71ff5e', transparent: true, opacity: 0.42 }),
     );
     gate.position.set(0, 1.9, -4.12);
-    const hpBack = new THREE.Mesh(
-      new THREE.BoxGeometry(7.2, 0.26, 0.18),
-      new THREE.MeshBasicMaterial({ color: '#1d281d' }),
-    );
-    hpBack.position.set(0, 6.4, 0);
-    const hpFill = new THREE.Mesh(
-      new THREE.BoxGeometry(7.2, 0.3, 0.2),
-      new THREE.MeshBasicMaterial({ color: '#78ff62' }),
-    );
-    hpFill.position.set(0, 6.43, 0.04);
-    group.add(body, gate, hpBack, hpFill);
+    const healthBar = this.createHealthBar(7.2, 0.56, '#58e59a');
+    healthBar.position.set(0, 6.45, 0);
+    group.add(body, gate, healthBar);
     group.position.copy(definition.position);
     group.traverse((object) => {
       if (!object.isMesh) return;
@@ -115,7 +108,24 @@ export class ZombieSurvivalSystem {
       object.receiveShadow = true;
     });
     this.scene.add(group);
-    return { ...definition, hp: definition.hp, maxHp: definition.hp, alive: true, group, hpFill };
+    return { ...definition, hp: definition.hp, maxHp: definition.hp, alive: true, group, healthBar, healthFill: healthBar.userData.fill };
+  }
+
+  createHealthBar(width = 2.25, height = 0.28, color = '#58e59a') {
+    const bar = new THREE.Group();
+    const frame = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({ color: '#101722', transparent: true, opacity: 0.92, side: THREE.DoubleSide }),
+    );
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(width * 0.9, height * 0.48),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+    );
+    fill.geometry.translate(width * 0.45, 0, 0);
+    fill.position.set(-width * 0.45, 0, 0.01);
+    bar.add(frame, fill);
+    bar.userData.fill = fill;
+    return bar;
   }
 
   update(dt, time, nightRemainingSeconds) {
@@ -175,7 +185,9 @@ export class ZombieSurvivalSystem {
       new THREE.MeshBasicMaterial({ color: '#ff4f4f' }),
     );
     eyes.position.set(0, type.height + 0.25, -type.radius * 0.75);
-    group.add(body, eyes);
+    const healthBar = this.createHealthBar(2.25, 0.28, '#58e59a');
+    healthBar.position.y = type.height + 0.72;
+    group.add(body, eyes, healthBar);
     group.position.copy(position);
     group.traverse((object) => {
       if (!object.isMesh) return;
@@ -191,11 +203,18 @@ export class ZombieSurvivalSystem {
       position: group.position,
       velocity: new THREE.Vector3(),
       lastAttackAt: 0,
+      maxHp: type.hp,
+      healthBar,
+      healthFill: healthBar.userData.fill,
     });
   }
 
   updateZombies(dt, time) {
     this.zombies = this.zombies.filter((zombie) => {
+      zombie.healthBar?.lookAt(this.camera.position);
+      if (zombie.healthFill) {
+        zombie.healthFill.scale.x = clamp(zombie.hp / zombie.maxHp, 0, 1);
+      }
       const target = this.nearestLivingPlayer(zombie.position);
       if (!target) return true;
       const toTarget = target.position.clone().sub(zombie.position);
@@ -276,8 +295,7 @@ export class ZombieSurvivalSystem {
 
   damageSpawner(spawner, damage, ownerId) {
     spawner.hp = Math.max(0, spawner.hp - damage);
-    spawner.hpFill.scale.x = clamp(spawner.hp / spawner.maxHp, 0, 1);
-    spawner.hpFill.position.x = -3.6 * (1 - spawner.hp / spawner.maxHp);
+    spawner.healthFill.scale.x = clamp(spawner.hp / spawner.maxHp, 0, 1);
     if (spawner.hp > 0) return;
     spawner.alive = false;
     const owner = this.players.get(ownerId);
@@ -343,6 +361,7 @@ export class ZombieSurvivalSystem {
   }
 
   updateRecallTags(time) {
+    this.spawners.forEach((spawner) => spawner.healthBar?.lookAt(this.camera.position));
     for (const tag of [...this.recallTags.values()]) {
       tag.mesh.rotation.y += 0.025;
       tag.mesh.position.y += Math.sin(time / 260) * 0.002;
