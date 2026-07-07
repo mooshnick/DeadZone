@@ -63,4 +63,23 @@ class LobbyRoomServiceTests {
         assertThat(tenPlayerRoom.maxPlayers()).isEqualTo(10);
         assertThat(clampedRoom.maxPlayers()).isEqualTo(10);
     }
+
+    @Test
+    void zombieSurvivalRoomsAreLockedToZombieMapAndFourPlayers() {
+        var room = service.create(new CreateRoomRequest(
+                "Night Squad",
+                "foundry",
+                "zombie-survival",
+                10,
+                false,
+                20,
+                20
+        ));
+
+        assertThat(room.gameMode()).isEqualTo("zombie-survival");
+        assertThat(room.mapId()).isEqualTo("zombie-outpost");
+        assertThat(room.maxPlayers()).isEqualTo(4);
+        assertThat(room.allowBots()).isTrue();
+        assertThat(room.scoreLimit()).isEqualTo(20);
+    }
 }

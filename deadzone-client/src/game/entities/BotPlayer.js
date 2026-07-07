@@ -3,7 +3,7 @@ import { makeId } from '../utils';
 import { PlayerEntity } from './PlayerEntity';
 
 export class BotPlayer extends PlayerEntity {
-  constructor({ index, team, mapId = 'foundry' }) {
+  constructor({ gameMode = 'team-deathmatch', index, team, mapId = 'foundry' }) {
     const outfit = OUTFITS[(index + 1) % OUTFITS.length];
     super({
       id: `bot-${index}-${makeId()}`,
@@ -12,6 +12,7 @@ export class BotPlayer extends PlayerEntity {
       weaponId: Object.keys(WEAPONS)[index % Object.keys(WEAPONS).length],
       outfitId: outfit.id,
       isBot: true,
+      gameMode,
       mapId,
       index,
     });

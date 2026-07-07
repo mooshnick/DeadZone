@@ -4,7 +4,7 @@ import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MobileTouchControls } from './MobileTouchControls';
 import { googleClientId } from '../api/users';
-import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS } from '../game/config';
+import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS, ZOMBIE_SURVIVAL_MODE } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
 import {
   createTranslator,
@@ -1098,28 +1098,45 @@ function SocialPanel({
 
 function CreateRoomForm({ createRoom, language = 'en', mapUnlocked, roomDraft, setPanel, setRoomDraft, t }) {
   const modeRules = GAME_MODE_RULES[roomDraft.gameMode] || GAME_MODE_RULES['team-deathmatch'];
+  const isZombieMode = roomDraft.gameMode === ZOMBIE_SURVIVAL_MODE;
+  const zombieMap = MAPS.find((map) => map.id === 'zombie-outpost') || MAPS[0];
+  const zombieMapDisplay = displayMap(zombieMap, language);
   return (
     <div className="create-room-form">
       <label>
         {t('room.name')}
         <input value={roomDraft.name} onChange={(event) => setRoomDraft((draft) => ({ ...draft, name: event.target.value }))} />
       </label>
-      <div className="map-choice-grid">
-        {MAPS.map((map) => {
-          const display = displayMap(map, language);
-          return (
-            <button className={roomDraft.mapId === map.id ? 'map-choice active' : 'map-choice'} disabled={!mapUnlocked(map)} key={map.id} onClick={() => setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}>
-              <i style={{ background: map.accent }} />
-              <span>{display.name}</span>
-            </button>
-          );
-        })}
-      </div>
+      {isZombieMode ? (
+        <div className="locked-room-choice">
+          <i style={{ background: zombieMap.accent }} />
+          <span>{zombieMapDisplay.name}</span>
+          <small>Locked for Zombie Survival</small>
+        </div>
+      ) : (
+        <div className="map-choice-grid">
+          {MAPS.filter((map) => map.id !== 'zombie-outpost').map((map) => {
+            const display = displayMap(map, language);
+            return (
+              <button className={roomDraft.mapId === map.id ? 'map-choice active' : 'map-choice'} disabled={!mapUnlocked(map)} key={map.id} onClick={() => setRoomDraft((draft) => ({ ...draft, mapId: map.id }))}>
+                <i style={{ background: map.accent }} />
+                <span>{display.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="mode-choice-grid">
         {GAME_MODES.map((mode) => {
           const display = displayGameMode(mode, language);
           return (
-            <button className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'} key={mode.id} onClick={() => setRoomDraft((draft) => ({ ...draft, gameMode: mode.id, scoreLimit: GAME_MODE_RULES[mode.id].defaultScore }))}>
+            <button className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'} key={mode.id} onClick={() => setRoomDraft((draft) => {
+              const nextRules = GAME_MODE_RULES[mode.id] || GAME_MODE_RULES['team-deathmatch'];
+              if (mode.id === ZOMBIE_SURVIVAL_MODE) {
+                return { ...draft, gameMode: mode.id, mapId: 'zombie-outpost', maxPlayers: 4, allowBots: true, scoreLimit: nextRules.defaultScore };
+              }
+              return { ...draft, gameMode: mode.id, mapId: draft.mapId === 'zombie-outpost' ? 'foundry' : draft.mapId, scoreLimit: nextRules.defaultScore };
+            })}>
               <strong>{display.short}</strong>
               <span>{display.name}</span>
               <small>{display.description}</small>
@@ -1141,14 +1158,24 @@ function CreateRoomForm({ createRoom, language = 'en', mapUnlocked, roomDraft, s
           <small>{t('room.maxTime')}</small>
         </label>
       </div>
-      <label>
-        {t('room.maxPlayers')}
-        <input type="number" min="2" max="10" value={roomDraft.maxPlayers} onChange={(event) => setRoomDraft((draft) => ({ ...draft, maxPlayers: Math.max(2, Math.min(10, Number(event.target.value) || 2)) }))} />
-      </label>
-      <label className="simple-check">
-        <input type="checkbox" checked={roomDraft.allowBots} onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))} />
-        {t('room.bots')}
-      </label>
+      {isZombieMode ? (
+        <div className="locked-room-choice compact">
+          <i style={{ background: '#75f7ff' }} />
+          <span>4 players</span>
+          <small>1-4 humans, empty slots are allied bots</small>
+        </div>
+      ) : (
+        <>
+          <label>
+            {t('room.maxPlayers')}
+            <input type="number" min="2" max="10" value={roomDraft.maxPlayers} onChange={(event) => setRoomDraft((draft) => ({ ...draft, maxPlayers: Math.max(2, Math.min(10, Number(event.target.value) || 2)) }))} />
+          </label>
+          <label className="simple-check">
+            <input type="checkbox" checked={roomDraft.allowBots} onChange={(event) => setRoomDraft((draft) => ({ ...draft, allowBots: event.target.checked }))} />
+            {t('room.bots')}
+          </label>
+        </>
+      )}
       <div className="create-actions">
         <button className="secondary-command" onClick={() => setPanel('play')}>{t('room.cancel')}</button>
         <button className="primary-command" onClick={createRoom}>{t('room.create')}</button>

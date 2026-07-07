@@ -43,6 +43,7 @@ export class ZombieSurvivalSystem {
     this.zombies = [];
     this.fireZones = [];
     this.recallTags = new Map();
+    this.carriedRecallTags = new Map();
     this.spawners = [];
     this.lastWaveAt = 0;
     this.lastHudAt = 0;
@@ -134,6 +135,7 @@ export class ZombieSurvivalSystem {
     for (const player of this.players.values()) {
       if (!player.isDead) continue;
       player.respawnReadyAt = Number.POSITIVE_INFINITY;
+      if (this.isTagCarried(player.id)) continue;
       this.createRecallTag(player);
     }
   }
@@ -225,12 +227,20 @@ export class ZombieSurvivalSystem {
     }
     player.kill(time);
     player.respawnReadyAt = Number.POSITIVE_INFINITY;
+    this.dropCarriedTags(player);
     this.createRecallTag(player);
     this.onEvent?.(`${sourceName} downed ${player.name}`);
     if (player.id === this.localId) {
       this.onHealthChange?.(0);
       this.onDeathChange?.({ isDead: true, ready: false, seconds: 0, killerName: sourceName, focusSeconds: 0 });
     }
+  }
+
+  markPlayerDown(player) {
+    if (!player) return;
+    player.respawnReadyAt = Number.POSITIVE_INFINITY;
+    this.dropCarriedTags(player);
+    this.createRecallTag(player);
   }
 
   updateBullets() {
@@ -316,7 +326,7 @@ export class ZombieSurvivalSystem {
   }
 
   createRecallTag(player) {
-    if (this.recallTags.has(player.id)) return;
+    if (this.recallTags.has(player.id) || this.isTagCarried(player.id)) return;
     const group = new THREE.Group();
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.7, 0.08, 8, 20),
@@ -329,34 +339,64 @@ export class ZombieSurvivalSystem {
     group.add(ring, core);
     group.position.copy(player.position.clone().add(new THREE.Vector3(0, 1.8, 0)));
     this.scene.add(group);
-    this.recallTags.set(player.id, { playerId: player.id, mesh: group, carrierId: null });
+    this.recallTags.set(player.id, { playerId: player.id, mesh: group });
   }
 
   updateRecallTags(time) {
-    for (const tag of this.recallTags.values()) {
+    for (const tag of [...this.recallTags.values()]) {
       tag.mesh.rotation.y += 0.025;
       tag.mesh.position.y += Math.sin(time / 260) * 0.002;
-      if (!tag.carrierId) {
-        const carrier = this.livingPlayers().find((player) => player.position.distanceTo(tag.mesh.position) <= TAG_PICKUP_RADIUS);
-        if (carrier) {
-          tag.carrierId = carrier.id;
-          this.onEvent?.(`${carrier.name} collected a recall tag`);
-        }
-        continue;
-      }
-      const carrier = this.players.get(tag.carrierId);
-      if (!carrier || carrier.isDead) {
-        tag.carrierId = null;
-        continue;
-      }
-      tag.mesh.position.copy(carrier.position.clone().add(new THREE.Vector3(0, 2.8, 0)));
-      if (carrier.position.distanceTo(this.recallCenter) <= RECALL_RADIUS) {
+      const carrier = this.livingPlayers().find((player) => player.position.distanceTo(tag.mesh.position) <= TAG_PICKUP_RADIUS);
+      if (carrier) {
         this.scene.remove(tag.mesh);
         this.recallTags.delete(tag.playerId);
-        this.revivePlayer?.(tag.playerId, this.recallCenter);
-        this.onEvent?.(`${carrier.name} recalled a teammate`);
+        this.addCarriedTag(carrier.id, tag.playerId);
+        this.onEvent?.(`${carrier.name} collected a recall tag`);
       }
     }
+
+    for (const [carrierId, tagSet] of [...this.carriedRecallTags.entries()]) {
+      const carrier = this.players.get(carrierId);
+      if (!carrier || carrier.isDead) {
+        if (carrier) this.dropCarriedTags(carrier);
+        continue;
+      }
+      if (carrier.position.distanceTo(this.recallCenter) > RECALL_RADIUS) continue;
+      [...tagSet].forEach((playerId) => {
+        this.revivePlayer?.(playerId, this.recallCenter);
+        tagSet.delete(playerId);
+        this.onEvent?.(`${carrier.name} recalled a teammate`);
+      });
+      if (tagSet.size === 0) {
+        this.carriedRecallTags.delete(carrierId);
+      }
+    }
+  }
+
+  addCarriedTag(carrierId, playerId) {
+    if (!this.carriedRecallTags.has(carrierId)) {
+      this.carriedRecallTags.set(carrierId, new Set());
+    }
+    this.carriedRecallTags.get(carrierId).add(playerId);
+  }
+
+  isTagCarried(playerId) {
+    return [...this.carriedRecallTags.values()].some((tagSet) => tagSet.has(playerId));
+  }
+
+  dropCarriedTags(carrier) {
+    const tagSet = this.carriedRecallTags.get(carrier.id);
+    if (!tagSet?.size) return;
+    [...tagSet].forEach((playerId, index) => {
+      const player = this.players.get(playerId);
+      if (!player || !player.isDead) return;
+      const dropPosition = carrier.position.clone().add(new THREE.Vector3((index - 0.5) * 1.2, 0, 0));
+      player.position.copy(dropPosition);
+      this.recallTags.delete(playerId);
+      this.createRecallTag(player);
+    });
+    this.carriedRecallTags.delete(carrier.id);
+    this.onEvent?.(`${carrier.name} dropped recall tags`);
   }
 
   updateAlliedBots(dt, time) {

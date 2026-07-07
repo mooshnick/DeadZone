@@ -450,6 +450,9 @@ export class GameWorld {
     }
     this.bumpLocalStateVersion();
     target.kill(time);
+    if (this.isZombieSurvival) {
+      this.zombieSystem?.markPlayerDown(target);
+    }
     this.onHealthChange?.(0);
     this.onDeathChange?.({
       isDead: true,
@@ -500,6 +503,26 @@ export class GameWorld {
       this.players.delete(id);
       this.onEvent?.(`${player.name} left the arena`);
     }
+    this.syncZombieAlliedBots();
+  }
+
+  syncZombieAlliedBots() {
+    if (!this.isZombieSurvival || !this.config.allowBots) {
+      return;
+    }
+    const humans = [...this.players.values()].filter((player) => !player.isBot).length;
+    const desiredBots = Math.max(0, this.maxPlayers - humans);
+    const bots = [...this.players.values()].filter((player) => player.isBot);
+    if (bots.length > desiredBots) {
+      bots.slice(desiredBots).forEach((bot) => {
+        this.scene.remove(bot.mesh);
+        this.players.delete(bot.id);
+      });
+      return;
+    }
+    for (let index = bots.length; index < desiredBots; index += 1) {
+      this.addPlayer(makeBot({ index, team: 'blue', gameMode: this.gameMode, mapId: this.config.mapId }));
+    }
   }
 
   applyLocalServerState(remote) {
@@ -525,6 +548,9 @@ export class GameWorld {
       if (player.health <= 0 && !player.isDead) {
         this.bumpLocalStateVersion();
         player.kill(time);
+        if (this.isZombieSurvival) {
+          this.zombieSystem?.markPlayerDown(player);
+        }
       }
     }
   }
@@ -917,8 +943,7 @@ export class GameWorld {
       this.bumpLocalStateVersion();
       player.kill(time);
       if (this.isZombieSurvival) {
-        player.respawnReadyAt = Number.POSITIVE_INFINITY;
-        this.zombieSystem?.createRecallTag(player);
+        this.zombieSystem?.markPlayerDown(player);
       }
       this.localDeathFocus = null;
       this.onHealthChange?.(0);
@@ -1369,8 +1394,7 @@ export class GameWorld {
 
   handleElimination(shooter, target, time) {
     if (this.isZombieSurvival) {
-      target.respawnReadyAt = Number.POSITIVE_INFINITY;
-      this.zombieSystem?.createRecallTag(target);
+      this.zombieSystem?.markPlayerDown(target);
     }
     if (target.id === this.localId) {
       this.bumpLocalStateVersion();
