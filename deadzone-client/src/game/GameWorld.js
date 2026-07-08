@@ -59,7 +59,7 @@ export class GameWorld {
     this.isZombieSurvival = this.gameMode === ZOMBIE_SURVIVAL_MODE;
     this.maxPlayers = this.isZombieSurvival ? 4 : (config.maxPlayers || MAX_PLAYERS);
     this.scoreLimit = config.scoreLimit || 30;
-    this.timeLimitMinutes = Math.min(20, Math.max(5, config.timeLimitMinutes || 20));
+    this.timeLimitMinutes = Math.min(20, Math.max(5, config.timeLimitMinutes || (this.isZombieSurvival ? 5 : 20)));
     this.matchStartedAt = nowMs();
     this.matchEnded = false;
     this.matchResult = null;
@@ -282,6 +282,7 @@ export class GameWorld {
       scene: this.scene,
       players: this.players,
       arenaLimit: this.arenaLimit,
+      collisionSystem: this.collisionSystem,
       onEvent: this.onEvent,
     });
     this.botSystem = this.isZombieSurvival ? null : new BotSystem({

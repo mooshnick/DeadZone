@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { ARENA_LIMIT, POWERUPS } from '../config';
+import { ARENA_LIMIT, FLOOR_Y, POWERUPS } from '../config';
 import { randomItem } from '../utils';
 
 const POWERUP_LAND_Y = 1.3;
 const POWERUP_DROP_Y = 28;
 const POWERUP_DROP_SPEED = 0.0042;
 const POWERUP_PICKUP_RADIUS = 2.2;
+const POWERUP_CLEAR_RADIUS = 3.2;
 const PARACHUTE_HIDE_DELAY = 1200;
 const POWERUP_MARKER_Y = 0.035;
 const SURPRISE_SOUND_URL = '/sound/surprise.mp3';
@@ -36,10 +37,11 @@ const SURPRISE_POWERUP = {
 };
 
 export class PowerupSystem {
-  constructor({ scene, players, arenaLimit = ARENA_LIMIT, onEvent }) {
+  constructor({ scene, players, arenaLimit = ARENA_LIMIT, collisionSystem = null, onEvent }) {
     this.scene = scene;
     this.players = players;
     this.arenaLimit = arenaLimit;
+    this.collisionSystem = collisionSystem;
     this.onEvent = onEvent;
     this.powerups = [];
     this.lastPowerupAt = 0;
@@ -58,11 +60,10 @@ export class PowerupSystem {
     const type = randomItem(Object.keys(POWERUPS));
     const data = POWERUPS[type];
     const drop = this.createPowerupDrop(data, 1, type);
-    const landingX = this.randomLandingCoordinate();
-    const landingZ = this.randomLandingCoordinate();
+    const landing = this.randomLandingPosition();
     const marker = this.createLandingMarker(type);
-    drop.position.set(landingX, POWERUP_DROP_Y, landingZ);
-    marker.position.set(landingX, POWERUP_MARKER_Y, landingZ);
+    drop.position.set(landing.x, POWERUP_DROP_Y, landing.z);
+    marker.position.set(landing.x, POWERUP_MARKER_Y, landing.z);
     this.scene.add(drop);
     this.scene.add(marker);
     this.powerups.push({ type, mesh: drop, marker, bornAt: time, landedAt: 0 });
@@ -74,11 +75,10 @@ export class PowerupSystem {
     }
     this.nextSurpriseAt = time + this.randomSurpriseDelay();
     const drop = this.createPowerupDrop(SURPRISE_POWERUP, 1.18, 'surprise');
-    const landingX = this.randomLandingCoordinate();
-    const landingZ = this.randomLandingCoordinate();
+    const landing = this.randomLandingPosition();
     const marker = this.createLandingMarker('surprise', 4.1);
-    drop.position.set(landingX, POWERUP_DROP_Y + 7, landingZ);
-    marker.position.set(landingX, POWERUP_MARKER_Y, landingZ);
+    drop.position.set(landing.x, POWERUP_DROP_Y + 7, landing.z);
+    marker.position.set(landing.x, POWERUP_MARKER_Y, landing.z);
     this.scene.add(drop);
     this.scene.add(marker);
     this.playSurpriseSound();
@@ -96,9 +96,59 @@ export class PowerupSystem {
     return baseTime + SURPRISE_DROP_MIN_DELAY + Math.random() * (SURPRISE_DROP_MAX_DELAY - SURPRISE_DROP_MIN_DELAY);
   }
 
-  randomLandingCoordinate() {
+  randomLandingPosition() {
     const usableLimit = Math.max(30, this.arenaLimit - 18);
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      const x = this.randomLandingCoordinate(usableLimit);
+      const z = this.randomLandingCoordinate(usableLimit);
+      if (this.isLandingClear(x, z)) {
+        return { x, z };
+      }
+    }
+    return { x: this.safeFallbackCoordinate(), z: this.safeFallbackCoordinate() };
+  }
+
+  randomLandingCoordinate(usableLimit = Math.max(30, this.arenaLimit - 18)) {
     return (Math.random() - 0.5) * usableLimit * 2;
+  }
+
+  safeFallbackCoordinate() {
+    return (Math.random() - 0.5) * Math.min(28, Math.max(12, this.arenaLimit * 0.28));
+  }
+
+  isLandingClear(x, z) {
+    const edgePadding = POWERUP_CLEAR_RADIUS + 2;
+    if (Math.abs(x) > this.arenaLimit - edgePadding || Math.abs(z) > this.arenaLimit - edgePadding) {
+      return false;
+    }
+    const samples = [
+      [0, 0],
+      [POWERUP_CLEAR_RADIUS, 0],
+      [-POWERUP_CLEAR_RADIUS, 0],
+      [0, POWERUP_CLEAR_RADIUS],
+      [0, -POWERUP_CLEAR_RADIUS],
+      [POWERUP_CLEAR_RADIUS * 0.7, POWERUP_CLEAR_RADIUS * 0.7],
+      [-POWERUP_CLEAR_RADIUS * 0.7, POWERUP_CLEAR_RADIUS * 0.7],
+      [POWERUP_CLEAR_RADIUS * 0.7, -POWERUP_CLEAR_RADIUS * 0.7],
+      [-POWERUP_CLEAR_RADIUS * 0.7, -POWERUP_CLEAR_RADIUS * 0.7],
+    ];
+    return samples.every(([offsetX, offsetZ]) => !this.blocksLandingPosition(x + offsetX, z + offsetZ));
+  }
+
+  blocksLandingPosition(x, z) {
+    if (Math.abs(x) > this.arenaLimit - 1 || Math.abs(z) > this.arenaLimit - 1) {
+      return true;
+    }
+    const blocks = this.collisionSystem?.blocks || [];
+    return blocks.some((block) => {
+      const blockTop = block.y + block.h / 2;
+      if (this.collisionSystem?.isFloorLike?.(block) && blockTop <= FLOOR_Y + 0.35) {
+        return false;
+      }
+      return Math.abs(x - block.x) < block.w / 2 + 1.35
+        && Math.abs(z - block.z) < block.d / 2 + 1.35
+        && blockTop > FLOOR_Y + 0.35;
+    });
   }
 
   createSound(url, volume) {

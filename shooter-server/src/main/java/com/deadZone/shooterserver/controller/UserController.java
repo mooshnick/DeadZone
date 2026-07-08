@@ -52,13 +52,13 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(@RequestHeader("Authorization") String authorization) {
+    public ResponseEntity<UserResponse> getCurrentUser(@RequestHeader(value = "Authorization", required = false) String authorization) {
         return ResponseEntity.ok(userService.getUser(jwtService.requireUserId(authorization)));
     }
 
     @PatchMapping("/me/progress")
     public ResponseEntity<UserResponse> updateProgress(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody ProgressRequest request
     ) {
         return ResponseEntity.ok(userService.updateProgress(jwtService.requireUserId(authorization), request));

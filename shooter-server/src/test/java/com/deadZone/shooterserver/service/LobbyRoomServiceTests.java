@@ -82,4 +82,19 @@ class LobbyRoomServiceTests {
         assertThat(room.allowBots()).isTrue();
         assertThat(room.scoreLimit()).isEqualTo(20);
     }
+
+    @Test
+    void zombieSurvivalDefaultsToFiveMinuteTimer() {
+        var room = service.create(new CreateRoomRequest(
+                "Night Squad",
+                "foundry",
+                "zombie-survival",
+                10,
+                false,
+                10,
+                null
+        ));
+
+        assertThat(room.timeLimitMinutes()).isEqualTo(5);
+    }
 }

@@ -386,10 +386,10 @@ export class ArenaLayouts {
         ...fs(34, -38, -1, 0, 0.7, 4.95, 8, 'city-ramp'),
       ],
       zombie: [
-        b(0, -124, 112, 5, 9, 4.5, 'zombie-wall'),
-        b(0, 124, 112, 5, 9, 4.5, 'zombie-wall'),
-        b(-124, 0, 5, 112, 9, 4.5, 'zombie-wall'),
-        b(124, 0, 5, 112, 9, 4.5, 'zombie-wall'),
+        b(0, -136, 272, 3, 9, 4.5, 'zombie-wall'),
+        b(0, 136, 272, 3, 9, 4.5, 'zombie-wall'),
+        b(-136, 0, 3, 272, 9, 4.5, 'zombie-wall'),
+        b(136, 0, 3, 272, 9, 4.5, 'zombie-wall'),
 
         b(-54, -32, 28, 6, 3.2, 1.6, 'ruined-barricade'),
         b(58, 34, 30, 6, 3.2, 1.6, 'ruined-barricade'),

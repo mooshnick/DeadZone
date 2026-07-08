@@ -223,6 +223,7 @@ function GoogleSignInButton({ compact = false, onLogin, t = createTranslator('en
     let cancelled = false;
     const renderButton = () => {
       if (cancelled || renderedRef.current || !buttonRef.current || !window.google?.accounts?.id) return;
+      const viewportWidth = window.visualViewport?.width || window.innerWidth || 320;
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: (response) => onLogin?.(response?.credential),
@@ -232,7 +233,7 @@ function GoogleSignInButton({ compact = false, onLogin, t = createTranslator('en
         size: compact ? 'medium' : 'large',
         shape: 'pill',
         text: 'continue_with',
-        width: Math.min(compact ? 260 : 320, Math.max(220, window.innerWidth - 48)),
+        width: Math.min(compact ? 260 : 320, Math.max(210, viewportWidth - 36)),
       });
       renderedRef.current = true;
     };
@@ -1133,7 +1134,7 @@ function CreateRoomForm({ createRoom, language = 'en', mapUnlocked, roomDraft, s
             <button className={roomDraft.gameMode === mode.id ? 'mode-choice active' : 'mode-choice'} key={mode.id} onClick={() => setRoomDraft((draft) => {
               const nextRules = GAME_MODE_RULES[mode.id] || GAME_MODE_RULES['team-deathmatch'];
               if (mode.id === ZOMBIE_SURVIVAL_MODE) {
-                return { ...draft, gameMode: mode.id, mapId: 'zombie-outpost', maxPlayers: 4, allowBots: true, scoreLimit: nextRules.defaultScore };
+                return { ...draft, gameMode: mode.id, mapId: 'zombie-outpost', maxPlayers: 4, allowBots: true, scoreLimit: nextRules.defaultScore, timeLimitMinutes: 5 };
               }
               return { ...draft, gameMode: mode.id, mapId: draft.mapId === 'zombie-outpost' ? 'foundry' : draft.mapId, scoreLimit: nextRules.defaultScore };
             })}>

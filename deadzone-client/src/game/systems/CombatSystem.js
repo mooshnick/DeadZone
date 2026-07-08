@@ -23,6 +23,7 @@ export class CombatSystem {
     this.players = players;
     this.localId = localId;
     this.collisionSystem = collisionSystem;
+    this.arenaLimit = Math.max(66, collisionSystem?.arenaLimit || 66);
     this.gameMode = gameMode;
     this.onScoreChange = onScoreChange;
     this.onWalletChange = onWalletChange;
@@ -320,7 +321,7 @@ export class CombatSystem {
         this.explodeOrRemove(bullet);
         return false;
       }
-      if (bullet.life <= 0 || bullet.mesh.position.length() > 135) {
+      if (bullet.life <= 0 || this.isBulletOutOfArena(bullet.mesh.position)) {
         if (bullet.radius > 0) {
           this.explodeOrRemove(bullet);
           return false;
@@ -344,6 +345,14 @@ export class CombatSystem {
       this.scene.remove(bullet.mesh);
       return false;
     });
+  }
+
+  isBulletOutOfArena(position) {
+    const margin = 10;
+    return Math.abs(position.x) > this.arenaLimit + margin
+      || Math.abs(position.z) > this.arenaLimit + margin
+      || position.y < -8
+      || position.y > 120;
   }
 
   explodeOrRemove(bullet) {

@@ -71,7 +71,7 @@ function normalizeRoom(room, fallback = {}) {
     maxPlayers: isZombieRoom ? 4 : (room?.maxPlayers || fallback.maxPlayers),
     allowBots: isZombieRoom ? true : (room?.allowBots ?? fallback.allowBots),
     scoreLimit: room?.scoreLimit || fallback.scoreLimit || rules.defaultScore,
-    timeLimitMinutes: room?.timeLimitMinutes || fallback.timeLimitMinutes || 20,
+    timeLimitMinutes: room?.timeLimitMinutes || fallback.timeLimitMinutes || (isZombieRoom ? 5 : 20),
   };
 }
 
@@ -918,7 +918,7 @@ export function useDeadzoneController() {
       allowBots: isZombieRoom ? true : roomDraft.allowBots,
       gameMode: roomDraft.gameMode || DEFAULT_GAME_MODE,
       scoreLimit: roomDraft.scoreLimit,
-      timeLimitMinutes: roomDraft.timeLimitMinutes,
+      timeLimitMinutes: isZombieRoom ? 5 : roomDraft.timeLimitMinutes,
     };
     const applyCreatedRoom = (serverRoom, message) => {
       const room = normalizeRoom(serverRoom, roomPayload);

@@ -69,7 +69,8 @@ public class LobbyRoomService {
             allowBots = true;
         }
         int scoreLimit = validScoreLimit(gameMode, request == null ? null : request.scoreLimit());
-        int timeLimitMinutes = Math.max(5, Math.min(20, request == null || request.timeLimitMinutes() == null ? 20 : request.timeLimitMinutes()));
+        int defaultTimeLimit = "zombie-survival".equals(gameMode) ? 5 : 20;
+        int timeLimitMinutes = Math.max(5, Math.min(20, request == null || request.timeLimitMinutes() == null ? defaultTimeLimit : request.timeLimitMinutes()));
         LobbyRoom room = new LobbyRoom(
                 generateCode(),
                 name,
