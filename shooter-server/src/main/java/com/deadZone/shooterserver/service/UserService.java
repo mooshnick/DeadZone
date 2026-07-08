@@ -73,8 +73,8 @@ public class UserService {
         if (existingUser.isPresent() && !existingUser.get().isEmailVerified() && email.equalsIgnoreCase(existingUser.get().getEmail())) {
             User user = existingUser.get();
             user.setPassword(passwordService.hash(request.password()));
-            boolean verificationEmailSent = emailVerificationService.sendVerification(user);
-            return new AuthResponse(null, UserResponse.from(userRepository.save(user)), verificationEmailSent);
+            emailVerificationService.sendVerification(user);
+            return authResponse(repairUserDefaults(userRepository.save(user)));
         }
         if (existingUser.isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is already taken!");
@@ -82,8 +82,8 @@ public class UserService {
 
         User user = new User(username, email, passwordService.hash(request.password()));
         user = userRepository.save(user);
-        boolean verificationEmailSent = emailVerificationService.sendVerification(user);
-        return new AuthResponse(null, UserResponse.from(user), verificationEmailSent);
+        emailVerificationService.sendVerification(user);
+        return authResponse(repairUserDefaults(user));
     }
 
     @Transactional
@@ -96,10 +96,7 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password!");
         }
         if (!user.isEmailVerified()) {
-            if (emailVerificationService.hasPendingVerification(user)) {
-                emailVerificationService.sendVerification(user);
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before logging in. We sent you a new 6-digit code.");
-            }
+            emailVerificationService.sendVerification(user);
             user.setEmailVerified(true);
             user.setEmailVerifiedAt(Instant.now());
         }

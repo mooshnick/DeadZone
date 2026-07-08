@@ -97,4 +97,29 @@ class LobbyRoomServiceTests {
 
         assertThat(room.timeLimitMinutes()).isEqualTo(5);
     }
+
+    @Test
+    void e2eCreatesAndJoinsAllCoreGameModes() {
+        String[] modes = {"team-deathmatch", "free-for-all", "capture-flag", "zombie-survival"};
+
+        for (String mode : modes) {
+            var room = service.create(new CreateRoomRequest(
+                    "E2E " + mode,
+                    "foundry",
+                    mode,
+                    6,
+                    true,
+                    null,
+                    null
+            ));
+            var joined = service.join(room.id());
+
+            assertThat(joined.gameMode()).isEqualTo(mode);
+            assertThat(joined.players()).isEqualTo(1);
+            if ("zombie-survival".equals(mode)) {
+                assertThat(joined.mapId()).isEqualTo("zombie-outpost");
+                assertThat(joined.maxPlayers()).isEqualTo(4);
+            }
+        }
+    }
 }

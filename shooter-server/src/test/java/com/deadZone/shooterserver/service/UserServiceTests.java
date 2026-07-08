@@ -45,7 +45,7 @@ class UserServiceTests {
         assertThat(response.user().username()).isEqualTo("player-one");
         assertThat(response.user().email()).isEqualTo("one@example.com");
         assertThat(response.user().emailVerified()).isFalse();
-        assertThat(response.token()).isNull();
+        assertThat(response.token()).isNotBlank();
         assertThat(storedUser.getPassword()).isNotEqualTo("secret");
         assertThat(emailVerificationTokenRepository.count()).isEqualTo(1);
     }
@@ -98,9 +98,6 @@ class UserServiceTests {
     @Test
     void loginAcceptsUsernameOrEmailAndReturnsSessionToken() {
         var auth = userService.register(new RegisterRequest("login-player", "login@example.com", "secret"));
-        User user = userRepository.findById(auth.user().id()).orElseThrow();
-        user.setEmailVerified(true);
-        userRepository.save(user);
 
         var usernameLogin = userService.login(new LoginRequest("login-player", "secret"));
         var emailLogin = userService.login(new LoginRequest("login@example.com", "secret"));
@@ -127,6 +124,42 @@ class UserServiceTests {
         assertThat(response.user().emailVerified()).isTrue();
         assertThat(response.user().outfitId()).isEqualTo("classic");
         assertThat(response.user().weaponId()).isEqualTo("rifle");
+    }
+
+    @Test
+    void e2eRegisterPurchaseLogoutAndLoginAgainKeepsProgress() {
+        var registered = userService.register(new RegisterRequest("e2e-player", "e2e@example.com", "1234"));
+        assertThat(registered.token()).isNotBlank();
+
+        User fundedUser = userRepository.findById(registered.user().id()).orElseThrow();
+        fundedUser.setWallet(1_000);
+        userRepository.save(fundedUser);
+
+        var purchase = userService.updateProgress(registered.user().id(), new ProgressRequest(
+                904,
+                220,
+                0,
+                0,
+                0,
+                "shadow",
+                "rifle",
+                "standard",
+                "standard",
+                List.of("classic", "shadow"),
+                List.of("standard"),
+                List.of("standard"),
+                List.of(),
+                List.of(),
+                Map.of(),
+                ""
+        ));
+        assertThat(purchase.wallet()).isEqualTo(904);
+        assertThat(purchase.ownedOutfits()).contains("shadow");
+
+        var relogin = userService.login(new LoginRequest("e2e-player", "1234"));
+        assertThat(relogin.token()).isNotBlank();
+        assertThat(relogin.user().wallet()).isEqualTo(904);
+        assertThat(relogin.user().ownedOutfits()).contains("shadow");
     }
 
     @Test

@@ -659,7 +659,7 @@ export function useDeadzoneController() {
       const user = action === 'register'
         ? await registerUser(username, credentials.email.trim(), password)
         : await loginUser(username, password);
-      if (action === 'register' && !user.emailVerified) {
+      if (action === 'register' && !user.emailVerified && !user.sessionActive) {
         setCredentials({ username: '', email: credentials.email.trim(), password: '', confirmPassword: '', verificationCode: '' });
         setAuthMode('verify');
         setScreen('auth');

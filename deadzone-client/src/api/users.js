@@ -60,6 +60,7 @@ function storeSession(response) {
     clearSession();
     return {
       ...user,
+      sessionActive: false,
       verificationEmailSent: Boolean(response?.verificationEmailSent),
     };
   }
@@ -74,6 +75,7 @@ function storeSession(response) {
 
   return {
     ...user,
+    sessionActive: Boolean(response?.token || response?.legacySession),
     verificationEmailSent: Boolean(response?.verificationEmailSent),
   };
 }
