@@ -1,5 +1,5 @@
 const DEFAULT_SERVER_PORT = '8080';
-const DEFAULT_PRODUCTION_API_ORIGIN = '';
+const DEFAULT_PRODUCTION_API_ORIGIN = 'https://deadzone-fvcb.onrender.com';
 
 function localNetworkOrigin(configured) {
   try {
@@ -41,7 +41,7 @@ function serverOrigin() {
   }
 
   if (!isLocal) {
-    return DEFAULT_PRODUCTION_API_ORIGIN || window.location.origin;
+    return DEFAULT_PRODUCTION_API_ORIGIN;
   }
   return `${protocol}//127.0.0.1:${DEFAULT_SERVER_PORT}`;
 }
