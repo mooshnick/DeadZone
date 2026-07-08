@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { CharacterPreview } from './CharacterPreview';
 import { StoreVisual } from './StoreVisual';
 import { MobileTouchControls } from './MobileTouchControls';
-import { googleClientId } from '../api/users';
 import { ACCESSORIES, GAME_MODES, GAME_MODE_RULES, GRENADE_SKINS, MAPS, MATCH_TIME_OPTIONS, OUTFITS, WEAPONS, WEAPON_SKINS, ZOMBIE_SURVIVAL_MODE } from '../game/config';
 import { KEYBIND_LABELS } from '../app/appConstants';
 import {
@@ -105,7 +104,7 @@ export function Lobby(props) {
   return <MainMenu {...props} />;
 }
 
-function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, handleGoogleLogin, language = 'en', setAuthMode, setCredentials, t }) {
+function AuthenticationScreen({ accountStatus, authMode, credentials, handleAccountAction, language = 'en', setAuthMode, setCredentials, t }) {
   const mode = authMode || null;
   const outfit = OUTFITS[0];
   const dir = LANGUAGES[language]?.dir || 'ltr';
@@ -123,7 +122,6 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
           <div className="auth-choice">
             <button className="primary-command" onClick={() => setAuthMode('login')}>{t('auth.login')}</button>
             <button className="secondary-command" onClick={() => setAuthMode('register')}>{t('auth.register')}</button>
-            <GoogleSignInButton onLogin={handleGoogleLogin} t={t} />
           </div>
         )}
 
@@ -205,83 +203,10 @@ function AuthenticationScreen({ accountStatus, authMode, credentials, handleAcco
             <button className="primary-command" type="submit">
               {mode === 'login' ? t('auth.login') : mode === 'verify' ? t('auth.verifyCode') : t('auth.createAccount')}
             </button>
-            {mode !== 'verify' && <GoogleSignInButton onLogin={handleGoogleLogin} compact t={t} />}
           </form>
         )}
       </section>
     </main>
-  );
-}
-
-function GoogleSignInButton({ compact = false, onLogin, t = createTranslator('en') }) {
-  const buttonRef = useRef(null);
-  const renderedRef = useRef(false);
-
-  useEffect(() => {
-    if (!googleClientId || renderedRef.current) return undefined;
-
-    let cancelled = false;
-    const renderButton = () => {
-      if (cancelled || renderedRef.current || !buttonRef.current || !window.google?.accounts?.id) return;
-      const viewportWidth = window.visualViewport?.width || window.innerWidth || 320;
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: (response) => {
-          const credential = response?.credential;
-          onLogin?.(credential || '');
-        },
-      });
-      window.google.accounts.id.renderButton(buttonRef.current, {
-        theme: 'filled_black',
-        size: compact ? 'medium' : 'large',
-        shape: 'pill',
-        text: 'continue_with',
-        width: Math.min(compact ? 260 : 320, Math.max(210, viewportWidth - 36)),
-      });
-      renderedRef.current = true;
-    };
-
-    if (window.google?.accounts?.id) {
-      renderButton();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-    if (existingScript) {
-      existingScript.addEventListener('load', renderButton, { once: true });
-      return () => {
-        cancelled = true;
-        existingScript.removeEventListener('load', renderButton);
-      };
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.addEventListener('load', renderButton, { once: true });
-    document.head.appendChild(script);
-
-    return () => {
-      cancelled = true;
-      script.removeEventListener('load', renderButton);
-    };
-  }, [compact, onLogin]);
-
-  if (!googleClientId) {
-    return (
-      <small className="google-login-hint">
-        {t('auth.googleHint')}
-      </small>
-    );
-  }
-
-  return (
-    <div className={compact ? 'google-login compact' : 'google-login'}>
-      <div ref={buttonRef} />
-    </div>
   );
 }
 

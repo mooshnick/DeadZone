@@ -1,12 +1,9 @@
 import { sameOriginApiBase } from './config';
 
 const API_BASE = sameOriginApiBase('/api/users');
-const AUTH_API_BASE = sameOriginApiBase('/api/auth');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
-const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.apps.googleusercontent.com';
 const REQUEST_TIMEOUT_MS = 12000;
-export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
 function token() {
   return localStorage.getItem(sessionTokenKey);
@@ -100,14 +97,6 @@ export function loginUser(username, password) {
   return request('/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
-  }).then(storeSession);
-}
-
-export function loginWithGoogle(idToken) {
-  return requestFrom(AUTH_API_BASE, '/google', {
-    method: 'POST',
-    body: JSON.stringify({ credential: idToken, idToken }),
-    skipAuth: true,
   }).then(storeSession);
 }
 

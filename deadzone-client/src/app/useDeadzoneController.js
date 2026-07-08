@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoomOnServer, fetchRooms, findRoomByCode, joinRoomOnServer, leaveRoomOnServer } from '../api/rooms';
-import { clearSession, hasSession, loadUser, loginUser, loginWithGoogle, registerUser, saveUserProgress, verifyEmail } from '../api/users';
+import { clearSession, hasSession, loadUser, loginUser, registerUser, saveUserProgress, verifyEmail } from '../api/users';
 import {
   acceptFriendRequest,
   acceptRoomInvite,
@@ -681,24 +681,6 @@ export function useDeadzoneController() {
     }
   }
 
-  async function handleGoogleLogin(idToken) {
-    if (!idToken) {
-      setAccountStatus('Google login did not return a valid token.');
-      return;
-    }
-    setAccountStatus('Signing in with Google...');
-    try {
-      const user = await loginWithGoogle(idToken);
-      applyUser(user, 'Logged in with Google.');
-      setCredentials({ username: '', email: '', password: '', confirmPassword: '', verificationCode: '' });
-      setPanel('main');
-      setScreen('lobby');
-      updateRoute(ROUTES.main, true);
-    } catch (error) {
-      setAccountStatus(error.message);
-    }
-  }
-
   function signOut() {
     setAccount(null);
     clearSession();
@@ -1336,7 +1318,6 @@ export function useDeadzoneController() {
       credentials,
       editingKeybind,
       handleAccountAction,
-      handleGoogleLogin,
       joinMatch,
       joinRoomByCode,
       findPlayers,
