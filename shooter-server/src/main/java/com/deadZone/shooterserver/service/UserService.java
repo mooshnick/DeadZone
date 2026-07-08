@@ -334,12 +334,13 @@ public class UserService {
         if (googleClientIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google login is not configured on the server.");
         }
-        if (request == null || request.idToken() == null || request.idToken().isBlank()) {
+        String token = request == null ? "" : request.token();
+        if (token == null || token.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Google token is required.");
         }
         try {
             String url = "https://oauth2.googleapis.com/tokeninfo?id_token="
-                    + URLEncoder.encode(request.idToken().trim(), StandardCharsets.UTF_8);
+                    + URLEncoder.encode(token.trim(), StandardCharsets.UTF_8);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .GET()

@@ -686,6 +686,7 @@ export function useDeadzoneController() {
       setAccountStatus('Google login did not return a valid token.');
       return;
     }
+    setAccountStatus('Signing in with Google...');
     try {
       const user = await loginWithGoogle(idToken);
       applyUser(user, 'Logged in with Google.');

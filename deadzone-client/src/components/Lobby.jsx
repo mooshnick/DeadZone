@@ -226,7 +226,10 @@ function GoogleSignInButton({ compact = false, onLogin, t = createTranslator('en
       const viewportWidth = window.visualViewport?.width || window.innerWidth || 320;
       window.google.accounts.id.initialize({
         client_id: googleClientId,
-        callback: (response) => onLogin?.(response?.credential),
+        callback: (response) => {
+          const credential = response?.credential;
+          onLogin?.(credential || '');
+        },
       });
       window.google.accounts.id.renderButton(buttonRef.current, {
         theme: 'filled_black',

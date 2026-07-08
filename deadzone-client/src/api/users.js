@@ -1,6 +1,7 @@
 import { sameOriginApiBase } from './config';
 
 const API_BASE = sameOriginApiBase('/api/users');
+const AUTH_API_BASE = sameOriginApiBase('/api/auth');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
 const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.apps.googleusercontent.com';
@@ -11,10 +12,14 @@ function token() {
 }
 
 async function request(path, options = {}) {
+  return requestFrom(API_BASE, path, options);
+}
+
+async function requestFrom(baseUrl, path, options = {}) {
   const { skipAuth = false, ...fetchOptions } = options;
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       ...fetchOptions,
       headers: {
         'Content-Type': 'application/json',
@@ -23,7 +28,7 @@ async function request(path, options = {}) {
       },
     });
   } catch (error) {
-    throw new Error(`Cannot reach the server at ${API_BASE}. Start the backend on port 8080 and try again.`, { cause: error });
+    throw new Error(`Cannot reach the server at ${baseUrl}. Start the backend on port 8080 and try again.`, { cause: error });
   }
 
   if (!response.ok) {
@@ -88,9 +93,9 @@ export function loginUser(username, password) {
 }
 
 export function loginWithGoogle(idToken) {
-  return request('/google-login', {
+  return requestFrom(AUTH_API_BASE, '/google', {
     method: 'POST',
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ credential: idToken, idToken }),
     skipAuth: true,
   }).then(storeSession);
 }
