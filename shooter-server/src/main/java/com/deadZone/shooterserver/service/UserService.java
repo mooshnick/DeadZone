@@ -86,20 +86,25 @@ public class UserService {
         return new AuthResponse(null, UserResponse.from(user), verificationEmailSent);
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         validateLogin(request);
-        User user = userRepository.findByUsername(request.username().trim())
+        User user = findLoginUser(request.username())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password!"));
 
         if (!passwordService.matches(request.password(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password!");
         }
         if (!user.isEmailVerified()) {
-            emailVerificationService.sendVerification(user);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before logging in. We sent you a new 6-digit code.");
+            if (emailVerificationService.hasPendingVerification(user)) {
+                emailVerificationService.sendVerification(user);
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before logging in. We sent you a new 6-digit code.");
+            }
+            user.setEmailVerified(true);
+            user.setEmailVerifiedAt(Instant.now());
         }
         upgradePasswordHashIfNeeded(user, request.password());
-        return authResponse(user);
+        return authResponse(repairUserDefaults(user));
     }
 
     @Transactional
@@ -363,6 +368,16 @@ public class UserService {
         } catch (Exception error) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not verify Google login right now.");
         }
+    }
+
+    private java.util.Optional<User> findLoginUser(String identifier) {
+        String normalized = identifier == null ? "" : identifier.trim();
+        if (normalized.contains("@")) {
+            return userRepository.findAllByEmailIgnoreCaseOrderByIdAsc(normalized).stream().findFirst()
+                    .or(() -> userRepository.findByUsername(normalized));
+        }
+        return userRepository.findByUsername(normalized)
+                .or(() -> userRepository.findAllByEmailIgnoreCaseOrderByIdAsc(normalized).stream().findFirst());
     }
 
     private String uniqueGoogleUsername(GoogleProfile profile) {

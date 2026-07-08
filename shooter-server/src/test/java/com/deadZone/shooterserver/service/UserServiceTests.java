@@ -1,6 +1,7 @@
 package com.deadZone.shooterserver.service;
 
 import com.deadZone.shooterserver.dto.RegisterRequest;
+import com.deadZone.shooterserver.dto.LoginRequest;
 import com.deadZone.shooterserver.dto.ProgressRequest;
 import com.deadZone.shooterserver.model.User;
 import com.deadZone.shooterserver.repository.EmailVerificationTokenRepository;
@@ -23,6 +24,9 @@ class UserServiceTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordService passwordService;
 
     @Autowired
     private EmailVerificationTokenRepository emailVerificationTokenRepository;
@@ -89,6 +93,40 @@ class UserServiceTests {
 
         assertThat(userRepository.findByUsername("first-player")).isPresent();
         assertThat(userRepository.findByUsername("second-player")).isPresent();
+    }
+
+    @Test
+    void loginAcceptsUsernameOrEmailAndReturnsSessionToken() {
+        var auth = userService.register(new RegisterRequest("login-player", "login@example.com", "secret"));
+        User user = userRepository.findById(auth.user().id()).orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        var usernameLogin = userService.login(new LoginRequest("login-player", "secret"));
+        var emailLogin = userService.login(new LoginRequest("login@example.com", "secret"));
+
+        assertThat(usernameLogin.token()).isNotBlank();
+        assertThat(emailLogin.token()).isNotBlank();
+        assertThat(emailLogin.user().username()).isEqualTo("login-player");
+    }
+
+    @Test
+    void legacyUnverifiedUserWithoutPendingCodeCanLoginAndGetsDefaults() {
+        User legacy = new User("legacy-player", "legacy@example.com", passwordService.hash("1234"));
+        legacy.setEmailVerified(false);
+        legacy.setOutfitId(null);
+        legacy.setWeaponId(null);
+        legacy.setOwnedOutfits(List.of());
+        legacy.setOwnedWeaponSkins(List.of());
+        legacy.setOwnedGrenadeSkins(List.of());
+        userRepository.save(legacy);
+
+        var response = userService.login(new LoginRequest("legacy-player", "1234"));
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(response.user().emailVerified()).isTrue();
+        assertThat(response.user().outfitId()).isEqualTo("classic");
+        assertThat(response.user().weaponId()).isEqualTo("rifle");
     }
 
     @Test

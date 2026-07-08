@@ -127,6 +127,10 @@ public class EmailVerificationService {
         }
     }
 
+    public boolean hasPendingVerification(User user) {
+        return user != null && tokenRepository.existsByUserAndUsedAtIsNull(user);
+    }
+
     private SimpleMailMessage message(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailFrom);
