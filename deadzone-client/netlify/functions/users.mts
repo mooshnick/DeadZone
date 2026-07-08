@@ -389,8 +389,8 @@ async function register(req: Request) {
     const responseUser = await userResponse(client, user);
     const token = jwt(user);
     await client.query('commit');
-    const verificationEmailSent = await sendVerificationEmailBestEffort(email, code);
-    return json({ token, user: responseUser, verificationEmailSent });
+    sendVerificationEmailBestEffort(email, code).catch(() => {});
+    return json({ token, user: responseUser, verificationEmailSent: false });
   } catch (error) {
     await client.query('rollback').catch(() => {});
     return text(error instanceof Error ? error.message : 'Could not create account.', 503);
@@ -448,7 +448,7 @@ async function login(req: Request) {
     let verificationEmailSent = false;
     if (!user.email_verified) {
       const code = await createVerification(client, user);
-      verificationEmailSent = await sendVerificationEmailBestEffort(user.email, code);
+      sendVerificationEmailBestEffort(user.email, code).catch(() => {});
       const verified = await client.query<DbUser>(
         'update users set email_verified = true, email_verified_at = now() where id = $1 returning *',
         [user.id],

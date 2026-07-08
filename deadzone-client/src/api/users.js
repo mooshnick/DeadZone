@@ -3,7 +3,7 @@ import { sameOriginApiBase } from './config';
 const API_BASE = sameOriginApiBase('/api/users');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
-const REQUEST_TIMEOUT_MS = 12000;
+const REQUEST_TIMEOUT_MS = 25000;
 
 function token() {
   return localStorage.getItem(sessionTokenKey);
