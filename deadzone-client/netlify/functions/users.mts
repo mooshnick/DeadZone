@@ -196,6 +196,15 @@ async function sendVerificationEmail(to: string, code: string) {
   return true;
 }
 
+async function sendVerificationEmailBestEffort(to: string, code: string) {
+  try {
+    return await sendVerificationEmail(to, code);
+  } catch (error) {
+    console.error('Could not send verification email.', error);
+    return false;
+  }
+}
+
 async function getList(client: pg.PoolClient, table: string, idColumn: string, userId: number) {
   const result = await client.query(
     `select ${idColumn} as value from ${table} where user_id = $1 order by sort_order asc`,
@@ -265,6 +274,18 @@ async function findUser(client: pg.PoolClient, field: 'id' | 'username', value: 
   return result.rows[0] || null;
 }
 
+async function findLoginUser(client: pg.PoolClient, identifier: string) {
+  const normalized = identifier.trim();
+  if (normalized.includes('@')) {
+    const emailResult = await client.query<DbUser>(
+      'select * from users where lower(email) = lower($1) order by id asc limit 1',
+      [normalized],
+    );
+    if (emailResult.rows[0]) return emailResult.rows[0];
+  }
+  return findUser(client, 'username', normalized);
+}
+
 async function seedDefaults(client: pg.PoolClient, userId: number) {
   await client.query('insert into user_owned_outfits (user_id, sort_order, outfit_id) values ($1, 0, $2) on conflict do nothing', [userId, DEFAULT_OUTFIT_ID]);
   await client.query('insert into user_owned_weapon_skins (user_id, sort_order, skin_id) values ($1, 0, $2) on conflict do nothing', [userId, DEFAULT_WEAPON_SKIN_ID]);
@@ -318,9 +339,10 @@ async function register(req: Request) {
     }
     code = await createVerification(client, user);
     const responseUser = await userResponse(client, user);
+    const token = jwt(user);
     await client.query('commit');
-    await sendVerificationEmail(email, code);
-    return json({ token: null, user: responseUser, verificationEmailSent: true });
+    const verificationEmailSent = await sendVerificationEmailBestEffort(email, code);
+    return json({ token, user: responseUser, verificationEmailSent });
   } catch (error) {
     await client.query('rollback').catch(() => {});
     return text(error instanceof Error ? error.message : 'Could not create account.', 503);
@@ -371,16 +393,21 @@ async function login(req: Request) {
   if (!username || !password) return text('Username and password are required.', 400);
   const client = await db().connect();
   try {
-    const user = await findUser(client, 'username', username);
+    let user = await findLoginUser(client, username);
     if (!user || !passwordMatches(password, user.password)) {
       return text('Invalid username or password!', 401);
     }
+    let verificationEmailSent = false;
     if (!user.email_verified) {
       const code = await createVerification(client, user);
-      await sendVerificationEmail(user.email, code);
-      return text('Please verify your email before logging in. We sent you a new 6-digit code.', 403);
+      verificationEmailSent = await sendVerificationEmailBestEffort(user.email, code);
+      const verified = await client.query<DbUser>(
+        'update users set email_verified = true, email_verified_at = now() where id = $1 returning *',
+        [user.id],
+      );
+      user = verified.rows[0] || user;
     }
-    return json({ token: jwt(user), user: await userResponse(client, user), verificationEmailSent: false });
+    return json({ token: jwt(user), user: await userResponse(client, user), verificationEmailSent });
   } finally {
     client.release();
   }
