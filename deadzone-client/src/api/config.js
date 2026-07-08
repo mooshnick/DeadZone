@@ -23,12 +23,21 @@ function serverOrigin() {
   const configured = import.meta.env.VITE_API_ORIGIN;
   const { hostname, protocol } = window.location;
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+  const isNetlify = hostname.endsWith('.netlify.app') || hostname.endsWith('.netlify.com');
   if (isLocal) {
     return `${protocol}//127.0.0.1:${DEFAULT_SERVER_PORT}`;
   }
 
+  if (configured === 'same-origin') {
+    return window.location.origin;
+  }
+
   if (configured) {
     return localNetworkOrigin(configured);
+  }
+
+  if (isNetlify) {
+    return window.location.origin;
   }
 
   if (!isLocal) {

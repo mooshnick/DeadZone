@@ -9,6 +9,7 @@ const DEFAULT_OUTFIT_ID = 'classic';
 const DEFAULT_WEAPON_ID = 'rifle';
 const DEFAULT_WEAPON_SKIN_ID = 'standard';
 const DEFAULT_GRENADE_SKIN_ID = 'standard';
+const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.apps.googleusercontent.com';
 const HASH_PREFIX = 'sha256';
 const TOKEN_TTL_MINUTES = 15;
 const SESSION_DAYS = 30;
@@ -18,6 +19,7 @@ type DbUser = {
   username: string;
   email: string;
   password: string;
+  google_subject?: string | null;
   email_verified: boolean;
   admin: boolean;
   total_kills: number;
@@ -286,6 +288,33 @@ async function findLoginUser(client: pg.PoolClient, identifier: string) {
   return findUser(client, 'username', normalized);
 }
 
+async function findGoogleUser(client: pg.PoolClient, subject: string, email: string) {
+  const subjectResult = await client.query<DbUser>('select * from users where google_subject = $1 limit 1', [subject]);
+  if (subjectResult.rows[0]) return subjectResult.rows[0];
+  const emailResult = await client.query<DbUser>(
+    'select * from users where lower(email) = lower($1) order by id asc limit 1',
+    [email],
+  );
+  return emailResult.rows[0] || null;
+}
+
+async function uniqueGoogleUsername(client: pg.PoolClient, email: string, name: string) {
+  const fallback = email.split('@', 1)[0] || 'google-player';
+  const base = (name || fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
+    .slice(0, 24) || 'google-player';
+  let candidate = base;
+  let suffix = 2;
+  while (await findUser(client, 'username', candidate)) {
+    const ending = `-${suffix}`;
+    candidate = `${base.slice(0, Math.max(1, 32 - ending.length))}${ending}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
 async function seedDefaults(client: pg.PoolClient, userId: number) {
   await client.query('insert into user_owned_outfits (user_id, sort_order, outfit_id) values ($1, 0, $2) on conflict do nothing', [userId, DEFAULT_OUTFIT_ID]);
   await client.query('insert into user_owned_weapon_skins (user_id, sort_order, skin_id) values ($1, 0, $2) on conflict do nothing', [userId, DEFAULT_WEAPON_SKIN_ID]);
@@ -413,6 +442,66 @@ async function login(req: Request) {
   }
 }
 
+async function googleLogin(req: Request) {
+  const body = await readJson(req);
+  const idToken = String(body.credential || body.idToken || body.token || '').trim();
+  if (!idToken) return text('Google token is required.', 400);
+
+  const configuredClientIds = (env('GOOGLE_CLIENT_IDS') || env('GOOGLE_CLIENT_ID') || env('VITE_GOOGLE_CLIENT_ID') || DEFAULT_GOOGLE_CLIENT_ID)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!configuredClientIds.length) return text('Google login is not configured.', 503);
+
+  const tokenResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+  if (!tokenResponse.ok) return text('Google login token is invalid.', 401);
+  const profile = await tokenResponse.json() as Record<string, unknown>;
+  const audience = String(profile.aud || '');
+  const subject = String(profile.sub || '').trim();
+  const email = String(profile.email || '').trim().toLowerCase();
+  const emailVerified = profile.email_verified === true || String(profile.email_verified || '').toLowerCase() === 'true';
+  const name = String(profile.given_name || profile.name || '').trim();
+  if (!configuredClientIds.includes(audience) || !subject || !email || !emailVerified) {
+    return text('Google account could not be verified.', 401);
+  }
+
+  const client = await db().connect();
+  try {
+    await client.query('begin');
+    let user = await findGoogleUser(client, subject, email);
+    if (user) {
+      const result = await client.query<DbUser>(
+        `update users
+         set google_subject = $1, email = $2, email_verified = true, email_verified_at = coalesce(email_verified_at, now())
+         where id = $3 returning *`,
+        [subject, email, user.id],
+      );
+      user = result.rows[0];
+    } else {
+      const username = await uniqueGoogleUsername(client, email, name);
+      const result = await client.query<DbUser>(
+        `insert into users (
+          username, email, password, google_subject, email_verified, email_verified_at,
+          total_kills, total_assists, total_deaths, wallet, xp,
+          outfit_id, weapon_id, weapon_skin_id, grenade_skin_id, mission_stats_json, admin
+        ) values ($1, $2, $3, $4, true, now(), 0, 0, 0, 0, 0, $5, $6, $7, $8, '', false) returning *`,
+        [username, email, hashPassword(crypto.randomUUID()), subject, DEFAULT_OUTFIT_ID, DEFAULT_WEAPON_ID, DEFAULT_WEAPON_SKIN_ID, DEFAULT_GRENADE_SKIN_ID],
+      );
+      user = result.rows[0];
+      await seedDefaults(client, user.id);
+    }
+    const responseUser = await userResponse(client, user);
+    const token = jwt(user);
+    await client.query('commit');
+    return json({ token, user: responseUser, verificationEmailSent: false });
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    return text(error instanceof Error ? error.message : 'Could not complete Google login.', 500);
+  } finally {
+    client.release();
+  }
+}
+
 async function me(req: Request) {
   const userId = requireUserId(req);
   const client = await db().connect();
@@ -468,6 +557,7 @@ export default async (req: Request) => {
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, '');
+    if (req.method === 'POST' && path.endsWith('/api/auth/google')) return googleLogin(req);
     if (req.method === 'POST' && path.endsWith('/register')) return register(req);
     if (req.method === 'POST' && path.endsWith('/verify-email')) return verifyEmail(req);
     if (req.method === 'POST' && path.endsWith('/login')) return login(req);
@@ -481,5 +571,5 @@ export default async (req: Request) => {
 };
 
 export const config: Config = {
-  path: ['/api/users', '/api/users/*'],
+  path: ['/api/users', '/api/users/*', '/api/auth/google'],
 };
