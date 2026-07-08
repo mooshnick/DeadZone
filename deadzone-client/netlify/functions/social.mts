@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions';
-import { db, json, levelFromXp, readJson, requireUserId, roomResponse, text } from './_shared/deadzone.mts';
+import { db, errorResponse, json, levelFromXp, readJson, requireUserId, roomResponse, text } from './_shared/deadzone.mts';
 
 const PENDING = 'PENDING';
 const ACCEPTED = 'ACCEPTED';
@@ -261,7 +261,8 @@ export default async (req: Request) => {
     if (req.method === 'DELETE' && segments[2] === 'room-invites') return declineRoomInvite(req, Number(segments[3]));
     return text('Not found.', 404);
   } catch (error) {
-    if (error instanceof Response) return error;
+    const response = errorResponse(error);
+    if (response) return response;
     return text(error instanceof Error ? error.message : 'Social request failed.', 500);
   }
 };

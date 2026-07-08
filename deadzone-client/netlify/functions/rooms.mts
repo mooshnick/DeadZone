@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions';
-import { db, json, readJson, requireUserId, roomResponse, text } from './_shared/deadzone.mts';
+import { db, errorResponse, json, readJson, requireUserId, roomResponse, text } from './_shared/deadzone.mts';
 
 const DEFAULT_ROOMS = [
   ['TEAM01', 'Frontline Teams', 'foundry', 'team-deathmatch', 30, 20, 0, 10, 0, 0, true, true],
@@ -142,7 +142,8 @@ export default async (req: Request) => {
     if (req.method === 'POST' && segments.length === 4 && segments[3] === 'leave') return leaveRoom(req, code);
     return text('Not found.', 404);
   } catch (error) {
-    if (error instanceof Response) return error;
+    const response = errorResponse(error);
+    if (response) return response;
     return text(error instanceof Error ? error.message : 'Room request failed.', 500);
   }
 };

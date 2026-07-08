@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions';
-import { db, json, readJson, requireUserId, text } from './_shared/deadzone.mts';
+import { db, errorResponse, json, readJson, requireUserId, text } from './_shared/deadzone.mts';
 
 const PLAYER_TTL_SECONDS = 8;
 
@@ -193,7 +193,8 @@ export default async (req: Request) => {
     }
     return text('Not found.', 404);
   } catch (error) {
-    if (error instanceof Response) return error;
+    const response = errorResponse(error);
+    if (response) return response;
     return text(error instanceof Error ? error.message : 'Realtime request failed.', 500);
   }
 };

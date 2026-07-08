@@ -5,6 +5,25 @@ const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
 
+export class HttpResponseError extends Error {
+  response: Response;
+
+  constructor(response: Response) {
+    super('HTTP response');
+    this.response = response;
+  }
+}
+
+export function errorResponse(error: unknown) {
+  if (error instanceof HttpResponseError) {
+    return error.response;
+  }
+  if (error instanceof Response) {
+    return error;
+  }
+  return null;
+}
+
 export function env(name: string) {
   return globalThis.Netlify?.env?.get(name) || process.env[name] || '';
 }
@@ -66,16 +85,16 @@ export function requireUserId(req: Request) {
   const authorization = req.headers.get('authorization') || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   const secret = env('JWT_SECRET') || env('DEADZONE_JWT_SECRET');
-  if (!token || !secret) throw text('Your session is invalid or expired.', 401);
+  if (!token || !secret) throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   const parts = token.split('.');
-  if (parts.length !== 3) throw text('Your session is invalid or expired.', 401);
+  if (parts.length !== 3) throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   const expected = crypto.createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
   if (!crypto.timingSafeEqual(Buffer.from(parts[2]), Buffer.from(expected))) {
-    throw text('Your session is invalid or expired.', 401);
+    throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   }
   const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
-    throw text('Your session is invalid or expired.', 401);
+    throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   }
   return Number(payload.sub);
 }
