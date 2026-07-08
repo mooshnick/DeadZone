@@ -5,6 +5,7 @@ const AUTH_API_BASE = sameOriginApiBase('/api/auth');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
 const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.apps.googleusercontent.com';
+const REQUEST_TIMEOUT_MS = 12000;
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
 function token() {
@@ -17,10 +18,13 @@ async function request(path, options = {}) {
 
 async function requestFrom(baseUrl, path, options = {}) {
   const { skipAuth = false, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response;
   try {
     response = await fetch(`${baseUrl}${path}`, {
       ...fetchOptions,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(!skipAuth && token() ? { Authorization: `Bearer ${token()}` } : {}),
@@ -28,7 +32,12 @@ async function requestFrom(baseUrl, path, options = {}) {
       },
     });
   } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The server took too long to respond. Please try again.');
+    }
     throw new Error(`Cannot reach the server at ${baseUrl}. Start the backend on port 8080 and try again.`, { cause: error });
+  } finally {
+    window.clearTimeout(timeout);
   }
 
   if (!response.ok) {
