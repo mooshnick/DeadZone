@@ -3,7 +3,8 @@ import { sameOriginApiBase } from './config';
 const API_BASE = sameOriginApiBase('/api/users');
 export const sessionTokenKey = 'deadzone-session-token';
 const legacyUserIdKey = 'deadzone-legacy-user-id';
-export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.apps.googleusercontent.com';
+export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
 function token() {
   return localStorage.getItem(sessionTokenKey);
@@ -103,13 +104,13 @@ export function verifyEmail(email, code) {
 }
 
 export function loadUser() {
-  const legacyUserId = localStorage.getItem(legacyUserIdKey);
-  return request(legacyUserId ? `/${legacyUserId}` : '/me');
+  localStorage.removeItem(legacyUserIdKey);
+  return request('/me');
 }
 
 export function saveUserProgress(progress) {
-  const legacyUserId = localStorage.getItem(legacyUserIdKey);
-  return request(legacyUserId ? `/${legacyUserId}/progress` : '/me/progress', {
+  localStorage.removeItem(legacyUserIdKey);
+  return request('/me/progress', {
     method: 'PATCH',
     body: JSON.stringify(progress),
   });
@@ -121,5 +122,8 @@ export function clearSession() {
 }
 
 export function hasSession() {
-  return Boolean(token() || localStorage.getItem(legacyUserIdKey));
+  if (localStorage.getItem(legacyUserIdKey) && !token()) {
+    localStorage.removeItem(legacyUserIdKey);
+  }
+  return Boolean(token());
 }
