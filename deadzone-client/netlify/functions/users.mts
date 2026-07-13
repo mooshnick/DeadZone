@@ -13,7 +13,7 @@ const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.
 const HASH_PREFIX = 'sha256';
 const TOKEN_TTL_MINUTES = 15;
 const SESSION_DAYS = 30;
-const DB_TIMEOUT_MS = 8000;
+const DB_TIMEOUT_MS = 25000;
 
 type DbUser = {
   id: number;
@@ -313,6 +313,32 @@ async function userResponse(client: pg.PoolClient, user: DbUser) {
   };
 }
 
+function basicUserResponse(user: DbUser) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    emailVerified: user.email_verified,
+    admin: user.admin,
+    totalKills: user.total_kills,
+    totalAssists: user.total_assists,
+    totalDeaths: user.total_deaths,
+    wallet: user.wallet,
+    xp: user.xp,
+    outfitId: user.outfit_id || DEFAULT_OUTFIT_ID,
+    weaponId: user.weapon_id || DEFAULT_WEAPON_ID,
+    weaponSkinId: user.weapon_skin_id || DEFAULT_WEAPON_SKIN_ID,
+    grenadeSkinId: user.grenade_skin_id || DEFAULT_GRENADE_SKIN_ID,
+    ownedOutfits: [DEFAULT_OUTFIT_ID],
+    ownedWeaponSkins: [DEFAULT_WEAPON_SKIN_ID],
+    ownedGrenadeSkins: [DEFAULT_GRENADE_SKIN_ID],
+    ownedAccessories: [],
+    accessoryIds: [],
+    weaponUpgrades: {},
+    missionStats: user.mission_stats_json || JSON.stringify({ claimed: [], mapPlays: {}, weaponKills: {} }),
+  };
+}
+
 async function findUser(client: pg.PoolClient, field: 'id' | 'username', value: number | string) {
   const result = await client.query<DbUser>(`select * from users where ${field} = $1`, [value]);
   return result.rows[0] || null;
@@ -409,7 +435,7 @@ async function register(req: Request) {
       await seedDefaults(client, user.id);
     }
     code = await createVerification(client, user);
-    const responseUser = await userResponse(client, user);
+    const responseUser = basicUserResponse(user);
     const token = jwt(user);
     await client.query('commit');
     sendVerificationEmailBestEffort(email, code).catch(() => {});

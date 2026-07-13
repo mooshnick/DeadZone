@@ -4,7 +4,7 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
-const DB_TIMEOUT_MS = 8000;
+const DB_TIMEOUT_MS = 25000;
 
 export class HttpResponseError extends Error {
   response: Response;
