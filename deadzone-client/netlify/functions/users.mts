@@ -59,8 +59,17 @@ function env(name: string) {
   return globalThis.Netlify?.env?.get(name) || process.env[name] || '';
 }
 
+function sessionSecret() {
+  return env('JWT_SECRET') || env('DEADZONE_JWT_SECRET') || env('SUPABASE_SECRET_KEY');
+}
+
 function databaseConfig() {
-  const rawUrl = env('NETLIFY_DATABASE_URL') || env('DATABASE_URL') || env('DB_URL');
+  const rawUrl = env('NETLIFY_DATABASE_URL')
+    || env('DATABASE_URL')
+    || env('SUPABASE_DB_URL')
+    || env('POSTGRES_URL')
+    || env('POSTGRES_PRISMA_URL')
+    || env('DB_URL');
   if (!rawUrl) {
     throw new Error('Database URL is not configured.');
   }
@@ -141,7 +150,7 @@ function base64Url(value: Buffer | string) {
 }
 
 function jwt(user: DbUser) {
-  const secret = env('JWT_SECRET') || env('DEADZONE_JWT_SECRET');
+  const secret = sessionSecret();
   if (!secret) {
     throw new Error('JWT secret is not configured.');
   }
@@ -155,7 +164,7 @@ function jwt(user: DbUser) {
 function requireUserId(req: Request) {
   const authorization = req.headers.get('authorization') || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  const secret = env('JWT_SECRET') || env('DEADZONE_JWT_SECRET');
+  const secret = sessionSecret();
   if (!token || !secret) throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   const parts = token.split('.');
   if (parts.length !== 3) throw new HttpResponseError(text('Your session is invalid or expired.', 401));
