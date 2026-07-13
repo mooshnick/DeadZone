@@ -13,7 +13,15 @@ const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.
 const HASH_PREFIX = 'sha256';
 const TOKEN_TTL_MINUTES = 15;
 const SESSION_DAYS = 30;
-const DB_TIMEOUT_MS = 25000;
+const DB_TIMEOUT_MS = 8000;
+const DATABASE_ENV_KEYS = [
+  'SUPABASE_DB_URL',
+  'DATABASE_URL',
+  'POSTGRES_URL',
+  'POSTGRES_PRISMA_URL',
+  'NETLIFY_DATABASE_URL',
+  'DB_URL',
+];
 
 type DbUser = {
   id: number;
@@ -64,13 +72,16 @@ function sessionSecret() {
   return env('JWT_SECRET') || env('DEADZONE_JWT_SECRET') || env('SUPABASE_SECRET_KEY');
 }
 
+function selectedDatabaseUrl() {
+  for (const key of DATABASE_ENV_KEYS) {
+    const value = env(key);
+    if (value) return { key, value };
+  }
+  return { key: '', value: '' };
+}
+
 function databaseConfig() {
-  const rawUrl = env('SUPABASE_DB_URL')
-    || env('DATABASE_URL')
-    || env('POSTGRES_URL')
-    || env('POSTGRES_PRISMA_URL')
-    || env('NETLIFY_DATABASE_URL')
-    || env('DB_URL');
+  const { value: rawUrl } = selectedDatabaseUrl();
   if (!rawUrl) {
     throw new Error('Database URL is not configured.');
   }
@@ -111,6 +122,57 @@ function db() {
     pool = new Pool(databaseConfig());
   }
   return pool;
+}
+
+function timeoutError(label: string) {
+  return new Error(`${label} timed out after ${DB_TIMEOUT_MS}ms.`);
+}
+
+async function withTimeout<T>(promise: Promise<T>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(timeoutError(label)), DB_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function connectClient() {
+  return withTimeout(db().connect(), 'Database connection');
+}
+
+function databaseTarget() {
+  const selected = selectedDatabaseUrl();
+  if (!selected.value) {
+    return {
+      configured: false,
+      key: '',
+      host: '',
+      port: '',
+      database: '',
+      username: '',
+      hasPassword: false,
+    };
+  }
+  const parsedUrl = new URL(selected.value.replace(/^jdbc:/, ''));
+  const username = env('DB_USERNAME');
+  const password = env('DB_PASSWORD');
+  if (username && password && (!parsedUrl.username || !parsedUrl.password)) {
+    parsedUrl.username = username;
+    parsedUrl.password = password;
+  }
+  return {
+    configured: true,
+    key: selected.key,
+    host: parsedUrl.hostname,
+    port: parsedUrl.port || '5432',
+    database: parsedUrl.pathname.replace(/^\//, ''),
+    username: decodeURIComponent(parsedUrl.username || ''),
+    hasPassword: Boolean(parsedUrl.password || password),
+  };
 }
 
 function json(body: unknown, status = 200) {
@@ -408,7 +470,7 @@ async function register(req: Request) {
     return text('Username, email and password are required.', 400);
   }
 
-  const client = await db().connect();
+  const client = await connectClient();
   let code = '';
   try {
     await client.query('begin');
@@ -453,7 +515,7 @@ async function verifyEmail(req: Request) {
   const email = String(body.email || '').trim().toLowerCase();
   const code = String(body.code || '').replace(/\D/g, '');
   if (!email || !code) return text('Email and verification code are required.', 400);
-  const client = await db().connect();
+  const client = await connectClient();
   try {
     await client.query('begin');
     const tokenResult = await client.query(
@@ -488,7 +550,7 @@ async function login(req: Request) {
   const username = String(body.username || '').trim();
   const password = String(body.password || '');
   if (!username || !password) return text('Username and password are required.', 400);
-  const client = await db().connect();
+  const client = await connectClient();
   try {
     let user = await findLoginUser(client, username);
     if (!user || !passwordMatches(password, user.password)) {
@@ -533,7 +595,7 @@ async function googleLogin(req: Request) {
     return text('Google account could not be verified.', 401);
   }
 
-  const client = await db().connect();
+  const client = await connectClient();
   try {
     await client.query('begin');
     let user = await findGoogleUser(client, subject, email);
@@ -580,7 +642,7 @@ async function me(req: Request) {
   } catch {
     return text('Your session is invalid or expired.', 401);
   }
-  const client = await db().connect();
+  const client = await connectClient();
   try {
     const user = await findUser(client, 'id', userId);
     if (!user) return text('User was not found.', 404);
@@ -593,7 +655,7 @@ async function me(req: Request) {
 async function progress(req: Request) {
   const userId = requireUserId(req);
   const body = await readJson(req);
-  const client = await db().connect();
+  const client = await connectClient();
   try {
     const result = await client.query<DbUser>(
       `update users set
@@ -629,11 +691,33 @@ async function progress(req: Request) {
   }
 }
 
+async function dbCheck() {
+  const target = databaseTarget();
+  if (!target.configured) {
+    return json({ ok: false, target, error: 'Database URL is not configured.' }, 503);
+  }
+  let client: pg.PoolClient | null = null;
+  try {
+    client = await connectClient();
+    const result = await withTimeout(client.query('select now() as now'), 'Database health query');
+    return json({ ok: true, target, now: result.rows[0]?.now || null });
+  } catch (error) {
+    return json({
+      ok: false,
+      target,
+      error: error instanceof Error ? error.message : 'Database check failed.',
+    }, 503);
+  } finally {
+    client?.release();
+  }
+}
+
 export default async (req: Request) => {
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, '');
     if (req.method === 'POST' && path.endsWith('/api/auth/google')) return googleLogin(req);
+    if (req.method === 'GET' && path.endsWith('/db-check')) return dbCheck();
     if (req.method === 'POST' && path.endsWith('/register')) return register(req);
     if (req.method === 'POST' && path.endsWith('/verify-email')) return verifyEmail(req);
     if (req.method === 'POST' && path.endsWith('/login')) return login(req);
