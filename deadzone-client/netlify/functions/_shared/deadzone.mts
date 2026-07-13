@@ -34,11 +34,11 @@ function sessionSecret() {
 }
 
 function databaseConfig() {
-  const rawUrl = env('NETLIFY_DATABASE_URL')
+  const rawUrl = env('SUPABASE_DB_URL')
     || env('DATABASE_URL')
-    || env('SUPABASE_DB_URL')
     || env('POSTGRES_URL')
     || env('POSTGRES_PRISMA_URL')
+    || env('NETLIFY_DATABASE_URL')
     || env('DB_URL');
   if (!rawUrl) {
     throw new Error('Database URL is not configured.');
@@ -50,7 +50,7 @@ function databaseConfig() {
   parsedUrl.searchParams.delete('sslkey');
   const username = env('DB_USERNAME');
   const password = env('DB_PASSWORD');
-  if (username && password) {
+  if (username && password && (!parsedUrl.username || !parsedUrl.password)) {
     parsedUrl.username = username;
     parsedUrl.password = password;
   } else if (parsedUrl.username === 'postgres' && parsedUrl.hostname.includes('supabase.com')) {
