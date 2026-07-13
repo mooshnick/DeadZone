@@ -4,6 +4,7 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
+const DB_TIMEOUT_MS = 8000;
 
 export class HttpResponseError extends Error {
   response: Response;
@@ -58,6 +59,10 @@ function databaseConfig() {
   return {
     connectionString: parsedUrl.toString(),
     ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: DB_TIMEOUT_MS,
+    idleTimeoutMillis: 10000,
+    query_timeout: DB_TIMEOUT_MS,
+    statement_timeout: DB_TIMEOUT_MS,
   };
 }
 

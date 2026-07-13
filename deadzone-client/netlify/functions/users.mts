@@ -13,6 +13,7 @@ const DEFAULT_GOOGLE_CLIENT_ID = '887346314238-ki4v912u2btr9i28sf2lcem8vqt889io.
 const HASH_PREFIX = 'sha256';
 const TOKEN_TTL_MINUTES = 15;
 const SESSION_DAYS = 30;
+const DB_TIMEOUT_MS = 8000;
 
 type DbUser = {
   id: number;
@@ -86,6 +87,10 @@ function databaseConfig() {
     return {
       connectionString: parsedUrl.toString(),
       ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: DB_TIMEOUT_MS,
+      idleTimeoutMillis: 10000,
+      query_timeout: DB_TIMEOUT_MS,
+      statement_timeout: DB_TIMEOUT_MS,
     };
   }
   if (parsedUrl.username === 'postgres' && parsedUrl.hostname.includes('supabase.com')) {
@@ -94,6 +99,10 @@ function databaseConfig() {
   return {
     connectionString: parsedUrl.toString(),
     ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: DB_TIMEOUT_MS,
+    idleTimeoutMillis: 10000,
+    query_timeout: DB_TIMEOUT_MS,
+    statement_timeout: DB_TIMEOUT_MS,
   };
 }
 
@@ -177,6 +186,11 @@ function requireUserId(req: Request) {
     throw new HttpResponseError(text('Your session is invalid or expired.', 401));
   }
   return Number(payload.sub);
+}
+
+function bearerToken(req: Request) {
+  const authorization = req.headers.get('authorization') || '';
+  return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
 }
 
 function verificationCode() {
@@ -531,7 +545,15 @@ async function googleLogin(req: Request) {
 }
 
 async function me(req: Request) {
-  const userId = requireUserId(req);
+  if (!bearerToken(req) || !sessionSecret()) {
+    return text('Your session is invalid or expired.', 401);
+  }
+  let userId = 0;
+  try {
+    userId = requireUserId(req);
+  } catch {
+    return text('Your session is invalid or expired.', 401);
+  }
   const client = await db().connect();
   try {
     const user = await findUser(client, 'id', userId);
